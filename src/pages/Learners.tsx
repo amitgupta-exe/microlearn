@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, Search, User, MoreHorizontal, ArrowLeft, Loader2 } from 'lucide-react';
@@ -28,6 +27,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import LearnerForm from '@/components/LearnerForm';
+import LearnerCourses from '@/components/LearnerCourses';
 import { Learner } from '@/lib/types';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,27 +48,24 @@ const Learners = () => {
     ? learners.find(learner => learner.id === id) 
     : undefined;
   
-  // Fetch learners when component mounts
   useEffect(() => {
     const fetchLearners = async () => {
       if (!user) return;
       
       try {
-        // First get or create a user record in the users table
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
           .eq('id', user.id)
           .single();
           
-        if (userError && userError.code !== 'PGRST116') { // Not found error
+        if (userError && userError.code !== 'PGRST116') {
           console.error('Error fetching user:', userError);
           toast.error('Failed to fetch user data');
           return;
         }
         
         if (!userData) {
-          // Create a new user record using profile data
           const { data: newUser, error: createError } = await supabase
             .from('users')
             .insert([{
@@ -86,7 +83,6 @@ const Learners = () => {
           }
         }
         
-        // Now fetch learners
         const { data, error } = await supabase
           .from('learners')
           .select('*')
@@ -99,11 +95,10 @@ const Learners = () => {
           return;
         }
         
-        // Transform the data to match our Learner type
         const learnersWithCourses = data.map(learner => ({
           ...learner,
           courses: [],
-          status: learner.status as 'active' | 'inactive' // Cast the status to the expected type
+          status: learner.status as 'active' | 'inactive'
         }));
         
         setLearners(learnersWithCourses);
@@ -131,7 +126,7 @@ const Learners = () => {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        status: 'active' as 'active', // Explicitly type as the literal 'active'
+        status: 'active' as 'active',
         created_by: user.id,
       };
       
@@ -147,7 +142,6 @@ const Learners = () => {
         throw error;
       }
       
-      // Add the typecasting for the newly created learner
       const learnerWithCourses: Learner = {
         ...createdLearner,
         courses: [],
@@ -183,7 +177,6 @@ const Learners = () => {
         throw error;
       }
       
-      // Update the local state
       const updatedLearners = learners.map(learner => 
         learner.id === currentLearner.id 
           ? { 
@@ -237,6 +230,43 @@ const Learners = () => {
       <div className="w-full h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <span className="ml-2">Loading...</span>
+      </div>
+    );
+  }
+  
+  if (isEdit && currentLearner) {
+    return (
+      <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
+        <div className="max-w-6xl mx-auto">
+          <Button 
+            variant="ghost" 
+            className="mb-6" 
+            onClick={() => navigate('/learners')}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Learners
+          </Button>
+          
+          <div className="grid grid-cols-1 gap-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Edit Learner</CardTitle>
+                <CardDescription>
+                  Update learner information
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <LearnerForm
+                  learner={currentLearner}
+                  onSubmit={handleUpdateLearner}
+                  onCancel={() => navigate('/learners')}
+                />
+              </CardContent>
+            </Card>
+            
+            <LearnerCourses learner={currentLearner} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -367,7 +397,7 @@ const Learners = () => {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => navigate(`/learners/${learner.id}`)}>
-                              Edit
+                              Manage
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"
