@@ -99,7 +99,13 @@ const Learners = () => {
           return;
         }
         
-        setLearners(data || []);
+        // Add empty courses array to each learner to satisfy the type requirements
+        const learnersWithCourses = data.map(learner => ({
+          ...learner,
+          courses: [] as any[]
+        }));
+        
+        setLearners(learnersWithCourses);
       } catch (error) {
         console.error('Error in learners fetch:', error);
         toast.error('An error occurred while loading learners');
@@ -140,7 +146,13 @@ const Learners = () => {
         throw error;
       }
       
-      setLearners([createdLearner, ...learners]);
+      // Add an empty courses array to maintain type consistency
+      const learnerWithCourses = {
+        ...createdLearner,
+        courses: []
+      };
+      
+      setLearners([learnerWithCourses, ...learners]);
       toast.success('Learner created successfully');
       navigate('/learners');
     } catch (error) {

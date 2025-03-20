@@ -11,7 +11,7 @@ export interface Learner {
   name: string;
   email: string;
   phone: string;
-  courses: Course[];
+  courses?: Course[]; // Make courses optional
   created_at: string;
   status: 'active' | 'inactive';
 }
