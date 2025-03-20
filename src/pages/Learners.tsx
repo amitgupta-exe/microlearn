@@ -99,10 +99,11 @@ const Learners = () => {
           return;
         }
         
-        // Add empty courses array to each learner to satisfy the type requirements
+        // Transform the data to match our Learner type
         const learnersWithCourses = data.map(learner => ({
           ...learner,
-          courses: [] as any[]
+          courses: [],
+          status: learner.status as 'active' | 'inactive' // Cast the status to the expected type
         }));
         
         setLearners(learnersWithCourses);
@@ -130,7 +131,7 @@ const Learners = () => {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        status: 'active',
+        status: 'active' as 'active', // Explicitly type as the literal 'active'
         created_by: user.id,
       };
       
@@ -146,10 +147,11 @@ const Learners = () => {
         throw error;
       }
       
-      // Add an empty courses array to maintain type consistency
-      const learnerWithCourses = {
+      // Add the typecasting for the newly created learner
+      const learnerWithCourses: Learner = {
         ...createdLearner,
-        courses: []
+        courses: [],
+        status: createdLearner.status as 'active' | 'inactive'
       };
       
       setLearners([learnerWithCourses, ...learners]);
