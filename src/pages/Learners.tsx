@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Search, User, MoreHorizontal, ArrowLeft } from 'lucide-react';
+import { Plus, Search, User, MoreHorizontal, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -29,43 +29,16 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import LearnerForm from '@/components/LearnerForm';
 import { Learner } from '@/lib/types';
-
-// Mock data
-const MOCK_LEARNERS: Learner[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    email: 'john@example.com',
-    phone: '+1234567890',
-    courses: [],
-    created_at: '2023-05-15T09:24:12Z',
-    status: 'active',
-  },
-  {
-    id: '2',
-    name: 'Jane Smith',
-    email: 'jane@example.com',
-    phone: '+0987654321',
-    courses: [],
-    created_at: '2023-06-22T14:18:36Z',
-    status: 'active',
-  },
-  {
-    id: '3',
-    name: 'Michael Johnson',
-    email: 'michael@example.com',
-    phone: '+1122334455',
-    courses: [],
-    created_at: '2023-07-10T11:42:58Z',
-    status: 'active',
-  },
-];
+import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 const Learners = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [learners, setLearners] = useState<Learner[]>(MOCK_LEARNERS);
+  const [learners, setLearners] = useState<Learner[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, profile, loading: authLoading } = useRequireAuth();
   
   const isNew = id === 'new';
   const isEdit = id && id !== 'new';
@@ -75,43 +48,168 @@ const Learners = () => {
     ? learners.find(learner => learner.id === id) 
     : undefined;
   
-  const handleCreateLearner = async (data: any) => {
-    // Simulating API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newLearner: Learner = {
-      id: Date.now().toString(),
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      courses: [],
-      created_at: new Date().toISOString(),
-      status: 'active',
+  // Fetch learners when component mounts
+  useEffect(() => {
+    const fetchLearners = async () => {
+      if (!user) return;
+      
+      try {
+        // First get or create a user record in the users table
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        if (userError && userError.code !== 'PGRST116') { // Not found error
+          console.error('Error fetching user:', userError);
+          toast.error('Failed to fetch user data');
+          return;
+        }
+        
+        if (!userData) {
+          // Create a new user record using profile data
+          const { data: newUser, error: createError } = await supabase
+            .from('users')
+            .insert([{
+              id: user.id,
+              email: user.email,
+              name: profile?.full_name || user.email?.split('@')[0] || 'User',
+            }])
+            .select('*')
+            .single();
+            
+          if (createError) {
+            console.error('Error creating user:', createError);
+            toast.error('Failed to create user data');
+            return;
+          }
+        }
+        
+        // Now fetch learners
+        const { data, error } = await supabase
+          .from('learners')
+          .select('*')
+          .eq('created_by', user.id)
+          .order('created_at', { ascending: false });
+          
+        if (error) {
+          console.error('Error fetching learners:', error);
+          toast.error('Failed to load learners');
+          return;
+        }
+        
+        setLearners(data || []);
+      } catch (error) {
+        console.error('Error in learners fetch:', error);
+        toast.error('An error occurred while loading learners');
+      } finally {
+        setIsLoading(false);
+      }
     };
-    
-    setLearners([newLearner, ...learners]);
-    navigate('/learners');
+
+    if (!authLoading && user) {
+      fetchLearners();
+    }
+  }, [user, authLoading, profile]);
+  
+  const handleCreateLearner = async (data: any) => {
+    try {
+      if (!user) {
+        toast.error('You must be logged in to create a learner');
+        return;
+      }
+      
+      const newLearner = {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        status: 'active',
+        created_by: user.id,
+      };
+      
+      const { data: createdLearner, error } = await supabase
+        .from('learners')
+        .insert([newLearner])
+        .select('*')
+        .single();
+        
+      if (error) {
+        console.error('Error creating learner:', error);
+        toast.error('Failed to create learner');
+        throw error;
+      }
+      
+      setLearners([createdLearner, ...learners]);
+      toast.success('Learner created successfully');
+      navigate('/learners');
+    } catch (error) {
+      console.error('Create learner error:', error);
+      toast.error('Failed to create learner');
+    }
   };
   
   const handleUpdateLearner = async (data: any) => {
-    // Simulating API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (!currentLearner) return;
-    
-    const updatedLearners = learners.map(learner => 
-      learner.id === currentLearner.id 
-        ? { ...learner, ...data } 
-        : learner
-    );
-    
-    setLearners(updatedLearners);
-    navigate('/learners');
+    try {
+      if (!currentLearner) return;
+      
+      const { error } = await supabase
+        .from('learners')
+        .update({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentLearner.id);
+        
+      if (error) {
+        console.error('Error updating learner:', error);
+        toast.error('Failed to update learner');
+        throw error;
+      }
+      
+      // Update the local state
+      const updatedLearners = learners.map(learner => 
+        learner.id === currentLearner.id 
+          ? { 
+              ...learner, 
+              name: data.name, 
+              email: data.email, 
+              phone: data.phone,
+              updated_at: new Date().toISOString(),
+            } 
+          : learner
+      );
+      
+      setLearners(updatedLearners);
+      toast.success('Learner updated successfully');
+      navigate('/learners');
+    } catch (error) {
+      console.error('Update learner error:', error);
+      toast.error('Failed to update learner');
+    }
   };
   
-  const handleDeleteLearner = (id: string) => {
-    setLearners(learners.filter(learner => learner.id !== id));
-    toast.success('Learner deleted successfully');
+  const handleDeleteLearner = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('learners')
+        .delete()
+        .eq('id', id);
+        
+      if (error) {
+        console.error('Error deleting learner:', error);
+        toast.error('Failed to delete learner');
+        throw error;
+      }
+      
+      setLearners(learners.filter(learner => learner.id !== id));
+      toast.success('Learner deleted successfully');
+    } catch (error) {
+      console.error('Delete learner error:', error);
+      toast.error('Failed to delete learner');
+    }
   };
   
   const filteredLearners = learners.filter(learner => 
@@ -119,6 +217,15 @@ const Learners = () => {
     learner.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     learner.phone.includes(searchQuery)
   );
+  
+  if (authLoading) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2">Loading...</span>
+      </div>
+    );
+  }
   
   if (showForm) {
     return (
@@ -201,10 +308,19 @@ const Learners = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLearners.length === 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center h-32">
+                      <div className="flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <span className="ml-2">Loading learners...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredLearners.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center h-32 text-muted-foreground">
-                      {searchQuery ? 'No learners match your search' : 'No learners found'}
+                      {searchQuery ? 'No learners match your search' : 'No learners found. Create your first one!'}
                     </TableCell>
                   </TableRow>
                 ) : (
