@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Plus, 
@@ -37,92 +37,14 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import CourseForm from '@/components/CourseForm';
 import CoursePreview from '@/components/CoursePreview';
 import { Course } from '@/lib/types';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
-// Mock data
-const MOCK_COURSES: Course[] = [
-  {
-    id: '1',
-    name: 'Introduction to Python',
-    description: 'Learn the basics of Python programming language',
-    category: 'Programming',
-    language: 'English',
-    days: [
-      {
-        id: '1-1',
-        day_number: 1,
-        title: 'Getting Started with Python',
-        info: 'Introduction to Python, installation and setup guide',
-        media_link: 'https://example.com/python-intro.mp4',
-      },
-      {
-        id: '1-2',
-        day_number: 2,
-        title: 'Variables and Data Types',
-        info: 'Learn about variables, strings, integers, and basic data structures',
-        media_link: 'https://example.com/python-variables.pdf',
-      },
-    ],
-    created_at: '2023-05-15T09:24:12Z',
-    status: 'active',
-  },
-  {
-    id: '2',
-    name: 'Digital Marketing Fundamentals',
-    description: 'Master the essentials of digital marketing',
-    category: 'Marketing',
-    language: 'English',
-    days: [
-      {
-        id: '2-1',
-        day_number: 1,
-        title: 'Digital Marketing Overview',
-        info: 'Introduction to digital marketing channels and strategies',
-        media_link: 'https://example.com/digital-marketing.pdf',
-      },
-    ],
-    created_at: '2023-06-22T14:18:36Z',
-    status: 'active',
-  },
-  {
-    id: '3',
-    name: 'Web Design Basics',
-    description: 'Learn modern web design principles and practices',
-    category: 'Design',
-    language: 'English',
-    days: [
-      {
-        id: '3-1',
-        day_number: 1,
-        title: 'HTML and CSS Fundamentals',
-        info: 'Introduction to HTML and CSS for web design',
-        media_link: 'https://example.com/html-css.pdf',
-      },
-      {
-        id: '3-2',
-        day_number: 2,
-        title: 'Responsive Design',
-        info: 'Creating responsive layouts for different screen sizes',
-        media_link: 'https://example.com/responsive-design.mp4',
-      },
-      {
-        id: '3-3',
-        day_number: 3,
-        title: 'Design Principles',
-        info: 'Core design principles for creating beautiful websites',
-        media_link: 'https://example.com/design-principles.pdf',
-      },
-    ],
-    created_at: '2023-07-10T11:42:58Z',
-    status: 'active',
-  },
-];
-
-// Enrollment counts for mock data
+// Enrollment counts for mock data (we'll replace this with real data later)
 const MOCK_ENROLLMENTS = {
   '1': 24,
   '2': 18,
@@ -131,12 +53,14 @@ const MOCK_ENROLLMENTS = {
 
 const Courses = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [courses, setCourses] = useState<Course[]>(MOCK_COURSES);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [previewCourse, setPreviewCourse] = useState<Course | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const isNew = id === 'new';
   const isEdit = id && id !== 'new';
@@ -146,74 +70,239 @@ const Courses = () => {
     ? courses.find(course => course.id === id) 
     : undefined;
   
-  const handleCreateCourse = async (data: any) => {
-    // Simulating API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  // Fetch courses from Supabase
+  useEffect(() => {
+    const fetchCourses = async () => {
+      if (!user) return;
+      
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('courses')
+          .select(`
+            *,
+            days:course_days(*)
+          `)
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (data) {
+          // Transform the data to match our Course type
+          const transformedCourses: Course[] = data.map(course => ({
+            id: course.id,
+            name: course.name,
+            description: course.description,
+            category: course.category,
+            language: course.language,
+            days: course.days.map((day: any) => ({
+              id: day.id,
+              day_number: day.day_number,
+              title: day.title,
+              info: day.info,
+              media_link: day.media_link || undefined
+            })),
+            created_at: course.created_at,
+            status: course.status as 'active' | 'archived' | 'draft',
+          }));
+          
+          setCourses(transformedCourses);
+        }
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+        toast.error('Failed to load courses');
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    const newCourse: Course = {
-      id: Date.now().toString(),
-      name: data.name,
-      description: data.description,
-      category: data.category,
-      language: data.language,
-      days: data.days.map((day: any, index: number) => ({
-        id: `new-${index + 1}`,
+    fetchCourses();
+  }, [user]);
+  
+  const handleCreateCourse = async (data: any) => {
+    if (!user) {
+      toast.error('You must be logged in to create a course');
+      return;
+    }
+    
+    try {
+      // Insert new course
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .insert({
+          name: data.name,
+          description: data.description,
+          category: data.category,
+          language: data.language,
+          status: 'active',
+          created_by: user.id,
+        })
+        .select()
+        .single();
+      
+      if (courseError) throw courseError;
+      
+      // Insert course days
+      const daysToInsert = data.days.map((day: any, index: number) => ({
+        course_id: courseData.id,
         day_number: index + 1,
         title: day.title,
         info: day.info,
-        media_link: day.media_link,
-      })),
-      created_at: new Date().toISOString(),
-      status: 'active',
-    };
-    
-    setCourses([newCourse, ...courses]);
-    navigate('/courses');
+        media_link: day.media_link || null,
+      }));
+      
+      const { data: daysData, error: daysError } = await supabase
+        .from('course_days')
+        .insert(daysToInsert)
+        .select();
+      
+      if (daysError) throw daysError;
+      
+      // Format the new course to match our Course type
+      const newCourse: Course = {
+        id: courseData.id,
+        name: courseData.name,
+        description: courseData.description,
+        category: courseData.category,
+        language: courseData.language,
+        days: daysData.map((day: any) => ({
+          id: day.id,
+          day_number: day.day_number,
+          title: day.title,
+          info: day.info,
+          media_link: day.media_link || undefined,
+        })),
+        created_at: courseData.created_at,
+        status: courseData.status as 'active' | 'archived' | 'draft',
+      };
+      
+      setCourses([newCourse, ...courses]);
+      navigate('/courses');
+      toast.success('Course created successfully');
+    } catch (error: any) {
+      console.error('Error creating course:', error);
+      toast.error(`Failed to create course: ${error.message}`);
+    }
   };
   
   const handleUpdateCourse = async (data: any) => {
-    // Simulating API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (!user || !currentCourse) {
+      toast.error('You must be logged in to update a course');
+      return;
+    }
     
-    if (!currentCourse) return;
-    
-    const updatedCourses = courses.map(course => 
-      course.id === currentCourse.id 
-        ? { 
-            ...course, 
-            name: data.name,
-            description: data.description,
-            category: data.category,
-            language: data.language,
-            days: data.days.map((day: any, index: number) => ({
-              id: `${course.id}-${index + 1}`,
-              day_number: index + 1,
-              title: day.title,
-              info: day.info,
-              media_link: day.media_link,
-            })),
-          } 
-        : course
-    );
-    
-    setCourses(updatedCourses);
-    navigate('/courses');
+    try {
+      // Update course
+      const { error: courseError } = await supabase
+        .from('courses')
+        .update({
+          name: data.name,
+          description: data.description,
+          category: data.category,
+          language: data.language,
+        })
+        .eq('id', currentCourse.id);
+      
+      if (courseError) throw courseError;
+      
+      // Delete existing days
+      const { error: deleteError } = await supabase
+        .from('course_days')
+        .delete()
+        .eq('course_id', currentCourse.id);
+      
+      if (deleteError) throw deleteError;
+      
+      // Insert new days
+      const daysToInsert = data.days.map((day: any, index: number) => ({
+        course_id: currentCourse.id,
+        day_number: index + 1,
+        title: day.title,
+        info: day.info,
+        media_link: day.media_link || null,
+      }));
+      
+      const { data: daysData, error: daysError } = await supabase
+        .from('course_days')
+        .insert(daysToInsert)
+        .select();
+      
+      if (daysError) throw daysError;
+      
+      // Update local state
+      const updatedCourses = courses.map(course => 
+        course.id === currentCourse.id 
+          ? { 
+              ...course, 
+              name: data.name,
+              description: data.description,
+              category: data.category,
+              language: data.language,
+              days: daysData.map((day: any) => ({
+                id: day.id,
+                day_number: day.day_number,
+                title: day.title,
+                info: day.info,
+                media_link: day.media_link || undefined,
+              })),
+            } 
+          : course
+      );
+      
+      setCourses(updatedCourses);
+      navigate('/courses');
+      toast.success('Course updated successfully');
+    } catch (error: any) {
+      console.error('Error updating course:', error);
+      toast.error(`Failed to update course: ${error.message}`);
+    }
   };
   
-  const handleDeleteCourse = (id: string) => {
-    setCourses(courses.filter(course => course.id !== id));
-    toast.success('Course deleted successfully');
+  const handleDeleteCourse = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setCourses(courses.filter(course => course.id !== id));
+      toast.success('Course deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting course:', error);
+      toast.error(`Failed to delete course: ${error.message}`);
+    }
   };
   
-  const handleArchiveCourse = (id: string) => {
-    const updatedCourses = courses.map(course => 
-      course.id === id 
-        ? { ...course, status: course.status === 'active' ? 'archived' : 'active' as any } 
-        : course
-    );
+  const handleArchiveCourse = async (id: string) => {
+    const course = courses.find(c => c.id === id);
+    if (!course) return;
     
-    setCourses(updatedCourses);
-    toast.success(`Course ${courses.find(c => c.id === id)?.status === 'active' ? 'archived' : 'activated'} successfully`);
+    const newStatus = course.status === 'active' ? 'archived' : 'active';
+    
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .update({ status: newStatus })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      const updatedCourses = courses.map(course => 
+        course.id === id 
+          ? { ...course, status: newStatus as 'active' | 'archived' | 'draft' } 
+          : course
+      );
+      
+      setCourses(updatedCourses);
+      toast.success(`Course ${newStatus === 'active' ? 'activated' : 'archived'} successfully`);
+    } catch (error: any) {
+      console.error(`Error ${newStatus === 'active' ? 'activating' : 'archiving'} course:`, error);
+      toast.error(`Failed to ${newStatus === 'active' ? 'activate' : 'archive'} course: ${error.message}`);
+    }
   };
   
   const handlePreviewCourse = (course: Course) => {
@@ -310,7 +399,15 @@ const Courses = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCourses.length === 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center h-32">
+                      <div className="flex justify-center items-center h-full">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredCourses.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center h-32 text-muted-foreground">
                       {searchQuery ? 'No courses match your search' : 'No courses found'}
