@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Loader2, BookOpen, MoreHorizontal, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -68,7 +67,6 @@ const LearnerCourses: React.FC<LearnerCoursesProps> = ({ learner }) => {
         return;
       }
       
-      // Transform the data to match our ExtendedLearnerCourse type
       const transformedData = data.map(item => ({
         id: item.id,
         learner_id: item.learner_id,
@@ -105,7 +103,6 @@ const LearnerCourses: React.FC<LearnerCoursesProps> = ({ learner }) => {
   
   const handleStatusUpdate = async (learnerCourseId: string, newStatus: 'scheduled' | 'in_progress' | 'completed') => {
     try {
-      // Calculate completion percentage based on status
       const completionPercentage = newStatus === 'completed' ? 100 : 
                                   newStatus === 'in_progress' ? 50 : 0;
       
@@ -126,7 +123,6 @@ const LearnerCourses: React.FC<LearnerCoursesProps> = ({ learner }) => {
       
       toast.success('Course status updated');
       
-      // Update the local state
       setLearnerCourses(prev => 
         prev.map(lc => 
           lc.id === learnerCourseId 
@@ -155,7 +151,6 @@ const LearnerCourses: React.FC<LearnerCoursesProps> = ({ learner }) => {
       
       toast.success('Course removed successfully');
       
-      // Update the local state
       setLearnerCourses(prev => prev.filter(lc => lc.id !== learnerCourseId));
     } catch (error) {
       console.error('Error removing course:', error);
@@ -166,13 +161,13 @@ const LearnerCourses: React.FC<LearnerCoursesProps> = ({ learner }) => {
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'success';
+        return 'success' as const;
       case 'in_progress':
-        return 'default';
+        return 'default' as const;
       case 'scheduled':
-        return 'outline';
+        return 'outline' as const;
       default:
-        return 'outline';
+        return 'outline' as const;
     }
   };
 

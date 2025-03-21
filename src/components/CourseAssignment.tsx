@@ -99,7 +99,13 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
         const assignedIds = assignedCourses.map(ac => ac.course_id);
         setAssignedCourseIds(assignedIds);
         
-        setCourses(coursesData);
+        // Transform the data to include the days property required by the Course type
+        const transformedCourses: Course[] = coursesData.map(course => ({
+          ...course,
+          days: [] // Add empty days array to satisfy the Course type
+        }));
+        
+        setCourses(transformedCourses);
       } catch (error) {
         console.error('Error fetching data:', error);
         toast.error('An error occurred while loading data');
