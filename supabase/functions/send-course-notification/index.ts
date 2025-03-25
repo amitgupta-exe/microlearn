@@ -15,7 +15,7 @@ interface NotificationRequestBody {
   course_name?: string;
   course_id?: string;
   start_date?: string;
-  type?: 'welcome' | 'course_assigned' | 'course_day';
+  type?: 'welcome' | 'course_assigned' | 'course_day' | 'test';
   course_day_info?: string;
 }
 
@@ -45,80 +45,89 @@ serve(async (req) => {
       course_day_info
     } = requestData;
 
-    if (!learner_phone) {
-      if (learner_id) {
-        // Fetch learner phone from database if not provided
-        const { data: learnerData, error: learnerError } = await supabaseClient
-          .from('learners')
-          .select('phone, name')
-          .eq('id', learner_id)
-          .single();
+    // Get phone number if not provided but learner_id is
+    let phoneNumber = learner_phone;
+    let name = learner_name;
+    
+    if (!phoneNumber && learner_id) {
+      // Fetch learner phone from database if not provided
+      const { data: learnerData, error: learnerError } = await supabaseClient
+        .from('learners')
+        .select('phone, name')
+        .eq('id', learner_id)
+        .single();
 
-        if (learnerError) {
-          console.error("Error fetching learner data:", learnerError);
-          return new Response(
-            JSON.stringify({ success: false, error: "Failed to fetch learner data" }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-          );
-        }
-
-        if (!learnerData?.phone) {
-          return new Response(
-            JSON.stringify({ success: false, error: "Learner phone number not found" }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-          );
-        }
-      } else {
+      if (learnerError) {
+        console.error("Error fetching learner data:", learnerError);
         return new Response(
-          JSON.stringify({ success: false, error: "Learner phone or ID is required" }),
+          JSON.stringify({ success: false, error: "Failed to fetch learner data" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
         );
       }
+
+      if (!learnerData?.phone) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Learner phone number not found" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      phoneNumber = learnerData.phone;
+      name = learnerData.name;
     }
 
-    // Fetch WhatsApp configuration
-    const { data: whatsappConfig, error: configError } = await supabaseClient
-      .from('whatsapp_config')
+    if (!phoneNumber) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Phone number is required" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    // Fetch WATI configuration
+    const { data: watiConfig, error: configError } = await supabaseClient
+      .from('wati_config')
       .select('*')
       .eq('is_configured', true)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (configError || !whatsappConfig) {
-      console.error("WhatsApp configuration error:", configError);
+    if (configError || !watiConfig) {
+      console.error("WATI configuration error:", configError);
       return new Response(
-        JSON.stringify({ success: false, error: "WhatsApp not configured" }),
+        JSON.stringify({ success: false, error: "WATI not configured" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
     // Format phone number (remove any non-numeric characters and add country code if needed)
-    const formattedPhone = formatPhoneNumber(learner_phone || "");
+    const formattedPhone = formatPhoneNumber(phoneNumber);
 
     // Construct the message based on the notification type
     let messageText = "";
     
     if (type === 'welcome') {
-      messageText = `Hello ${learner_name || "there"}! You have been successfully registered for MicroLearn training.`;
+      messageText = `Hello ${name || "there"}! You have been successfully registered for MicroLearn training.`;
     } else if (type === 'course_assigned') {
-      messageText = `Hello ${learner_name || "there"}! You have been assigned to the course "${course_name}" starting on ${formatDate(start_date || new Date().toISOString())}.`;
+      messageText = `Hello ${name || "there"}! You have been assigned to the course "${course_name}" starting on ${formatDate(start_date || new Date().toISOString())}.`;
     } else if (type === 'course_day') {
-      messageText = `Hello ${learner_name || "there"}! Here is your content for today's lesson in "${course_name}":\n\n${course_day_info || "No content available"}`;
+      messageText = `Hello ${name || "there"}! Here is your content for today's lesson in "${course_name}":\n\n${course_day_info || "No content available"}`;
+    } else if (type === 'test') {
+      messageText = `This is a test message from MicroLearn. If you received this, your WATI integration is working correctly.`;
     }
 
-    // Send WhatsApp message using the WhatsApp Business API
-    const apiResponse = await sendWhatsAppMessage(
-      whatsappConfig.api_key,
-      whatsappConfig.phone_number_id,
+    // Send WhatsApp message using the WATI API
+    const apiResponse = await sendWatiMessage(
+      watiConfig.api_key,
+      watiConfig.endpoint,
       formattedPhone,
       messageText
     );
 
-    console.log("WhatsApp API response:", apiResponse);
+    console.log("WATI API response:", apiResponse);
 
     // Log the message in the database if learner_id and course_id are provided
-    if (learner_id && type !== 'welcome') {
+    if (learner_id && type !== 'welcome' && type !== 'test') {
       try {
         const { error: messageError } = await supabaseClient
           .from('messages')
@@ -179,19 +188,17 @@ function formatDate(isoDate: string): string {
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'long', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric'
     });
   } catch (e) {
     return isoDate;
   }
 }
 
-// Send WhatsApp message using WhatsApp Business API
-async function sendWhatsAppMessage(
+// Send WhatsApp message using WATI API
+async function sendWatiMessage(
   apiKey: string,
-  phoneNumberId: string,
+  endpoint: string,
   to: string,
   body: string
 ): Promise<any> {
@@ -202,9 +209,12 @@ async function sendWhatsAppMessage(
       return { status: "success", mode: "test" };
     }
 
-    // Real implementation connecting to WhatsApp API
+    // Clean up the endpoint URL if needed
+    const baseEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
+    
+    // Send message using WATI API
     const response = await fetch(
-      `https://graph.facebook.com/v17.0/${phoneNumberId}/messages`,
+      `${baseEndpoint}/sendSessionMessage/${to}`,
       {
         method: 'POST',
         headers: {
@@ -212,22 +222,19 @@ async function sendWhatsAppMessage(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: to,
-          type: 'text',
-          text: { body: body }
+          messageText: body
         }),
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`WhatsApp API error: ${response.status} ${errorText}`);
+      throw new Error(`WATI API error: ${response.status} ${errorText}`);
     }
 
     return await response.json();
   } catch (error) {
-    console.error("Error sending WhatsApp message:", error);
+    console.error("Error sending WATI message:", error);
     throw error;
   }
 }

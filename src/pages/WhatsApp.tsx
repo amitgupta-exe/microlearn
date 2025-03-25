@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, AlertCircle, CheckCircle, MessageCircle, Info } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle, Info } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -28,9 +29,8 @@ import {
   AlertDescription,
   AlertTitle,
 } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { WhatsAppConfig } from '@/lib/types';
+import { WatiConfig } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -38,16 +38,9 @@ const formSchema = z.object({
   api_key: z.string().min(1, {
     message: "API Key is required.",
   }),
-  phone_number_id: z.string().min(1, {
-    message: "Phone Number ID is required.",
-  }),
-  business_account_id: z.string().min(1, {
-    message: "Business Account ID is required.",
-  }),
-  webhook_url: z.string().url({
+  endpoint: z.string().url({
     message: "Please enter a valid URL.",
   }),
-  enable_test_mode: z.boolean().default(false),
 });
 
 const WhatsApp = () => {
@@ -63,10 +56,7 @@ const WhatsApp = () => {
     resolver: zodResolver(formSchema),
     defaultValues: {
       api_key: '',
-      phone_number_id: '',
-      business_account_id: '',
-      webhook_url: 'https://yourdomain.com/api/whatsapp/webhook',
-      enable_test_mode: false,
+      endpoint: 'https://api.wati.io/api/v1',
     },
   });
   
@@ -78,14 +68,14 @@ const WhatsApp = () => {
         setIsLoading(true);
         
         const { data, error } = await supabase
-          .from('whatsapp_config')
+          .from('wati_config')
           .select('*')
           .eq('user_id', user.id)
           .limit(1)
-          .single();
+          .maybeSingle();
           
         if (error) {
-          console.error('Error fetching WhatsApp config:', error);
+          console.error('Error fetching WATI config:', error);
           return;
         }
         
@@ -95,14 +85,11 @@ const WhatsApp = () => {
           
           form.reset({
             api_key: data.api_key || '',
-            phone_number_id: data.phone_number_id || '',
-            business_account_id: data.business_account_id || '',
-            webhook_url: data.webhook_url || 'https://yourdomain.com/api/whatsapp/webhook',
-            enable_test_mode: false,
+            endpoint: data.endpoint || 'https://api.wati.io/api/v1',
           });
         }
       } catch (error) {
-        console.error('Error loading WhatsApp config:', error);
+        console.error('Error loading WATI config:', error);
       } finally {
         setIsLoading(false);
       }
@@ -120,11 +107,9 @@ const WhatsApp = () => {
     try {
       setIsSubmitting(true);
       
-      const config: WhatsAppConfig = {
+      const config: WatiConfig = {
         api_key: data.api_key,
-        phone_number_id: data.phone_number_id,
-        business_account_id: data.business_account_id,
-        webhook_url: data.webhook_url,
+        endpoint: data.endpoint,
         is_configured: true,
         user_id: user.id,
       };
@@ -133,31 +118,31 @@ const WhatsApp = () => {
       
       if (configId) {
         const { error } = await supabase
-          .from('whatsapp_config')
+          .from('wati_config')
           .update(config)
           .eq('id', configId);
           
         saveError = error;
       } else {
         const { error } = await supabase
-          .from('whatsapp_config')
+          .from('wati_config')
           .insert([config]);
           
         saveError = error;
       }
       
       if (saveError) {
-        console.error('Error saving WhatsApp config:', saveError);
+        console.error('Error saving WATI config:', saveError);
         toast.error('Failed to save configuration');
         return;
       }
       
       setIsConfigured(true);
-      toast.success('WhatsApp configuration saved successfully');
+      toast.success('WATI configuration saved successfully');
       
       if (!configId) {
         const { data } = await supabase
-          .from('whatsapp_config')
+          .from('wati_config')
           .select('id')
           .eq('user_id', user.id)
           .single();
@@ -181,21 +166,21 @@ const WhatsApp = () => {
       setIsVerifying(true);
       
       const { data: config, error: configError } = await supabase
-        .from('whatsapp_config')
+        .from('wati_config')
         .select('*')
         .limit(1)
-        .single();
+        .maybeSingle();
       
       if (configError) {
-        console.error('Error fetching WhatsApp config for verification:', configError);
+        console.error('Error fetching WATI config for verification:', configError);
         setVerificationStatus('error');
-        toast.error('Failed to fetch WhatsApp configuration for verification');
+        toast.error('Failed to fetch WATI configuration for verification');
         return;
       }
       
       if (!config || !config.is_configured) {
         setVerificationStatus('error');
-        toast.error('Please save the WhatsApp configuration first');
+        toast.error('Please save the WATI configuration first');
         return;
       }
       
@@ -204,89 +189,29 @@ const WhatsApp = () => {
           learner_name: 'Test User',
           learner_phone: '1234567890',
           course_name: 'Test Course',
-          start_date: new Date().toLocaleDateString()
+          start_date: new Date().toLocaleDateString(),
+          type: 'test'
         }
       });
       
       if (error) {
-        console.error('Error verifying WhatsApp connection:', error);
+        console.error('Error verifying WATI connection:', error);
         setVerificationStatus('error');
-        toast.error('Failed to verify WhatsApp connection. Please check your credentials.');
+        toast.error('Failed to verify WATI connection. Please check your credentials.');
         return;
       }
       
       console.log('Verification response:', data);
       
       setVerificationStatus('success');
-      toast.success('WhatsApp API connection test initiated');
+      toast.success('WATI API connection test initiated');
       
     } catch (error) {
       setVerificationStatus('error');
-      toast.error('Failed to verify WhatsApp connection. Please check your credentials.');
+      toast.error('Failed to verify WATI connection. Please check your credentials.');
       console.error(error);
     } finally {
       setIsVerifying(false);
-    }
-  };
-
-  const handleSendTestMessage = async () => {
-    try {
-      setIsSubmitting(true);
-      
-      const { data: learners, error: learnersError } = await supabase
-        .from('learners')
-        .select('id, name, phone')
-        .eq('status', 'active')
-        .limit(1);
-        
-      if (learnersError || !learners || learners.length === 0) {
-        console.error('Error fetching learners:', learnersError);
-        toast.error('No active learners found to send test message');
-        return;
-      }
-      
-      const testLearner = learners[0];
-      
-      const { data: courses, error: coursesError } = await supabase
-        .from('courses')
-        .select('id, name')
-        .eq('status', 'active')
-        .limit(1);
-        
-      if (coursesError || !courses || courses.length === 0) {
-        console.error('Error fetching courses:', coursesError);
-        toast.error('No active courses found to send test message');
-        return;
-      }
-      
-      const testCourse = courses[0];
-      
-      const notificationData = {
-        learner_id: testLearner.id,
-        learner_name: testLearner.name,
-        learner_phone: testLearner.phone,
-        course_name: testCourse.name,
-        start_date: new Date().toLocaleDateString()
-      };
-      
-      const { data, error } = await supabase.functions.invoke('send-course-notification', {
-        body: notificationData
-      });
-      
-      if (error) {
-        console.error('Error sending test message:', error);
-        toast.error('Failed to send test message');
-        return;
-      }
-      
-      console.log('Test message response:', data);
-      toast.success(`Test message sent to ${testLearner.name}`);
-      
-    } catch (error) {
-      console.error('Error sending test message:', error);
-      toast.error('Failed to send test message');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -295,7 +220,7 @@ const WhatsApp = () => {
       <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
         <div className="max-w-3xl mx-auto flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2">Loading WhatsApp configuration...</span>
+          <span className="ml-2">Loading WATI configuration...</span>
         </div>
       </div>
     );
@@ -306,7 +231,7 @@ const WhatsApp = () => {
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">WhatsApp Configuration</h1>
-          <p className="text-muted-foreground mt-1">Connect your WhatsApp Business API</p>
+          <p className="text-muted-foreground mt-1">Connect your WATI WhatsApp Business API</p>
         </div>
 
         {verificationStatus === 'success' && (
@@ -314,7 +239,7 @@ const WhatsApp = () => {
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertTitle>Connection Verified</AlertTitle>
             <AlertDescription>
-              Your WhatsApp Business API connection is working correctly.
+              Your WATI WhatsApp Business API connection is working correctly.
             </AlertDescription>
           </Alert>
         )}
@@ -324,44 +249,29 @@ const WhatsApp = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Verification Failed</AlertTitle>
             <AlertDescription>
-              Unable to connect to WhatsApp Business API. Please check your credentials and try again.
+              Unable to connect to WATI WhatsApp Business API. Please check your credentials and try again.
             </AlertDescription>
           </Alert>
         )}
-
-        <Alert className="mb-6">
-          <Info className="h-4 w-4" />
-          <AlertTitle>Setup Instructions</AlertTitle>
-          <AlertDescription>
-            <p>To use WhatsApp integration, you need to:</p>
-            <ol className="list-decimal list-inside mt-2 space-y-1">
-              <li>Create a Meta for Developers account at <a href="https://developers.facebook.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">developers.facebook.com</a></li>
-              <li>Set up a WhatsApp Business account and get your API credentials</li>
-              <li>Configure your webhook URL to receive message delivery updates</li>
-              <li>Enable the API key and configure the required permissions</li>
-            </ol>
-          </AlertDescription>
-        </Alert>
 
         <Alert className="mb-6 bg-blue-50 border-blue-200 text-blue-800">
           <Info className="h-4 w-4 text-blue-600" />
           <AlertTitle>Automated Messaging</AlertTitle>
           <AlertDescription>
-            <p className="mb-2">Once configured, the system will automatically send WhatsApp messages to your learners in these scenarios:</p>
+            <p className="mb-2">Once configured, the system will automatically send WhatsApp messages to your learners:</p>
             <ol className="list-decimal list-inside space-y-1 ml-2">
               <li><strong>Welcome Message:</strong> When a new learner is created</li>
               <li><strong>Course Assignment:</strong> When a learner is assigned to a course</li>
               <li><strong>Daily Content:</strong> Course content will be sent at the scheduled time</li>
             </ol>
-            <p className="mt-2 text-sm">These messages are triggered by database events and scheduled tasks. No additional configuration is required.</p>
           </AlertDescription>
         </Alert>
 
         <Card className="glass-card">
           <CardHeader>
-            <CardTitle>WhatsApp Business API Settings</CardTitle>
+            <CardTitle>WATI WhatsApp API Settings</CardTitle>
             <CardDescription>
-              Configure your WhatsApp Business API to send messages to your learners
+              Configure your WATI WhatsApp API to send messages to your learners
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -372,17 +282,17 @@ const WhatsApp = () => {
                   name="api_key"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>API Key</FormLabel>
+                      <FormLabel>WATI Access Token</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="Enter your WhatsApp Business API key" 
+                          placeholder="Enter your WATI access token" 
                           className="glass-input" 
                           type="password"
                           {...field} 
                         />
                       </FormControl>
                       <FormDescription>
-                        This is your WhatsApp Business API key from Meta Developer Dashboard
+                        This is your WATI access token from WATI dashboard
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -391,111 +301,26 @@ const WhatsApp = () => {
                 
                 <FormField
                   control={form.control}
-                  name="phone_number_id"
+                  name="endpoint"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number ID</FormLabel>
+                      <FormLabel>WATI API Endpoint</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="Enter your WhatsApp Phone Number ID" 
+                          placeholder="https://api.wati.io/api/v1" 
                           className="glass-input" 
                           {...field} 
                         />
                       </FormControl>
                       <FormDescription>
-                        The ID of your WhatsApp Business phone number
+                        The WATI API endpoint (default is https://api.wati.io/api/v1)
                       </FormDescription>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="business_account_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Business Account ID</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="Enter your WhatsApp Business Account ID" 
-                          className="glass-input" 
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Your WhatsApp Business Account ID from Meta Business Manager
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="webhook_url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Webhook URL</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="https://yourdomain.com/api/whatsapp/webhook" 
-                          className="glass-input" 
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        URL for WhatsApp to send message delivery status updates
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="enable_test_mode"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Test Mode</FormLabel>
-                        <FormDescription>
-                          Enable test mode to avoid sending actual messages
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
                     </FormItem>
                   )}
                 />
                 
                 <div className="flex flex-col sm:flex-row gap-3 justify-end">
-                  {isConfigured && (
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={handleSendTestMessage}
-                      disabled={isSubmitting}
-                      className="sm:order-1"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <MessageCircle className="mr-2 h-4 w-4" />
-                          Send Test Message
-                        </>
-                      )}
-                    </Button>
-                  )}
-                  
                   <Button 
                     type="button" 
                     variant="outline" 
@@ -509,10 +334,7 @@ const WhatsApp = () => {
                         Verifying...
                       </>
                     ) : (
-                      <>
-                        <MessageCircle className="mr-2 h-4 w-4" />
-                        Verify Connection
-                      </>
+                      'Verify Connection'
                     )}
                   </Button>
                   
@@ -535,14 +357,8 @@ const WhatsApp = () => {
             </Form>
           </CardContent>
           <CardFooter className="flex flex-col items-start text-muted-foreground text-sm border-t p-6">
-            <h4 className="font-medium text-foreground mb-2">Important Notes:</h4>
-            <ul className="list-disc list-inside space-y-1">
-              <li>You need a WhatsApp Business account to use this feature</li>
-              <li>For the webhook to work, your site needs to be publicly accessible</li>
-              <li>WhatsApp has a messaging rate limit, check Meta's documentation for details</li>
-              <li>Test thoroughly before sending real messages to your learners</li>
-              <li>The configured WhatsApp number must be approved by Meta for message templates</li>
-            </ul>
+            <h4 className="font-medium text-foreground mb-2">Note:</h4>
+            <p>You need a WATI Business account to use this feature. Get your access token from your WATI dashboard.</p>
           </CardFooter>
         </Card>
       </div>

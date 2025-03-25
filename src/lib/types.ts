@@ -55,14 +55,12 @@ export interface MessageSent {
   status: 'sent' | 'delivered' | 'read' | 'failed';
 }
 
-export interface WhatsAppConfig {
+export interface WatiConfig {
   api_key: string;
-  phone_number_id: string;
-  business_account_id: string;
-  webhook_url: string;
+  endpoint: string;
   is_configured: boolean;
-  user_id: string; // Required field
-  id?: string;      // Added id field for existing config
+  user_id: string;
+  id?: string;
 }
 
 export interface AnalyticsData {

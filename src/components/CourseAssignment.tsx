@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, Calendar, PercentIcon } from 'lucide-react';
+import { Loader2, Calendar } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -28,9 +28,9 @@ import {
   PopoverContent,
 } from '@/components/ui/popover';
 import { toast } from 'sonner';
-import { Course, Learner, LearnerCourse } from '@/lib/types';
+import { Course, Learner } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 
 const formSchema = z.object({
   course_id: z.string().min(1, {
@@ -60,10 +60,14 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   const [loading, setLoading] = useState(true);
   const [assignedCourseIds, setAssignedCourseIds] = useState<string[]>([]);
   
+  // Set default start date to tomorrow
+  const tomorrow = addDays(new Date(), 1);
+  
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       status: 'scheduled',
+      start_date: tomorrow,
     },
   });
 
@@ -241,7 +245,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                           !field.value ? "text-muted-foreground" : ""
                         }`}
                         type="button" // Important: specify button type to prevent form submission
-                        onClick={(e) => e.preventDefault()} // Prevent any default behavior
                       >
                         {field.value ? (
                           format(field.value, "PPP")
@@ -258,6 +261,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                       selected={field.value}
                       onSelect={field.onChange}
                       initialFocus
+                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} // Disable past dates
                     />
                   </PopoverContent>
                 </Popover>
