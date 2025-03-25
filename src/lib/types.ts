@@ -60,6 +60,8 @@ export interface WhatsAppConfig {
   business_account_id: string;
   webhook_url: string;
   is_configured: boolean;
+  user_id?: string; // Added user_id field to match database schema
+  id?: string;      // Added id field for existing config
 }
 
 export interface AnalyticsData {

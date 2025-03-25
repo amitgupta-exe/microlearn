@@ -33,6 +33,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { WhatsAppConfig } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const formSchema = z.object({
   api_key: z.string().min(1, {
@@ -56,6 +57,8 @@ const WhatsApp = () => {
   const [isConfigured, setIsConfigured] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'success' | 'error' | null>(null);
+  const [configId, setConfigId] = useState<string | null>(null);
+  const { user } = useAuth();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -71,12 +74,15 @@ const WhatsApp = () => {
   // Load existing configuration from database
   useEffect(() => {
     const fetchConfig = async () => {
+      if (!user) return;
+      
       try {
         setIsLoading(true);
         
         const { data, error } = await supabase
           .from('whatsapp_config')
           .select('*')
+          .eq('user_id', user.id)
           .limit(1)
           .single();
           
@@ -87,6 +93,7 @@ const WhatsApp = () => {
         
         if (data) {
           setIsConfigured(data.is_configured);
+          setConfigId(data.id);
           
           form.reset({
             api_key: data.api_key || '',
@@ -104,9 +111,14 @@ const WhatsApp = () => {
     };
     
     fetchConfig();
-  }, [form]);
+  }, [form, user]);
 
   const handleSubmit = async (data: z.infer<typeof formSchema>) => {
+    if (!user) {
+      toast.error('You must be logged in to save configuration');
+      return;
+    }
+    
     try {
       setIsSubmitting(true);
       
@@ -116,28 +128,17 @@ const WhatsApp = () => {
         business_account_id: data.business_account_id,
         webhook_url: data.webhook_url,
         is_configured: true,
+        user_id: user.id,
       };
-      
-      // Check if configuration already exists
-      const { data: existingConfig, error: fetchError } = await supabase
-        .from('whatsapp_config')
-        .select('id')
-        .limit(1);
-        
-      if (fetchError) {
-        console.error('Error checking existing config:', fetchError);
-        toast.error('Failed to check existing configuration');
-        return;
-      }
       
       let saveError;
       
-      if (existingConfig && existingConfig.length > 0) {
+      if (configId) {
         // Update existing configuration
         const { error } = await supabase
           .from('whatsapp_config')
           .update(config)
-          .eq('id', existingConfig[0].id);
+          .eq('id', configId);
           
         saveError = error;
       } else {
@@ -157,6 +158,19 @@ const WhatsApp = () => {
       
       setIsConfigured(true);
       toast.success('WhatsApp configuration saved successfully');
+      
+      // Refresh config ID if it was a new insertion
+      if (!configId) {
+        const { data } = await supabase
+          .from('whatsapp_config')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+          
+        if (data) {
+          setConfigId(data.id);
+        }
+      }
       
       // Automatically verify the connection
       await handleVerify();

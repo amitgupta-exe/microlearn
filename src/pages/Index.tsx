@@ -15,13 +15,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { Course } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
+interface ExtendedCourse extends Course {
+  learner_count?: number;
+}
+
 const Index = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
     totalLearners: 0,
     activeCourses: 0,
     messagesSent: 0,
-    recentCourses: [] as Course[]
+    recentCourses: [] as ExtendedCourse[]
   });
 
   useEffect(() => {
@@ -77,7 +81,7 @@ const Index = () => {
           ...course,
           days: [],
           status: course.status as 'active' | 'archived' | 'draft',
-          learners: Array.isArray(course.learner_courses) ? course.learner_courses.length : 0
+          learner_count: Array.isArray(course.learner_courses) ? course.learner_courses.length : 0
         })) : [];
         
         setDashboardData({
@@ -184,7 +188,7 @@ const Index = () => {
                                 {course.category}
                               </span>
                               <span className="text-xs text-muted-foreground">
-                                {course.learners} learners
+                                {course.learner_count} learners
                               </span>
                             </div>
                           </div>
