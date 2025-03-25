@@ -85,7 +85,7 @@ serve(async (req) => {
 
     // Fetch WATI configuration
     const { data: watiConfig, error: configError } = await supabaseClient
-      .from('wati_config')
+      .from('whatsapp_config')
       .select('*')
       .eq('is_configured', true)
       .order('created_at', { ascending: false })

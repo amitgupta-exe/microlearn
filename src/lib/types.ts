@@ -56,11 +56,11 @@ export interface MessageSent {
 }
 
 export interface WatiConfig {
+  id?: string;
+  user_id: string;
   api_key: string;
   endpoint: string;
   is_configured: boolean;
-  user_id: string;
-  id?: string;
 }
 
 export interface AnalyticsData {

@@ -68,7 +68,7 @@ const WhatsApp = () => {
         setIsLoading(true);
         
         const { data, error } = await supabase
-          .from('wati_config')
+          .from('whatsapp_config')
           .select('*')
           .eq('user_id', user.id)
           .limit(1)
@@ -118,14 +118,14 @@ const WhatsApp = () => {
       
       if (configId) {
         const { error } = await supabase
-          .from('wati_config')
+          .from('whatsapp_config')
           .update(config)
           .eq('id', configId);
           
         saveError = error;
       } else {
         const { error } = await supabase
-          .from('wati_config')
+          .from('whatsapp_config')
           .insert([config]);
           
         saveError = error;
@@ -142,7 +142,7 @@ const WhatsApp = () => {
       
       if (!configId) {
         const { data } = await supabase
-          .from('wati_config')
+          .from('whatsapp_config')
           .select('id')
           .eq('user_id', user.id)
           .single();
@@ -166,7 +166,7 @@ const WhatsApp = () => {
       setIsVerifying(true);
       
       const { data: config, error: configError } = await supabase
-        .from('wati_config')
+        .from('whatsapp_config')
         .select('*')
         .limit(1)
         .maybeSingle();
