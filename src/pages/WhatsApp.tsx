@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, AlertCircle, CheckCircle, MessageCircle } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle, MessageCircle, Info } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -32,6 +32,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { WhatsAppConfig } from '@/lib/types';
+import { supabase } from '@/integrations/supabase/client';
 
 const formSchema = z.object({
   api_key: z.string().min(1, {
@@ -51,6 +52,7 @@ const formSchema = z.object({
 
 const WhatsApp = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isConfigured, setIsConfigured] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'success' | 'error' | null>(null);
@@ -65,12 +67,48 @@ const WhatsApp = () => {
       enable_test_mode: false,
     },
   });
+  
+  // Load existing configuration from database
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        setIsLoading(true);
+        
+        const { data, error } = await supabase
+          .from('whatsapp_config')
+          .select('*')
+          .limit(1)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching WhatsApp config:', error);
+          return;
+        }
+        
+        if (data) {
+          setIsConfigured(data.is_configured);
+          
+          form.reset({
+            api_key: data.api_key || '',
+            phone_number_id: data.phone_number_id || '',
+            business_account_id: data.business_account_id || '',
+            webhook_url: data.webhook_url || 'https://yourdomain.com/api/whatsapp/webhook',
+            enable_test_mode: false,
+          });
+        }
+      } catch (error) {
+        console.error('Error loading WhatsApp config:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchConfig();
+  }, [form]);
 
   const handleSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       setIsSubmitting(true);
-      // Simulating API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
       
       const config: WhatsAppConfig = {
         api_key: data.api_key,
@@ -80,11 +118,48 @@ const WhatsApp = () => {
         is_configured: true,
       };
       
-      // Here you would save the config to your database
-      console.log('WhatsApp Configuration saved:', config);
+      // Check if configuration already exists
+      const { data: existingConfig, error: fetchError } = await supabase
+        .from('whatsapp_config')
+        .select('id')
+        .limit(1);
+        
+      if (fetchError) {
+        console.error('Error checking existing config:', fetchError);
+        toast.error('Failed to check existing configuration');
+        return;
+      }
+      
+      let saveError;
+      
+      if (existingConfig && existingConfig.length > 0) {
+        // Update existing configuration
+        const { error } = await supabase
+          .from('whatsapp_config')
+          .update(config)
+          .eq('id', existingConfig[0].id);
+          
+        saveError = error;
+      } else {
+        // Insert new configuration
+        const { error } = await supabase
+          .from('whatsapp_config')
+          .insert([config]);
+          
+        saveError = error;
+      }
+      
+      if (saveError) {
+        console.error('Error saving WhatsApp config:', saveError);
+        toast.error('Failed to save configuration');
+        return;
+      }
       
       setIsConfigured(true);
       toast.success('WhatsApp configuration saved successfully');
+      
+      // Automatically verify the connection
+      await handleVerify();
     } catch (error) {
       toast.error('Failed to save configuration. Please try again.');
       console.error(error);
@@ -96,12 +171,50 @@ const WhatsApp = () => {
   const handleVerify = async () => {
     try {
       setIsVerifying(true);
-      // Simulating API call to verify WhatsApp connection
-      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Simulate successful verification
+      // Get the current configuration
+      const { data: config, error: configError } = await supabase
+        .from('whatsapp_config')
+        .select('*')
+        .limit(1)
+        .single();
+      
+      if (configError) {
+        console.error('Error fetching WhatsApp config for verification:', configError);
+        setVerificationStatus('error');
+        toast.error('Failed to fetch WhatsApp configuration for verification');
+        return;
+      }
+      
+      if (!config || !config.is_configured) {
+        setVerificationStatus('error');
+        toast.error('Please save the WhatsApp configuration first');
+        return;
+      }
+      
+      // Call the test function
+      const { data, error } = await supabase.functions.invoke('send-course-notification', {
+        body: {
+          learner_name: 'Test User',
+          learner_phone: '1234567890', // This will be properly formatted in the function
+          course_name: 'Test Course',
+          start_date: new Date().toLocaleDateString()
+        }
+      });
+      
+      if (error) {
+        console.error('Error verifying WhatsApp connection:', error);
+        setVerificationStatus('error');
+        toast.error('Failed to verify WhatsApp connection. Please check your credentials.');
+        return;
+      }
+      
+      console.log('Verification response:', data);
+      
+      // If we got here, at least the function call was successful
       setVerificationStatus('success');
-      toast.success('WhatsApp API connection verified successfully');
+      toast.success('WhatsApp API connection test initiated');
+      
     } catch (error) {
       setVerificationStatus('error');
       toast.error('Failed to verify WhatsApp connection. Please check your credentials.');
@@ -110,6 +223,82 @@ const WhatsApp = () => {
       setIsVerifying(false);
     }
   };
+
+  const handleSendTestMessage = async () => {
+    try {
+      setIsSubmitting(true);
+      
+      // Get a random learner to send the test message to
+      const { data: learners, error: learnersError } = await supabase
+        .from('learners')
+        .select('id, name, phone')
+        .eq('status', 'active')
+        .limit(1);
+        
+      if (learnersError || !learners || learners.length === 0) {
+        console.error('Error fetching learners:', learnersError);
+        toast.error('No active learners found to send test message');
+        return;
+      }
+      
+      const testLearner = learners[0];
+      
+      // Get a random course for the test
+      const { data: courses, error: coursesError } = await supabase
+        .from('courses')
+        .select('id, name')
+        .eq('status', 'active')
+        .limit(1);
+        
+      if (coursesError || !courses || courses.length === 0) {
+        console.error('Error fetching courses:', coursesError);
+        toast.error('No active courses found to send test message');
+        return;
+      }
+      
+      const testCourse = courses[0];
+      
+      // Prepare notification data
+      const notificationData = {
+        learner_id: testLearner.id,
+        learner_name: testLearner.name,
+        learner_phone: testLearner.phone,
+        course_name: testCourse.name,
+        start_date: new Date().toLocaleDateString()
+      };
+      
+      // Send test message
+      const { data, error } = await supabase.functions.invoke('send-course-notification', {
+        body: notificationData
+      });
+      
+      if (error) {
+        console.error('Error sending test message:', error);
+        toast.error('Failed to send test message');
+        return;
+      }
+      
+      console.log('Test message response:', data);
+      toast.success(`Test message sent to ${testLearner.name}`);
+      
+    } catch (error) {
+      console.error('Error sending test message:', error);
+      toast.error('Failed to send test message');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
+        <div className="max-w-3xl mx-auto flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Loading WhatsApp configuration...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
@@ -138,6 +327,20 @@ const WhatsApp = () => {
             </AlertDescription>
           </Alert>
         )}
+
+        <Alert className="mb-6">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Setup Instructions</AlertTitle>
+          <AlertDescription>
+            <p>To use WhatsApp integration, you need to:</p>
+            <ol className="list-decimal list-inside mt-2 space-y-1">
+              <li>Create a Meta for Developers account at <a href="https://developers.facebook.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">developers.facebook.com</a></li>
+              <li>Set up a WhatsApp Business account and get your API credentials</li>
+              <li>Configure your webhook URL to receive message delivery updates</li>
+              <li>Enable the API key and configure the required permissions</li>
+            </ol>
+          </AlertDescription>
+        </Alert>
 
         <Card className="glass-card">
           <CardHeader>
@@ -256,12 +459,34 @@ const WhatsApp = () => {
                 />
                 
                 <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                  {isConfigured && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={handleSendTestMessage}
+                      disabled={isSubmitting}
+                      className="sm:order-1"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <MessageCircle className="mr-2 h-4 w-4" />
+                          Send Test Message
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  
                   <Button 
                     type="button" 
                     variant="outline" 
                     disabled={isVerifying || !isConfigured}
                     onClick={handleVerify}
-                    className="sm:order-1"
+                    className="sm:order-2"
                   >
                     {isVerifying ? (
                       <>
@@ -275,10 +500,11 @@ const WhatsApp = () => {
                       </>
                     )}
                   </Button>
+                  
                   <Button 
                     type="submit" 
                     disabled={isSubmitting}
-                    className="sm:order-2"
+                    className="sm:order-3"
                   >
                     {isSubmitting ? (
                       <>
@@ -297,9 +523,10 @@ const WhatsApp = () => {
             <h4 className="font-medium text-foreground mb-2">Important Notes:</h4>
             <ul className="list-disc list-inside space-y-1">
               <li>You need a WhatsApp Business account to use this feature</li>
-              <li>Your webhook URL must be publicly accessible</li>
+              <li>For the webhook to work, your site needs to be publicly accessible</li>
               <li>WhatsApp has a messaging rate limit, check Meta's documentation for details</li>
-              <li>Test thoroughly using the test mode before sending real messages</li>
+              <li>Test thoroughly before sending real messages to your learners</li>
+              <li>The configured WhatsApp number must be approved by Meta for message templates</li>
             </ul>
           </CardFooter>
         </Card>

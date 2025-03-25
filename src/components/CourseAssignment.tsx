@@ -71,6 +71,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   useEffect(() => {
     const fetchCourses = async () => {
       try {
+        setLoading(true);
         // Fetch all courses
         const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
@@ -102,7 +103,8 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
         // Transform the data to include the days property required by the Course type
         const transformedCourses: Course[] = coursesData.map(course => ({
           ...course,
-          days: [] // Add empty days array to satisfy the Course type
+          days: [], // Add empty days array to satisfy the Course type
+          status: course.status as 'active' | 'archived' | 'draft' // Type assertion to match Course type
         }));
         
         setCourses(transformedCourses);
@@ -129,14 +131,41 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
         completion_percentage: data.status === 'completed' ? 100 : 0,
       };
       
-      const { error } = await supabase
+      console.log('Assigning course with data:', newLearnerCourse);
+      
+      const { data: insertedData, error } = await supabase
         .from('learner_courses')
-        .insert([newLearnerCourse]);
+        .insert([newLearnerCourse])
+        .select();
         
       if (error) {
         console.error('Error assigning course:', error);
         toast.error('Failed to assign course');
         throw error;
+      }
+      
+      console.log('Course assigned successfully:', insertedData);
+      
+      // If the course is assigned successfully, send a WhatsApp notification
+      try {
+        const courseDetails = courses.find(c => c.id === data.course_id);
+        const notificationData = {
+          learner_id: learner.id,
+          learner_name: learner.name,
+          learner_phone: learner.phone,
+          course_name: courseDetails?.name || 'New course',
+          start_date: format(data.start_date, 'PPP')
+        };
+        
+        // Send WhatsApp notification
+        await supabase.functions.invoke('send-course-notification', {
+          body: notificationData
+        });
+        
+        console.log('WhatsApp notification sent successfully');
+      } catch (notifyError) {
+        console.error('Failed to send WhatsApp notification:', notifyError);
+        // Don't block the course assignment if notification fails
       }
       
       toast.success('Course assigned successfully');
@@ -211,6 +240,8 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                         className={`glass-input w-full pl-3 text-left font-normal ${
                           !field.value ? "text-muted-foreground" : ""
                         }`}
+                        type="button" // Important: specify button type to prevent form submission
+                        onClick={(e) => e.preventDefault()} // Prevent any default behavior
                       >
                         {field.value ? (
                           format(field.value, "PPP")
