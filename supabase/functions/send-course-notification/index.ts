@@ -1,190 +1,233 @@
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.14.0";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.29.0";
 
+// Add CORS headers
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface NotificationData {
-  learner_id: string;
-  learner_name: string;
-  learner_phone: string;
-  course_name: string;
-  start_date: string;
+interface NotificationRequestBody {
+  learner_id?: string;
+  learner_name?: string;
+  learner_phone?: string;
+  course_name?: string;
+  course_id?: string;
+  start_date?: string;
+  type?: 'welcome' | 'course_assigned' | 'course_day';
+  course_day_info?: string;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight request
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders,
-    });
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const notificationData: NotificationData = await req.json();
-    const { learner_name, learner_phone, course_name, start_date } = notificationData;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Validate data
-    if (!learner_phone || !course_name) {
-      throw new Error("Missing required fields");
+    // Get request body
+    const requestData: NotificationRequestBody = await req.json();
+    console.log("Notification request received:", JSON.stringify(requestData));
+
+    const { 
+      learner_id, 
+      learner_name, 
+      learner_phone, 
+      course_name, 
+      course_id,
+      start_date,
+      type = 'course_assigned',
+      course_day_info
+    } = requestData;
+
+    if (!learner_phone) {
+      if (learner_id) {
+        // Fetch learner phone from database if not provided
+        const { data: learnerData, error: learnerError } = await supabaseClient
+          .from('learners')
+          .select('phone, name')
+          .eq('id', learner_id)
+          .single();
+
+        if (learnerError) {
+          console.error("Error fetching learner data:", learnerError);
+          return new Response(
+            JSON.stringify({ success: false, error: "Failed to fetch learner data" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          );
+        }
+
+        if (!learnerData?.phone) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Learner phone number not found" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          );
+        }
+      } else {
+        return new Response(
+          JSON.stringify({ success: false, error: "Learner phone or ID is required" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
     }
 
-    // Normalize phone number (ensure it has the international format for WhatsApp)
-    const normalizedPhone = formatPhoneNumber(learner_phone);
-
-    // Log for debugging
-    console.log(`Sending WhatsApp notification to ${normalizedPhone} for course ${course_name}`);
-
-    // Create Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") || "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
-    );
-
-    // Get WhatsApp configuration from database
+    // Fetch WhatsApp configuration
     const { data: whatsappConfig, error: configError } = await supabaseClient
-      .from("whatsapp_config")
-      .select("*")
+      .from('whatsapp_config')
+      .select('*')
+      .eq('is_configured', true)
+      .order('created_at', { ascending: false })
       .limit(1)
       .single();
 
     if (configError || !whatsappConfig) {
-      console.error("Failed to retrieve WhatsApp configuration:", configError);
-      throw new Error("WhatsApp is not configured");
-    }
-
-    // Check if WhatsApp is configured and enabled
-    if (!whatsappConfig.is_configured) {
-      console.log("WhatsApp is not configured yet, skipping notification");
+      console.error("WhatsApp configuration error:", configError);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: "WhatsApp is not configured" 
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
+        JSON.stringify({ success: false, error: "WhatsApp not configured" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    // Prepare message text
-    const messageText = `Hello ${learner_name}! You have been assigned a new course: "${course_name}" starting on ${start_date}. Please check your learning portal for more details.`;
+    // Format phone number (remove any non-numeric characters and add country code if needed)
+    const formattedPhone = formatPhoneNumber(learner_phone || "");
 
-    if (whatsappConfig.api_key) {
-      // Call WhatsApp Business API
-      const whatsappResponse = await sendWhatsAppMessage(
-        whatsappConfig,
-        normalizedPhone,
-        messageText
-      );
-
-      // Log notification in messages table
-      await supabaseClient.from("messages").insert([
-        {
-          learner_id: notificationData.learner_id,
-          course_id: null, // We don't have course_id in the notification payload
-          course_day_id: null,
-          type: "whatsapp",
-          status: "sent",
-        },
-      ]);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "WhatsApp notification sent",
-          whatsappResponse
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    } else {
-      // For testing/development when API key is not set
-      console.log("WhatsApp notification would be sent with message:", messageText);
-      
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "WhatsApp notification simulated (testing mode)",
-          testMessage: messageText
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        }
-      );
-    }
-  } catch (error) {
-    console.error("Error sending WhatsApp notification:", error);
+    // Construct the message based on the notification type
+    let messageText = "";
     
+    if (type === 'welcome') {
+      messageText = `Hello ${learner_name || "there"}! You have been successfully registered for MicroLearn training.`;
+    } else if (type === 'course_assigned') {
+      messageText = `Hello ${learner_name || "there"}! You have been assigned to the course "${course_name}" starting on ${formatDate(start_date || new Date().toISOString())}.`;
+    } else if (type === 'course_day') {
+      messageText = `Hello ${learner_name || "there"}! Here is your content for today's lesson in "${course_name}":\n\n${course_day_info || "No content available"}`;
+    }
+
+    // Send WhatsApp message using the WhatsApp Business API
+    const apiResponse = await sendWhatsAppMessage(
+      whatsappConfig.api_key,
+      whatsappConfig.phone_number_id,
+      formattedPhone,
+      messageText
+    );
+
+    console.log("WhatsApp API response:", apiResponse);
+
+    // Log the message in the database if learner_id and course_id are provided
+    if (learner_id && type !== 'welcome') {
+      try {
+        const { error: messageError } = await supabaseClient
+          .from('messages')
+          .insert([{ 
+            learner_id,
+            course_id: course_id || null,
+            course_day_id: type === 'course_day' ? course_id : null, // Using course_id as course_day_id for simplicity
+            type: 'whatsapp',
+            status: 'sent'
+          }]);
+
+        if (messageError) {
+          console.error("Error logging message:", messageError);
+        }
+      } catch (error) {
+        console.error("Error inserting message record:", error);
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
-        success: false, 
-        error: error.message 
+        success: true, 
+        message: "Notification sent successfully",
+        details: apiResponse
       }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("Error processing notification request:", error);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
 });
 
-// Helper function to format phone number for WhatsApp
+// Format phone number to international format
 function formatPhoneNumber(phone: string): string {
-  // Remove all non-digit characters
-  let digits = phone.replace(/\D/g, "");
+  // Remove any non-numeric characters
+  const cleaned = phone.replace(/\D/g, '');
   
-  // Ensure it has a country code (add 91 for India if not present)
-  if (digits.length === 10) {
-    digits = "91" + digits; // Add India country code
-  } else if (digits.length > 10 && !digits.startsWith("91")) {
-    // If it has more than 10 digits but doesn't start with 91,
-    // assume it has some country code and leave it as is
+  // Check if the number already has a country code (starts with + or has enough digits)
+  if (cleaned.startsWith('1') && cleaned.length >= 10) {
+    return cleaned;
+  } else if (cleaned.length === 10) {
+    // Assume US/Canada number and add country code
+    return '1' + cleaned;
   }
   
-  return digits;
+  // Return as is if already formatted or can't determine format
+  return cleaned;
 }
 
-// Function to send WhatsApp message using the Meta WhatsApp Business API
-async function sendWhatsAppMessage(
-  whatsappConfig: any,
-  phone: string,
-  message: string
-) {
+// Format date to a human-readable format
+function formatDate(isoDate: string): string {
   try {
-    const url = `https://graph.facebook.com/v16.0/${whatsappConfig.phone_number_id}/messages`;
-    
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${whatsappConfig.api_key}`
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: phone,
-        type: "text",
-        text: {
-          preview_url: false,
-          body: message
-        }
-      })
+    const date = new Date(isoDate);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
-    
-    const data = await response.json();
-    console.log("WhatsApp API response:", data);
-    return data;
+  } catch (e) {
+    return isoDate;
+  }
+}
+
+// Send WhatsApp message using WhatsApp Business API
+async function sendWhatsAppMessage(
+  apiKey: string,
+  phoneNumberId: string,
+  to: string,
+  body: string
+): Promise<any> {
+  try {
+    // For demo or test mode, just log and return success
+    if (Deno.env.get('ENVIRONMENT') === 'development') {
+      console.log(`[TEST MODE] Would send message to ${to}: ${body}`);
+      return { status: "success", mode: "test" };
+    }
+
+    // Real implementation connecting to WhatsApp API
+    const response = await fetch(
+      `https://graph.facebook.com/v17.0/${phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: to,
+          type: 'text',
+          text: { body: body }
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`WhatsApp API error: ${response.status} ${errorText}`);
+    }
+
+    return await response.json();
   } catch (error) {
-    console.error("Error calling WhatsApp API:", error);
+    console.error("Error sending WhatsApp message:", error);
     throw error;
   }
 }

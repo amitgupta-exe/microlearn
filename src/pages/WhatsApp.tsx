@@ -122,6 +122,7 @@ const WhatsApp = () => {
     try {
       setIsSubmitting(true);
       
+      // Create the config object with required user_id field
       const config: WhatsAppConfig = {
         api_key: data.api_key,
         phone_number_id: data.phone_number_id,
