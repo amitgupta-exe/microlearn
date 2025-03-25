@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -71,7 +70,6 @@ const WhatsApp = () => {
     },
   });
   
-  // Load existing configuration from database
   useEffect(() => {
     const fetchConfig = async () => {
       if (!user) return;
@@ -122,7 +120,6 @@ const WhatsApp = () => {
     try {
       setIsSubmitting(true);
       
-      // Create the config object with required user_id field
       const config: WhatsAppConfig = {
         api_key: data.api_key,
         phone_number_id: data.phone_number_id,
@@ -135,7 +132,6 @@ const WhatsApp = () => {
       let saveError;
       
       if (configId) {
-        // Update existing configuration
         const { error } = await supabase
           .from('whatsapp_config')
           .update(config)
@@ -143,7 +139,6 @@ const WhatsApp = () => {
           
         saveError = error;
       } else {
-        // Insert new configuration
         const { error } = await supabase
           .from('whatsapp_config')
           .insert([config]);
@@ -160,7 +155,6 @@ const WhatsApp = () => {
       setIsConfigured(true);
       toast.success('WhatsApp configuration saved successfully');
       
-      // Refresh config ID if it was a new insertion
       if (!configId) {
         const { data } = await supabase
           .from('whatsapp_config')
@@ -173,7 +167,6 @@ const WhatsApp = () => {
         }
       }
       
-      // Automatically verify the connection
       await handleVerify();
     } catch (error) {
       toast.error('Failed to save configuration. Please try again.');
@@ -187,7 +180,6 @@ const WhatsApp = () => {
     try {
       setIsVerifying(true);
       
-      // Get the current configuration
       const { data: config, error: configError } = await supabase
         .from('whatsapp_config')
         .select('*')
@@ -207,11 +199,10 @@ const WhatsApp = () => {
         return;
       }
       
-      // Call the test function
       const { data, error } = await supabase.functions.invoke('send-course-notification', {
         body: {
           learner_name: 'Test User',
-          learner_phone: '1234567890', // This will be properly formatted in the function
+          learner_phone: '1234567890',
           course_name: 'Test Course',
           start_date: new Date().toLocaleDateString()
         }
@@ -226,7 +217,6 @@ const WhatsApp = () => {
       
       console.log('Verification response:', data);
       
-      // If we got here, at least the function call was successful
       setVerificationStatus('success');
       toast.success('WhatsApp API connection test initiated');
       
@@ -243,7 +233,6 @@ const WhatsApp = () => {
     try {
       setIsSubmitting(true);
       
-      // Get a random learner to send the test message to
       const { data: learners, error: learnersError } = await supabase
         .from('learners')
         .select('id, name, phone')
@@ -258,7 +247,6 @@ const WhatsApp = () => {
       
       const testLearner = learners[0];
       
-      // Get a random course for the test
       const { data: courses, error: coursesError } = await supabase
         .from('courses')
         .select('id, name')
@@ -273,7 +261,6 @@ const WhatsApp = () => {
       
       const testCourse = courses[0];
       
-      // Prepare notification data
       const notificationData = {
         learner_id: testLearner.id,
         learner_name: testLearner.name,
@@ -282,7 +269,6 @@ const WhatsApp = () => {
         start_date: new Date().toLocaleDateString()
       };
       
-      // Send test message
       const { data, error } = await supabase.functions.invoke('send-course-notification', {
         body: notificationData
       });
@@ -354,6 +340,20 @@ const WhatsApp = () => {
               <li>Configure your webhook URL to receive message delivery updates</li>
               <li>Enable the API key and configure the required permissions</li>
             </ol>
+          </AlertDescription>
+        </Alert>
+
+        <Alert className="mb-6 bg-blue-50 border-blue-200 text-blue-800">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertTitle>Automated Messaging</AlertTitle>
+          <AlertDescription>
+            <p className="mb-2">Once configured, the system will automatically send WhatsApp messages to your learners in these scenarios:</p>
+            <ol className="list-decimal list-inside space-y-1 ml-2">
+              <li><strong>Welcome Message:</strong> When a new learner is created</li>
+              <li><strong>Course Assignment:</strong> When a learner is assigned to a course</li>
+              <li><strong>Daily Content:</strong> Course content will be sent at the scheduled time</li>
+            </ol>
+            <p className="mt-2 text-sm">These messages are triggered by database events and scheduled tasks. No additional configuration is required.</p>
           </AlertDescription>
         </Alert>
 

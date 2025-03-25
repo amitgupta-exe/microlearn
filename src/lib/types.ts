@@ -33,6 +33,7 @@ export interface Course {
   days: CourseDay[];
   created_at: string;
   status: 'active' | 'archived' | 'draft';
+  learner_count?: number; // Add this property to fix the TypeScript error
 }
 
 export interface LearnerCourse {
@@ -60,7 +61,7 @@ export interface WhatsAppConfig {
   business_account_id: string;
   webhook_url: string;
   is_configured: boolean;
-  user_id: string; // Changed from optional to required
+  user_id: string; // Required field
   id?: string;      // Added id field for existing config
 }
 
