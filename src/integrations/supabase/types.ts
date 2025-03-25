@@ -292,36 +292,30 @@ export type Database = {
       whatsapp_config: {
         Row: {
           api_key: string
-          business_account_id: string
           created_at: string
+          endpoint: string
           id: string
           is_configured: boolean
-          phone_number_id: string
           updated_at: string
           user_id: string
-          webhook_url: string
         }
         Insert: {
           api_key: string
-          business_account_id: string
           created_at?: string
+          endpoint?: string
           id?: string
           is_configured?: boolean
-          phone_number_id: string
           updated_at?: string
           user_id: string
-          webhook_url: string
         }
         Update: {
           api_key?: string
-          business_account_id?: string
           created_at?: string
+          endpoint?: string
           id?: string
           is_configured?: boolean
-          phone_number_id?: string
           updated_at?: string
           user_id?: string
-          webhook_url?: string
         }
         Relationships: [
           {

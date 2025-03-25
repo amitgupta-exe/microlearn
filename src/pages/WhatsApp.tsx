@@ -151,8 +151,6 @@ const WhatsApp = () => {
           setConfigId(data.id);
         }
       }
-      
-      await handleVerify();
     } catch (error) {
       toast.error('Failed to save configuration. Please try again.');
       console.error(error);
@@ -165,25 +163,7 @@ const WhatsApp = () => {
     try {
       setIsVerifying(true);
       
-      const { data: config, error: configError } = await supabase
-        .from('whatsapp_config')
-        .select('*')
-        .limit(1)
-        .maybeSingle();
-      
-      if (configError) {
-        console.error('Error fetching WATI config for verification:', configError);
-        setVerificationStatus('error');
-        toast.error('Failed to fetch WATI configuration for verification');
-        return;
-      }
-      
-      if (!config || !config.is_configured) {
-        setVerificationStatus('error');
-        toast.error('Please save the WATI configuration first');
-        return;
-      }
-      
+      // Send a test message to verify the configuration
       const { data, error } = await supabase.functions.invoke('send-course-notification', {
         body: {
           learner_name: 'Test User',
@@ -256,14 +236,9 @@ const WhatsApp = () => {
 
         <Alert className="mb-6 bg-blue-50 border-blue-200 text-blue-800">
           <Info className="h-4 w-4 text-blue-600" />
-          <AlertTitle>Automated Messaging</AlertTitle>
+          <AlertTitle>WhatsApp Integration</AlertTitle>
           <AlertDescription>
-            <p className="mb-2">Once configured, the system will automatically send WhatsApp messages to your learners:</p>
-            <ol className="list-decimal list-inside space-y-1 ml-2">
-              <li><strong>Welcome Message:</strong> When a new learner is created</li>
-              <li><strong>Course Assignment:</strong> When a learner is assigned to a course</li>
-              <li><strong>Daily Content:</strong> Course content will be sent at the scheduled time</li>
-            </ol>
+            <p>Once configured, the system will automatically send WhatsApp messages to your learners when they register and when courses are assigned.</p>
           </AlertDescription>
         </Alert>
 
@@ -271,7 +246,7 @@ const WhatsApp = () => {
           <CardHeader>
             <CardTitle>WATI WhatsApp API Settings</CardTitle>
             <CardDescription>
-              Configure your WATI WhatsApp API to send messages to your learners
+              Enter your WATI API credentials to enable WhatsApp messaging
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -292,7 +267,7 @@ const WhatsApp = () => {
                         />
                       </FormControl>
                       <FormDescription>
-                        This is your WATI access token from WATI dashboard
+                        Your WATI access token from WATI dashboard
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -334,7 +309,7 @@ const WhatsApp = () => {
                         Verifying...
                       </>
                     ) : (
-                      'Verify Connection'
+                      'Test Connection'
                     )}
                   </Button>
                   
@@ -356,10 +331,6 @@ const WhatsApp = () => {
               </form>
             </Form>
           </CardContent>
-          <CardFooter className="flex flex-col items-start text-muted-foreground text-sm border-t p-6">
-            <h4 className="font-medium text-foreground mb-2">Note:</h4>
-            <p>You need a WATI Business account to use this feature. Get your access token from your WATI dashboard.</p>
-          </CardFooter>
         </Card>
       </div>
     </div>
