@@ -35,10 +35,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 const formSchema = z.object({
-  api_key: z.string().min(1, {
+  serri_api_key: z.string().min(1, {
     message: "API Key is required.",
   }),
-  endpoint: z.string().url({
+  serri_endpoint: z.string().url({
     message: "Please enter a valid URL.",
   }),
 });
@@ -55,8 +55,8 @@ const WhatsApp = () => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      api_key: '',
-      endpoint: 'https://api.wati.io/api/v1',
+      serri_api_key: '',
+      serri_endpoint: 'https://api.serri.io/api/v1',
     },
   });
   
@@ -75,7 +75,7 @@ const WhatsApp = () => {
           .maybeSingle();
           
         if (error) {
-          console.error('Error fetching WATI config:', error);
+          console.error('Error fetching Serri config:', error);
           return;
         }
         
@@ -84,12 +84,12 @@ const WhatsApp = () => {
           setConfigId(data.id);
           
           form.reset({
-            api_key: data.api_key || '',
-            endpoint: data.endpoint || 'https://api.wati.io/api/v1',
+            serri_api_key: data.serri_api_key || '',
+            serri_endpoint: data.serri_endpoint || 'https://api.serri.io/api/v1',
           });
         }
       } catch (error) {
-        console.error('Error loading WATI config:', error);
+        console.error('Error loading Serri config:', error);
       } finally {
         setIsLoading(false);
       }
@@ -108,8 +108,8 @@ const WhatsApp = () => {
       setIsSubmitting(true);
       
       const config: WatiConfig = {
-        api_key: data.api_key,
-        endpoint: data.endpoint,
+        serri_api_key: data.serri_api_key,
+        serri_endpoint: data.serri_endpoint,
         is_configured: true,
         user_id: user.id,
       };
@@ -132,13 +132,13 @@ const WhatsApp = () => {
       }
       
       if (saveError) {
-        console.error('Error saving WATI config:', saveError);
+        console.error('Error saving Serri config:', saveError);
         toast.error('Failed to save configuration');
         return;
       }
       
       setIsConfigured(true);
-      toast.success('WATI configuration saved successfully');
+      toast.success('Serri configuration saved successfully');
       
       if (!configId) {
         const { data } = await supabase
@@ -175,20 +175,20 @@ const WhatsApp = () => {
       });
       
       if (error) {
-        console.error('Error verifying WATI connection:', error);
+        console.error('Error verifying Serri connection:', error);
         setVerificationStatus('error');
-        toast.error('Failed to verify WATI connection. Please check your credentials.');
+        toast.error('Failed to verify Serri connection. Please check your credentials.');
         return;
       }
       
       console.log('Verification response:', data);
       
       setVerificationStatus('success');
-      toast.success('WATI API connection test initiated');
+      toast.success('Serri API connection test initiated');
       
     } catch (error) {
       setVerificationStatus('error');
-      toast.error('Failed to verify WATI connection. Please check your credentials.');
+      toast.error('Failed to verify Serri connection. Please check your credentials.');
       console.error(error);
     } finally {
       setIsVerifying(false);
@@ -200,7 +200,7 @@ const WhatsApp = () => {
       <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
         <div className="max-w-3xl mx-auto flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2">Loading WATI configuration...</span>
+          <span className="ml-2">Loading Serri configuration...</span>
         </div>
       </div>
     );
@@ -211,7 +211,7 @@ const WhatsApp = () => {
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">WhatsApp Configuration</h1>
-          <p className="text-muted-foreground mt-1">Connect your WATI WhatsApp Business API</p>
+          <p className="text-muted-foreground mt-1">Connect your Serri WhatsApp Business API</p>
         </div>
 
         {verificationStatus === 'success' && (
@@ -219,7 +219,7 @@ const WhatsApp = () => {
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertTitle>Connection Verified</AlertTitle>
             <AlertDescription>
-              Your WATI WhatsApp Business API connection is working correctly.
+              Your Serri WhatsApp Business API connection is working correctly.
             </AlertDescription>
           </Alert>
         )}
@@ -229,7 +229,7 @@ const WhatsApp = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Verification Failed</AlertTitle>
             <AlertDescription>
-              Unable to connect to WATI WhatsApp Business API. Please check your credentials and try again.
+              Unable to connect to Serri WhatsApp Business API. Please check your credentials and try again.
             </AlertDescription>
           </Alert>
         )}
@@ -238,15 +238,15 @@ const WhatsApp = () => {
           <Info className="h-4 w-4 text-blue-600" />
           <AlertTitle>WhatsApp Integration</AlertTitle>
           <AlertDescription>
-            <p>Once configured, the system will automatically send WhatsApp messages to your learners when they register and when courses are assigned.</p>
+            <p>Once configured, the system will automatically send WhatsApp messages to your learners when they register and when courses are assigned. Messages will be sent at 10:00 AM on the scheduled start date.</p>
           </AlertDescription>
         </Alert>
 
         <Card className="glass-card">
           <CardHeader>
-            <CardTitle>WATI WhatsApp API Settings</CardTitle>
+            <CardTitle>Serri WhatsApp API Settings</CardTitle>
             <CardDescription>
-              Enter your WATI API credentials to enable WhatsApp messaging
+              Enter your Serri API credentials to enable WhatsApp messaging
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -254,20 +254,20 @@ const WhatsApp = () => {
               <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
-                  name="api_key"
+                  name="serri_api_key"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>WATI Access Token</FormLabel>
+                      <FormLabel>Serri Access Token</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="Enter your WATI access token" 
+                          placeholder="Enter your Serri access token" 
                           className="glass-input" 
                           type="password"
                           {...field} 
                         />
                       </FormControl>
                       <FormDescription>
-                        Your WATI access token from WATI dashboard
+                        Your Serri access token from Serri dashboard
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -276,19 +276,19 @@ const WhatsApp = () => {
                 
                 <FormField
                   control={form.control}
-                  name="endpoint"
+                  name="serri_endpoint"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>WATI API Endpoint</FormLabel>
+                      <FormLabel>Serri API Endpoint</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="https://api.wati.io/api/v1" 
+                          placeholder="https://api.serri.io/api/v1" 
                           className="glass-input" 
                           {...field} 
                         />
                       </FormControl>
                       <FormDescription>
-                        The WATI API endpoint (default is https://api.wati.io/api/v1)
+                        The Serri API endpoint (default is https://api.serri.io/api/v1)
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

@@ -14,6 +14,7 @@ export interface Learner {
   courses?: Course[]; // Make courses optional
   created_at: string;
   status: 'active' | 'inactive';
+  total_courses?: number; // New field to track total courses
 }
 
 export interface CourseDay {
@@ -33,7 +34,7 @@ export interface Course {
   days: CourseDay[];
   created_at: string;
   status: 'active' | 'archived' | 'draft';
-  learner_count?: number; // Add this property to fix the TypeScript error
+  total_enrollments?: number; // Add this property to track enrollments
 }
 
 export interface LearnerCourse {
@@ -58,8 +59,8 @@ export interface MessageSent {
 export interface WatiConfig {
   id?: string;
   user_id: string;
-  api_key: string;
-  endpoint: string;
+  serri_api_key: string; // Changed from api_key to serri_api_key
+  serri_endpoint: string; // Changed from endpoint to serri_endpoint
   is_configured: boolean;
 }
 

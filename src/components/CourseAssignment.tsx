@@ -148,6 +148,18 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
         throw error;
       }
       
+      // Increment total courses for the learner
+      await supabase
+        .from('learners')
+        .update({ total_courses: learner.total_courses ? learner.total_courses + 1 : 1 })
+        .eq('id', learner.id);
+        
+      // Increment total enrollments for the course
+      await supabase
+        .from('courses')
+        .update({ total_enrollments: (courses.find(c => c.id === data.course_id)?.total_enrollments || 0) + 1 })
+        .eq('id', data.course_id);
+      
       console.log('Course assigned successfully:', insertedData);
       
       // If the course is assigned successfully, send a WhatsApp notification
@@ -245,6 +257,10 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                           !field.value ? "text-muted-foreground" : ""
                         }`}
                         type="button" // Important: specify button type to prevent form submission
+                        onClick={(e) => {
+                          // Stop event propagation to prevent dialog from closing
+                          e.stopPropagation();
+                        }}
                       >
                         {field.value ? (
                           format(field.value, "PPP")
@@ -255,11 +271,13 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto p-0" align="start" onClick={(e) => e.stopPropagation()}>
                     <CalendarComponent
                       mode="single"
                       selected={field.value}
-                      onSelect={field.onChange}
+                      onSelect={(date) => {
+                        field.onChange(date);
+                      }}
                       initialFocus
                       disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} // Disable past dates
                     />
@@ -301,7 +319,10 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           <Button 
             type="button" 
             variant="outline" 
-            onClick={onCancel}
+            onClick={(e) => {
+              e.preventDefault();
+              onCancel();
+            }}
             disabled={isSubmitting}
           >
             Cancel
