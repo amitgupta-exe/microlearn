@@ -149,16 +149,29 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
       }
       
       // Increment total courses for the learner
-      await supabase
+      const { error: learnerUpdateError } = await supabase
         .from('learners')
-        .update({ total_courses: learner.total_courses ? learner.total_courses + 1 : 1 })
+        .update({ 
+          total_courses: (learner.total_courses || 0) + 1 
+        })
         .eq('id', learner.id);
         
+      if (learnerUpdateError) {
+        console.error('Error updating learner:', learnerUpdateError);
+      }
+        
       // Increment total enrollments for the course
-      await supabase
+      const selectedCourse = courses.find(c => c.id === data.course_id);
+      const { error: courseUpdateError } = await supabase
         .from('courses')
-        .update({ total_enrollments: (courses.find(c => c.id === data.course_id)?.total_enrollments || 0) + 1 })
+        .update({ 
+          total_enrollments: (selectedCourse?.total_enrollments || 0) + 1 
+        })
         .eq('id', data.course_id);
+        
+      if (courseUpdateError) {
+        console.error('Error updating course:', courseUpdateError);
+      }
       
       console.log('Course assigned successfully:', insertedData);
       
@@ -257,10 +270,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                           !field.value ? "text-muted-foreground" : ""
                         }`}
                         type="button" // Important: specify button type to prevent form submission
-                        onClick={(e) => {
-                          // Stop event propagation to prevent dialog from closing
-                          e.stopPropagation();
-                        }}
                       >
                         {field.value ? (
                           format(field.value, "PPP")
@@ -271,13 +280,11 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start" onClick={(e) => e.stopPropagation()}>
+                  <PopoverContent className="w-auto p-0" align="start">
                     <CalendarComponent
                       mode="single"
                       selected={field.value}
-                      onSelect={(date) => {
-                        field.onChange(date);
-                      }}
+                      onSelect={field.onChange}
                       initialFocus
                       disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} // Disable past dates
                     />
