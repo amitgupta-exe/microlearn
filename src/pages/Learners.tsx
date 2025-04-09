@@ -142,6 +142,20 @@ const Learners = () => {
         throw error;
       }
       
+      try {
+        await supabase.functions.invoke('send-course-notification', {
+          body: {
+            learner_id: createdLearner.id,
+            learner_name: createdLearner.name,
+            learner_phone: createdLearner.phone,
+            type: 'welcome'
+          }
+        });
+        console.log('Welcome message sent successfully');
+      } catch (welcomeError) {
+        console.error('Error sending welcome message:', welcomeError);
+      }
+      
       const learnerWithCourses: Learner = {
         ...createdLearner,
         courses: [],

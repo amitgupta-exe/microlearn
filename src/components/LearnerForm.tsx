@@ -17,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Learner } from '@/lib/types';
+import { supabase } from '@/integrations/supabase/client';
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -52,10 +53,46 @@ const LearnerForm: React.FC<LearnerFormProps> = ({
     },
   });
 
+  const sendWelcomeMessage = async (learnerId: string, name: string, phone: string) => {
+    try {
+      // Only send welcome message for new learners (not when updating)
+      if (!learner) {
+        await supabase.functions.invoke('send-course-notification', {
+          body: {
+            learner_id: learnerId,
+            learner_name: name,
+            learner_phone: phone,
+            type: 'welcome'
+          }
+        });
+        console.log('Welcome message sent successfully');
+      }
+    } catch (error) {
+      console.error('Error sending welcome message:', error);
+      // We don't want to fail the whole operation if just the welcome message fails
+      toast.error('Learner created but welcome message could not be sent');
+    }
+  };
+
   const handleSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       setIsSubmitting(true);
       await onSubmit(data);
+      
+      // If this is a creation (not update), send welcome message
+      if (!learner) {
+        // Get the newly created learner's ID from the Learners component
+        const { data: newLearners, error } = await supabase
+          .from('learners')
+          .select('id')
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        if (!error && newLearners && newLearners.length > 0) {
+          await sendWelcomeMessage(newLearners[0].id, data.name, data.phone);
+        }
+      }
+      
       toast.success(`Learner ${learner ? 'updated' : 'created'} successfully`);
     } catch (error) {
       toast.error('Something went wrong. Please try again.');
