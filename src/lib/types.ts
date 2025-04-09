@@ -59,8 +59,7 @@ export interface MessageSent {
 export interface WatiConfig {
   id?: string;
   user_id: string;
-  serri_api_key: string; // Changed from api_key to serri_api_key
-  serri_endpoint: string; // Changed from endpoint to serri_endpoint
+  access_token: string; // Changed from serri_api_key/endpoint to single access_token
   is_configured: boolean;
 }
 

@@ -35,11 +35,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 const formSchema = z.object({
-  serri_api_key: z.string().min(1, {
-    message: "API Key is required.",
-  }),
-  serri_endpoint: z.string().url({
-    message: "Please enter a valid URL.",
+  access_token: z.string().min(1, {
+    message: "Access Token is required.",
   }),
 });
 
@@ -55,8 +52,7 @@ const WhatsApp = () => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      serri_api_key: '',
-      serri_endpoint: 'https://api.serri.io/api/v1',
+      access_token: '',
     },
   });
   
@@ -75,7 +71,7 @@ const WhatsApp = () => {
           .maybeSingle();
           
         if (error) {
-          console.error('Error fetching Serri config:', error);
+          console.error('Error fetching WhatsApp config:', error);
           return;
         }
         
@@ -84,12 +80,11 @@ const WhatsApp = () => {
           setConfigId(data.id);
           
           form.reset({
-            serri_api_key: data.serri_api_key || '',
-            serri_endpoint: data.serri_endpoint || 'https://api.serri.io/api/v1',
+            access_token: data.access_token || '',
           });
         }
       } catch (error) {
-        console.error('Error loading Serri config:', error);
+        console.error('Error loading WhatsApp config:', error);
       } finally {
         setIsLoading(false);
       }
@@ -108,8 +103,7 @@ const WhatsApp = () => {
       setIsSubmitting(true);
       
       const config: WatiConfig = {
-        serri_api_key: data.serri_api_key,
-        serri_endpoint: data.serri_endpoint,
+        access_token: data.access_token,
         is_configured: true,
         user_id: user.id,
       };
@@ -132,13 +126,13 @@ const WhatsApp = () => {
       }
       
       if (saveError) {
-        console.error('Error saving Serri config:', saveError);
+        console.error('Error saving WhatsApp config:', saveError);
         toast.error('Failed to save configuration');
         return;
       }
       
       setIsConfigured(true);
-      toast.success('Serri configuration saved successfully');
+      toast.success('WhatsApp configuration saved successfully');
       
       if (!configId) {
         const { data } = await supabase
@@ -167,7 +161,7 @@ const WhatsApp = () => {
       const { data, error } = await supabase.functions.invoke('send-course-notification', {
         body: {
           learner_name: 'Test User',
-          learner_phone: '1234567890',
+          learner_phone: '9767989231', // Example phone number
           course_name: 'Test Course',
           start_date: new Date().toLocaleDateString(),
           type: 'test'
@@ -175,20 +169,20 @@ const WhatsApp = () => {
       });
       
       if (error) {
-        console.error('Error verifying Serri connection:', error);
+        console.error('Error verifying WhatsApp connection:', error);
         setVerificationStatus('error');
-        toast.error('Failed to verify Serri connection. Please check your credentials.');
+        toast.error('Failed to verify WhatsApp connection. Please check your credentials.');
         return;
       }
       
       console.log('Verification response:', data);
       
       setVerificationStatus('success');
-      toast.success('Serri API connection test initiated');
+      toast.success('WhatsApp API connection test initiated');
       
     } catch (error) {
       setVerificationStatus('error');
-      toast.error('Failed to verify Serri connection. Please check your credentials.');
+      toast.error('Failed to verify WhatsApp connection. Please check your credentials.');
       console.error(error);
     } finally {
       setIsVerifying(false);
@@ -200,7 +194,7 @@ const WhatsApp = () => {
       <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
         <div className="max-w-3xl mx-auto flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2">Loading Serri configuration...</span>
+          <span className="ml-2">Loading WhatsApp configuration...</span>
         </div>
       </div>
     );
@@ -211,7 +205,7 @@ const WhatsApp = () => {
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">WhatsApp Configuration</h1>
-          <p className="text-muted-foreground mt-1">Connect your Serri WhatsApp Business API</p>
+          <p className="text-muted-foreground mt-1">Connect your AiSensy WhatsApp Business API</p>
         </div>
 
         {verificationStatus === 'success' && (
@@ -219,7 +213,7 @@ const WhatsApp = () => {
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertTitle>Connection Verified</AlertTitle>
             <AlertDescription>
-              Your Serri WhatsApp Business API connection is working correctly.
+              Your AiSensy WhatsApp Business API connection is working correctly.
             </AlertDescription>
           </Alert>
         )}
@@ -229,7 +223,7 @@ const WhatsApp = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Verification Failed</AlertTitle>
             <AlertDescription>
-              Unable to connect to Serri WhatsApp Business API. Please check your credentials and try again.
+              Unable to connect to AiSensy WhatsApp Business API. Please check your credentials and try again.
             </AlertDescription>
           </Alert>
         )}
@@ -244,9 +238,9 @@ const WhatsApp = () => {
 
         <Card className="glass-card">
           <CardHeader>
-            <CardTitle>Serri WhatsApp API Settings</CardTitle>
+            <CardTitle>AiSensy WhatsApp API Settings</CardTitle>
             <CardDescription>
-              Enter your Serri API credentials to enable WhatsApp messaging
+              Enter your AiSensy API access token to enable WhatsApp messaging
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -254,41 +248,20 @@ const WhatsApp = () => {
               <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
-                  name="serri_api_key"
+                  name="access_token"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Serri Access Token</FormLabel>
+                      <FormLabel>AiSensy Access Token</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="Enter your Serri access token" 
+                          placeholder="Enter your AiSensy access token" 
                           className="glass-input" 
                           type="password"
                           {...field} 
                         />
                       </FormControl>
                       <FormDescription>
-                        Your Serri access token from Serri dashboard
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="serri_endpoint"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Serri API Endpoint</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="https://api.serri.io/api/v1" 
-                          className="glass-input" 
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        The Serri API endpoint (default is https://api.serri.io/api/v1)
+                        Your AiSensy access token from the AiSensy dashboard
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

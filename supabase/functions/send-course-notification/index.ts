@@ -83,8 +83,8 @@ serve(async (req) => {
       );
     }
 
-    // Fetch WATI configuration
-    const { data: watiConfig, error: configError } = await supabaseClient
+    // Fetch WhatsApp configuration
+    const { data: whatsappConfig, error: configError } = await supabaseClient
       .from('whatsapp_config')
       .select('*')
       .eq('is_configured', true)
@@ -92,10 +92,10 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    if (configError || !watiConfig) {
-      console.error("WATI configuration error:", configError);
+    if (configError || !whatsappConfig) {
+      console.error("WhatsApp configuration error:", configError);
       return new Response(
-        JSON.stringify({ success: false, error: "WATI not configured" }),
+        JSON.stringify({ success: false, error: "WhatsApp not configured" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
@@ -113,18 +113,17 @@ serve(async (req) => {
     } else if (type === 'course_day') {
       messageText = `Hello ${name || "there"}! Here is your content for today's lesson in "${course_name}":\n\n${course_day_info || "No content available"}`;
     } else if (type === 'test') {
-      messageText = `This is a test message from MicroLearn. If you received this, your WATI integration is working correctly.`;
+      messageText = `This is a test message from MicroLearn. If you received this, your WhatsApp integration is working correctly.`;
     }
 
-    // Send WhatsApp message using the WATI API
-    const apiResponse = await sendWatiMessage(
-      watiConfig.api_key,
-      watiConfig.endpoint,
+    // Send WhatsApp message using the AiSensy API
+    const apiResponse = await sendAiSensyMessage(
+      whatsappConfig.access_token,
       formattedPhone,
       messageText
     );
 
-    console.log("WATI API response:", apiResponse);
+    console.log("AiSensy API response:", apiResponse);
 
     // Log the message in the database if learner_id and course_id are provided
     if (learner_id && type !== 'welcome' && type !== 'test') {
@@ -174,7 +173,7 @@ function formatPhoneNumber(phone: string): string {
     return cleaned;
   } else if (cleaned.length === 10) {
     // Assume US/Canada number and add country code
-    return '1' + cleaned;
+    return '91' + cleaned;
   }
   
   // Return as is if already formatted or can't determine format
@@ -195,10 +194,9 @@ function formatDate(isoDate: string): string {
   }
 }
 
-// Send WhatsApp message using WATI API
-async function sendWatiMessage(
-  apiKey: string,
-  endpoint: string,
+// Send WhatsApp message using AiSensy API
+async function sendAiSensyMessage(
+  accessToken: string,
   to: string,
   body: string
 ): Promise<any> {
@@ -208,33 +206,35 @@ async function sendWatiMessage(
       console.log(`[TEST MODE] Would send message to ${to}: ${body}`);
       return { status: "success", mode: "test" };
     }
-
-    // Clean up the endpoint URL if needed
-    const baseEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
     
-    // Send message using WATI API
+    // Send message using AiSensy API
     const response = await fetch(
-      `${baseEndpoint}/sendSessionMessage/${to}`,
+      'https://backend.aisensy.com/direct-apis/t1/messages',
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': accessToken,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messageText: body
+          to: to,
+          type: "text",
+          recipient_type: "individual",
+          text: {
+            body: body
+          }
         }),
       }
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`WATI API error: ${response.status} ${errorText}`);
+      throw new Error(`AiSensy API error: ${response.status} ${errorText}`);
     }
 
     return await response.json();
   } catch (error) {
-    console.error("Error sending WATI message:", error);
+    console.error("Error sending AiSensy message:", error);
     throw error;
   }
 }
