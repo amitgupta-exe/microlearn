@@ -59,7 +59,8 @@ export interface MessageSent {
 export interface WatiConfig {
   id?: string;
   user_id: string;
-  access_token: string; // Changed from serri_api_key/endpoint to single access_token
+  serri_api_key: string; // Using the existing database column name for now
+  serri_endpoint?: string; // Optional as we might not need this anymore
   is_configured: boolean;
 }
 

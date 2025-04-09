@@ -35,7 +35,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 const formSchema = z.object({
-  access_token: z.string().min(1, {
+  serri_api_key: z.string().min(1, {
     message: "Access Token is required.",
   }),
 });
@@ -52,7 +52,7 @@ const WhatsApp = () => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      access_token: '',
+      serri_api_key: '',
     },
   });
   
@@ -80,7 +80,7 @@ const WhatsApp = () => {
           setConfigId(data.id);
           
           form.reset({
-            access_token: data.access_token || '',
+            serri_api_key: data.serri_api_key || '',
           });
         }
       } catch (error) {
@@ -103,7 +103,7 @@ const WhatsApp = () => {
       setIsSubmitting(true);
       
       const config: WatiConfig = {
-        access_token: data.access_token,
+        serri_api_key: data.serri_api_key,
         is_configured: true,
         user_id: user.id,
       };
@@ -248,7 +248,7 @@ const WhatsApp = () => {
               <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
-                  name="access_token"
+                  name="serri_api_key"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>AiSensy Access Token</FormLabel>

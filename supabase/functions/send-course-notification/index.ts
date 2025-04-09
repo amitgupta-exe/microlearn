@@ -118,7 +118,7 @@ serve(async (req) => {
 
     // Send WhatsApp message using the AiSensy API
     const apiResponse = await sendAiSensyMessage(
-      whatsappConfig.access_token,
+      whatsappConfig.serri_api_key, // Use serri_api_key as the access token
       formattedPhone,
       messageText
     );
