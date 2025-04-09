@@ -21,23 +21,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Course, Learner } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
-import { format, addDays } from 'date-fns';
+import { format, addDays, parse } from 'date-fns';
 
 const formSchema = z.object({
   course_id: z.string().min(1, {
     message: "Please select a course.",
   }),
-  start_date: z.date({
-    required_error: "Please select a start date.",
+  start_date_string: z.string().min(1, {
+    message: "Please enter a start date (YYYY-MM-DD).",
+  }).refine((value) => {
+    try {
+      const date = parse(value, 'yyyy-MM-dd', new Date());
+      return !isNaN(date.getTime()) && date >= new Date(new Date().setHours(0, 0, 0, 0));
+    } catch (error) {
+      return false;
+    }
+  }, {
+    message: "Invalid date or date is in the past.",
   }),
   status: z.enum(['scheduled', 'in_progress', 'completed'], {
     required_error: "Please select a status.",
@@ -62,12 +66,13 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   
   // Set default start date to tomorrow
   const tomorrow = addDays(new Date(), 1);
+  const defaultDateString = format(tomorrow, 'yyyy-MM-dd');
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       status: 'scheduled',
-      start_date: tomorrow,
+      start_date_string: defaultDateString,
     },
   });
 
@@ -127,10 +132,13 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
     try {
       setIsSubmitting(true);
       
+      // Parse the date string to a Date object
+      const startDate = parse(data.start_date_string, 'yyyy-MM-dd', new Date());
+      
       const newLearnerCourse = {
         learner_id: learner.id,
         course_id: data.course_id,
-        start_date: data.start_date.toISOString(),
+        start_date: startDate.toISOString(),
         status: data.status,
         completion_percentage: data.status === 'completed' ? 100 : 0,
       };
@@ -183,7 +191,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           learner_name: learner.name,
           learner_phone: learner.phone,
           course_name: courseDetails?.name || 'New course',
-          start_date: format(data.start_date, 'PPP')
+          start_date: format(startDate, 'PPP')
         };
         
         // Send WhatsApp notification
@@ -257,39 +265,18 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           
           <FormField
             control={form.control}
-            name="start_date"
+            name="start_date_string"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Start Date</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        className={`glass-input w-full pl-3 text-left font-normal ${
-                          !field.value ? "text-muted-foreground" : ""
-                        }`}
-                        type="button" // Important: specify button type to prevent form submission
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <Calendar className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      initialFocus
-                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} // Disable past dates
-                    />
-                  </PopoverContent>
-                </Popover>
+                <FormLabel>Start Date (YYYY-MM-DD)</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder="YYYY-MM-DD"
+                    className="glass-input"
+                    type="date"
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
