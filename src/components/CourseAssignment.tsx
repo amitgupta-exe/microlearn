@@ -66,10 +66,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   const [loading, setLoading] = useState(true);
   const [assignedCourseIds, setAssignedCourseIds] = useState<string[]>([]);
 
-  //whatsapp api bearer token
-  const token: string = '';
-
-  //serri send message api endpoint
+  const token: string = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhc3Npc3RhbnRJZCI6IjY3ZDUxMjA0MGI3YWRmMGJmNWJjYzIwMCIsImNsaWVudElkIjoiNjdkNTEwYTYwMDI0ZjIwYmY0MGJmMmE5IiwiaWF0IjoxNzQzNDg1NTE4fQ.XrwL67xEU4DqrohH3sqHtqfcG3wLPUV2or8k9IzAF0I';
   const url: string = 'https://backend.aisensy.com/direct-apis/t1/messages';
 
   interface WhatsAppTextMessage {
@@ -223,7 +220,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
               type: "text",
               recipient_type: "individual",
               text: {
-                body: "course assigned successfully"
+                body: "course assigned successfully to 976798923111111"
               }
             };
 
