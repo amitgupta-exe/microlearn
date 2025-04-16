@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Loader2, Calendar } from 'lucide-react';
 
+import axios, { AxiosResponse, AxiosError } from 'axios';
+
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -54,7 +56,7 @@ interface CourseAssignmentProps {
   onCancel: () => void;
 }
 
-const CourseAssignment: React.FC<CourseAssignmentProps> = ({ 
+const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   learner,
   onAssigned,
   onCancel
@@ -63,11 +65,24 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [assignedCourseIds, setAssignedCourseIds] = useState<string[]>([]);
-  
+
+  const token: string = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhc3Npc3RhbnRJZCI6IjY3ZDUxMjA0MGI3YWRmMGJmNWJjYzIwMCIsImNsaWVudElkIjoiNjdkNTEwYTYwMDI0ZjIwYmY0MGJmMmE5IiwiaWF0IjoxNzQzNDg1NTE4fQ.XrwL67xEU4DqrohH3sqHtqfcG3wLPUV2or8k9IzAF0I';
+  const url: string = 'https://backend.aisensy.com/direct-apis/t1/messages';
+
+  interface WhatsAppTextMessage {
+    to: string;
+    type: string;
+    recipient_type: string;
+    text: {
+      body: string;
+    }
+  }
+
+
   // Set default start date to tomorrow
   const tomorrow = addDays(new Date(), 1);
   const defaultDateString = format(tomorrow, 'yyyy-MM-dd');
-  
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -86,36 +101,36 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           .from('courses')
           .select('*')
           .eq('status', 'active');
-          
+
         if (coursesError) {
           console.error('Error fetching courses:', coursesError);
           toast.error('Failed to load courses');
           return;
         }
-        
+
         // Fetch already assigned courses to this learner
         const { data: assignedCourses, error: assignedError } = await supabase
           .from('learner_courses')
           .select('course_id')
           .eq('learner_id', learner.id);
-          
+
         if (assignedError) {
           console.error('Error fetching assigned courses:', assignedError);
           toast.error('Failed to load assigned courses');
           return;
         }
-        
+
         // Set the assigned course IDs to filter them out
         const assignedIds = assignedCourses.map(ac => ac.course_id);
         setAssignedCourseIds(assignedIds);
-        
+
         // Transform the data to include the days property required by the Course type
         const transformedCourses: Course[] = coursesData.map(course => ({
           ...course,
           days: [], // Add empty days array to satisfy the Course type
           status: course.status as 'active' | 'archived' | 'draft' // Type assertion to match Course type
         }));
-        
+
         setCourses(transformedCourses);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -131,10 +146,10 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   const handleSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       setIsSubmitting(true);
-      
+
       // Parse the date string to a Date object
       const startDate = parse(data.start_date_string, 'yyyy-MM-dd', new Date());
-      
+
       const newLearnerCourse = {
         learner_id: learner.id,
         course_id: data.course_id,
@@ -142,47 +157,47 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
         status: data.status,
         completion_percentage: data.status === 'completed' ? 100 : 0,
       };
-      
+
       console.log('Assigning course with data:', newLearnerCourse);
-      
+
       const { data: insertedData, error } = await supabase
         .from('learner_courses')
         .insert([newLearnerCourse])
         .select();
-        
+
       if (error) {
         console.error('Error assigning course:', error);
         toast.error('Failed to assign course');
         throw error;
       }
-      
+
       // Increment total courses for the learner
       const { error: learnerUpdateError } = await supabase
         .from('learners')
-        .update({ 
-          total_courses: (learner.total_courses || 0) + 1 
+        .update({
+          total_courses: (learner.total_courses || 0) + 1
         })
         .eq('id', learner.id);
-        
+
       if (learnerUpdateError) {
         console.error('Error updating learner:', learnerUpdateError);
       }
-        
+
       // Increment total enrollments for the course
       const selectedCourse = courses.find(c => c.id === data.course_id);
       const { error: courseUpdateError } = await supabase
         .from('courses')
-        .update({ 
-          total_enrollments: (selectedCourse?.total_enrollments || 0) + 1 
+        .update({
+          total_enrollments: (selectedCourse?.total_enrollments || 0) + 1
         })
         .eq('id', data.course_id);
-        
+
       if (courseUpdateError) {
         console.error('Error updating course:', courseUpdateError);
       }
-      
+
       console.log('Course assigned successfully:', insertedData);
-      
+
       // If the course is assigned successfully, send a WhatsApp notification
       try {
         const courseDetails = courses.find(c => c.id === data.course_id);
@@ -193,30 +208,71 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           course_name: courseDetails?.name || 'New course',
           start_date: format(startDate, 'PPP')
         };
-        
+
+        const sendWhatsAppMessage = async (): Promise<any> => {
+          try {
+            const url = 'https://your-whatsapp-api-endpoint.com/messages';
+            const token = 'your_bearer_token_here';
+
+            // Your message payload
+            const messagePayload: WhatsAppTextMessage = {
+              to: "919767989231",
+              type: "text",
+              recipient_type: "individual",
+              text: {
+                body: "course assigned successfully to 976798923111111"
+              }
+            };
+
+            const config = {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            };
+
+            const response = await axios.post(url, messagePayload, config);
+            console.log('Message sent successfully:', response.data);
+            return response.data;
+
+          } catch (error: any) {
+            console.error('Error sending WhatsApp message:',
+              error.response?.data || error.message);
+            throw error;
+          }
+        };
+
+        // Call the function
+        sendWhatsAppMessage();
         // Send WhatsApp notification
         await supabase.functions.invoke('send-course-notification', {
           body: notificationData
         });
-        
+
+
+
+
+
+
         console.log('WhatsApp notification sent successfully');
       } catch (notifyError) {
         console.error('Failed to send WhatsApp notification:', notifyError);
         // Don't block the course assignment if notification fails
       }
-      
+
       toast.success('Course assigned successfully');
       onAssigned();
     } catch (error) {
       console.error('Course assignment error:', error);
       toast.error('Failed to assign course');
     } finally {
+
       setIsSubmitting(false);
     }
   };
 
   // Filter out already assigned courses
-  const availableCourses = courses.filter(course => 
+  const availableCourses = courses.filter(course =>
     !assignedCourseIds.includes(course.id)
   );
 
@@ -262,7 +318,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
               )}
             />
           )}
-          
+
           <FormField
             control={form.control}
             name="start_date_string"
@@ -281,7 +337,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="status"
@@ -308,11 +364,11 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
             )}
           />
         </div>
-        
+
         <div className="flex justify-end gap-3">
-          <Button 
-            type="button" 
-            variant="outline" 
+          <Button
+            type="button"
+            variant="outline"
             onClick={(e) => {
               e.preventDefault();
               onCancel();
@@ -321,8 +377,8 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           >
             Cancel
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={isSubmitting || availableCourses.length === 0}
           >
             {isSubmitting ? (
