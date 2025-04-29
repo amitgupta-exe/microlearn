@@ -6,7 +6,7 @@ import * as z from 'zod';
 import { Loader2, Calendar } from 'lucide-react';
 
 import axios, { AxiosResponse, AxiosError } from 'axios';
-
+import request from 'request';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { Course, Learner } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addDays, parse } from 'date-fns';
+
 
 const formSchema = z.object({
   course_id: z.string().min(1, {
@@ -208,52 +209,32 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           course_name: courseDetails?.name || 'New course',
           start_date: format(startDate, 'PPP')
         };
+console.log(notificationData.learner_phone);
 
-        const sendWhatsAppMessage = async (): Promise<any> => {
-          try {
-            const url = 'https://your-whatsapp-api-endpoint.com/messages';
-            const token = 'your_bearer_token_here';
 
-            // Your message payload
-            const messagePayload: WhatsAppTextMessage = {
-              to: "919767989231",
-              type: "text",
-              recipient_type: "individual",
-              text: {
-                body: "course assigned successfully to 976798923111111"
-              }
-            };
-
-            const config = {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            };
-
-            const response = await axios.post(url, messagePayload, config);
-            console.log('Message sent successfully:', response.data);
-            return response.data;
-
-          } catch (error: any) {
-            console.error('Error sending WhatsApp message:',
-              error.response?.data || error.message);
-            throw error;
-          }
-        };
-
-        // Call the function
-        sendWhatsAppMessage();
         // Send WhatsApp notification
         await supabase.functions.invoke('send-course-notification', {
           body: notificationData
         });
+        const sendText = async (msg, senderID) => {
+          try {
+            const response = await axios.post(
+              `https://${import.meta.env.VITE_URL}/api/v1/sendSessionMessage/${senderID}`,
+              { messageText: msg },
+              {
+                headers: {
+                  'Authorization': import.meta.env.VITE_API,
+                  'Content-Type': 'application/x-www-form-urlencoded'
+                }
+              }
+            );
+            return response.data.result;
+          } catch (error) {
+            console.error('Error sending message:', error);
+          }
+        };
 
-
-
-
-
-
+        sendText(`hello ${notificationData.learner_name}, ${notificationData.course_name} course is assigned to you`, `+91${notificationData.learner_phone}`);
         console.log('WhatsApp notification sent successfully');
       } catch (notifyError) {
         console.error('Failed to send WhatsApp notification:', notifyError);

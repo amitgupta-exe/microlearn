@@ -21,6 +21,7 @@ import ResetPassword from "./pages/ResetPassword";
 import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient();
+console.log(import.meta.env.VITE_URL);
 
 // Protected route wrapper component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
