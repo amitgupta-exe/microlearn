@@ -23,6 +23,9 @@ export interface CourseDay {
   title: string;
   info: string;
   media_link?: string;
+  module_1?: string;
+  module_2?: string;
+  module_3?: string;
 }
 
 export interface Course {
@@ -34,6 +37,7 @@ export interface Course {
   days: CourseDay[];
   created_at: string;
   status: 'active' | 'archived' | 'draft';
+  visibility?: 'public' | 'private';
   total_enrollments?: number; // Add this property to track enrollments
 }
 
