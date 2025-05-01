@@ -9,7 +9,6 @@ import Index from "./pages/Index";
 import Learners from "./pages/Learners";
 import Courses from "./pages/Courses";
 import Analytics from "./pages/Analytics";
-import WhatsApp from "./pages/WhatsApp";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Sidebar from "./components/Sidebar";
@@ -144,6 +143,16 @@ const AppRoutes = () => {
           </div>
         </ProtectedRoute>
       } />
+      <Route path="/courses/assign/:id" element={
+        <ProtectedRoute>
+          <div className="flex w-full min-h-screen">
+            <Sidebar user={user} />
+            <div className="flex-1 overflow-auto">
+              <Courses />
+            </div>
+          </div>
+        </ProtectedRoute>
+      } />
       <Route path="/analytics" element={
         <ProtectedRoute>
           <div className="flex w-full min-h-screen">
@@ -154,7 +163,8 @@ const AppRoutes = () => {
           </div>
         </ProtectedRoute>
       } />
-      <Route path="/whatsapp" element={
+      {/* Commenting out WhatsApp route as requested */}
+      {/* <Route path="/whatsapp" element={
         <ProtectedRoute>
           <div className="flex w-full min-h-screen">
             <Sidebar user={user} />
@@ -163,7 +173,7 @@ const AppRoutes = () => {
             </div>
           </div>
         </ProtectedRoute>
-      } />
+      } /> */}
       <Route path="/settings" element={
         <ProtectedRoute>
           <div className="flex w-full min-h-screen">

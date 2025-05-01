@@ -9,6 +9,126 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      alfred_course_data: {
+        Row: {
+          course_name: string
+          created_at: string
+          day: number
+          id: string
+          module_1_text: string | null
+          module_2_text: string | null
+          module_3_text: string | null
+        }
+        Insert: {
+          course_name: string
+          created_at?: string
+          day: number
+          id?: string
+          module_1_text?: string | null
+          module_2_text?: string | null
+          module_3_text?: string | null
+        }
+        Update: {
+          course_name?: string
+          created_at?: string
+          day?: number
+          id?: string
+          module_1_text?: string | null
+          module_2_text?: string | null
+          module_3_text?: string | null
+        }
+        Relationships: []
+      }
+      cop_students: {
+        Row: {
+          airtable_id: string | null
+          "Certificate File": string | null
+          "completed courses": number | null
+          Completion_Certificate: string | null
+          "Course Completed": boolean | null
+          "Course Status": string | null
+          Created: string | null
+          Date: string | null
+          "Day Completed": number | null
+          Doubt: string | null
+          Feedback: string | null
+          Goal: string | null
+          id: number
+          Interactive_Responses: Json | null
+          "Join Waitlist": boolean | null
+          Language: string | null
+          Last_Msg: string | null
+          "Module Completed": number | null
+          Name: string | null
+          "Next Day": string | null
+          "Next Module": string | null
+          Phone: string | null
+          Progress: number | null
+          "Question Responses": Json | null
+          Responses: Json | null
+          Style: string | null
+          Topic: string | null
+        }
+        Insert: {
+          airtable_id?: string | null
+          "Certificate File"?: string | null
+          "completed courses"?: number | null
+          Completion_Certificate?: string | null
+          "Course Completed"?: boolean | null
+          "Course Status"?: string | null
+          Created?: string | null
+          Date?: string | null
+          "Day Completed"?: number | null
+          Doubt?: string | null
+          Feedback?: string | null
+          Goal?: string | null
+          id?: number
+          Interactive_Responses?: Json | null
+          "Join Waitlist"?: boolean | null
+          Language?: string | null
+          Last_Msg?: string | null
+          "Module Completed"?: number | null
+          Name?: string | null
+          "Next Day"?: string | null
+          "Next Module"?: string | null
+          Phone?: string | null
+          Progress?: number | null
+          "Question Responses"?: Json | null
+          Responses?: Json | null
+          Style?: string | null
+          Topic?: string | null
+        }
+        Update: {
+          airtable_id?: string | null
+          "Certificate File"?: string | null
+          "completed courses"?: number | null
+          Completion_Certificate?: string | null
+          "Course Completed"?: boolean | null
+          "Course Status"?: string | null
+          Created?: string | null
+          Date?: string | null
+          "Day Completed"?: number | null
+          Doubt?: string | null
+          Feedback?: string | null
+          Goal?: string | null
+          id?: number
+          Interactive_Responses?: Json | null
+          "Join Waitlist"?: boolean | null
+          Language?: string | null
+          Last_Msg?: string | null
+          "Module Completed"?: number | null
+          Name?: string | null
+          "Next Day"?: string | null
+          "Next Module"?: string | null
+          Phone?: string | null
+          Progress?: number | null
+          "Question Responses"?: Json | null
+          Responses?: Json | null
+          Style?: string | null
+          Topic?: string | null
+        }
+        Relationships: []
+      }
       course_days: {
         Row: {
           course_id: string
@@ -17,6 +137,9 @@ export type Database = {
           id: string
           info: string
           media_link: string | null
+          module_1: string | null
+          module_2: string | null
+          module_3: string | null
           title: string
           updated_at: string
         }
@@ -27,6 +150,9 @@ export type Database = {
           id?: string
           info: string
           media_link?: string | null
+          module_1?: string | null
+          module_2?: string | null
+          module_3?: string | null
           title: string
           updated_at?: string
         }
@@ -37,6 +163,9 @@ export type Database = {
           id?: string
           info?: string
           media_link?: string | null
+          module_1?: string | null
+          module_2?: string | null
+          module_3?: string | null
           title?: string
           updated_at?: string
         }
@@ -50,6 +179,177 @@ export type Database = {
           },
         ]
       }
+      course_name: {
+        Row: {
+          day: number
+          id: string
+          module_1_answer: string | null
+          module_1_ibody: string | null
+          module_1_ibuttons: string | null
+          module_1_link: string | null
+          module_1_list: string | null
+          module_1_ltitle: string | null
+          module_1_next: string | null
+          module_1_question: string | null
+          module_1_text: string | null
+          module_2_answer: string | null
+          module_2_ibody: string | null
+          module_2_ibuttons: string | null
+          module_2_link: string | null
+          module_2_list: string | null
+          module_2_ltitle: string | null
+          module_2_next: string | null
+          module_2_question: string | null
+          module_2_text: string | null
+          module_3_answer: string | null
+          module_3_ibody: string | null
+          module_3_ibuttons: string | null
+          module_3_link: string | null
+          module_3_list: string | null
+          module_3_ltitle: string | null
+          module_3_next: string | null
+          module_3_question: string | null
+          module_3_text: string | null
+          module_4_answer: string | null
+          module_4_ibody: string | null
+          module_4_ibuttons: string | null
+          module_4_link: string | null
+          module_4_list: string | null
+          module_4_ltitle: string | null
+          module_4_next: string | null
+          module_4_question: string | null
+          module_4_text: string | null
+          module_5_answer: string | null
+          module_5_ibody: string | null
+          module_5_ibuttons: string | null
+          module_5_link: string | null
+          module_5_list: string | null
+          module_5_ltitle: string | null
+          module_5_next: string | null
+          module_5_question: string | null
+          module_5_text: string | null
+        }
+        Insert: {
+          day: number
+          id?: string
+          module_1_answer?: string | null
+          module_1_ibody?: string | null
+          module_1_ibuttons?: string | null
+          module_1_link?: string | null
+          module_1_list?: string | null
+          module_1_ltitle?: string | null
+          module_1_next?: string | null
+          module_1_question?: string | null
+          module_1_text?: string | null
+          module_2_answer?: string | null
+          module_2_ibody?: string | null
+          module_2_ibuttons?: string | null
+          module_2_link?: string | null
+          module_2_list?: string | null
+          module_2_ltitle?: string | null
+          module_2_next?: string | null
+          module_2_question?: string | null
+          module_2_text?: string | null
+          module_3_answer?: string | null
+          module_3_ibody?: string | null
+          module_3_ibuttons?: string | null
+          module_3_link?: string | null
+          module_3_list?: string | null
+          module_3_ltitle?: string | null
+          module_3_next?: string | null
+          module_3_question?: string | null
+          module_3_text?: string | null
+          module_4_answer?: string | null
+          module_4_ibody?: string | null
+          module_4_ibuttons?: string | null
+          module_4_link?: string | null
+          module_4_list?: string | null
+          module_4_ltitle?: string | null
+          module_4_next?: string | null
+          module_4_question?: string | null
+          module_4_text?: string | null
+          module_5_answer?: string | null
+          module_5_ibody?: string | null
+          module_5_ibuttons?: string | null
+          module_5_link?: string | null
+          module_5_list?: string | null
+          module_5_ltitle?: string | null
+          module_5_next?: string | null
+          module_5_question?: string | null
+          module_5_text?: string | null
+        }
+        Update: {
+          day?: number
+          id?: string
+          module_1_answer?: string | null
+          module_1_ibody?: string | null
+          module_1_ibuttons?: string | null
+          module_1_link?: string | null
+          module_1_list?: string | null
+          module_1_ltitle?: string | null
+          module_1_next?: string | null
+          module_1_question?: string | null
+          module_1_text?: string | null
+          module_2_answer?: string | null
+          module_2_ibody?: string | null
+          module_2_ibuttons?: string | null
+          module_2_link?: string | null
+          module_2_list?: string | null
+          module_2_ltitle?: string | null
+          module_2_next?: string | null
+          module_2_question?: string | null
+          module_2_text?: string | null
+          module_3_answer?: string | null
+          module_3_ibody?: string | null
+          module_3_ibuttons?: string | null
+          module_3_link?: string | null
+          module_3_list?: string | null
+          module_3_ltitle?: string | null
+          module_3_next?: string | null
+          module_3_question?: string | null
+          module_3_text?: string | null
+          module_4_answer?: string | null
+          module_4_ibody?: string | null
+          module_4_ibuttons?: string | null
+          module_4_link?: string | null
+          module_4_list?: string | null
+          module_4_ltitle?: string | null
+          module_4_next?: string | null
+          module_4_question?: string | null
+          module_4_text?: string | null
+          module_5_answer?: string | null
+          module_5_ibody?: string | null
+          module_5_ibuttons?: string | null
+          module_5_link?: string | null
+          module_5_list?: string | null
+          module_5_ltitle?: string | null
+          module_5_next?: string | null
+          module_5_question?: string | null
+          module_5_text?: string | null
+        }
+        Relationships: []
+      }
+      course_prompt_templates: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          prompt: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          prompt: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          prompt?: string
+        }
+        Relationships: []
+      }
       courses: {
         Row: {
           category: string
@@ -62,6 +362,7 @@ export type Database = {
           status: string
           total_enrollments: number
           updated_at: string
+          visibility: string
         }
         Insert: {
           category: string
@@ -74,6 +375,7 @@ export type Database = {
           status: string
           total_enrollments?: number
           updated_at?: string
+          visibility?: string
         }
         Update: {
           category?: string
@@ -86,6 +388,7 @@ export type Database = {
           status?: string
           total_enrollments?: number
           updated_at?: string
+          visibility?: string
         }
         Relationships: [
           {
@@ -268,29 +571,92 @@ export type Database = {
         }
         Relationships: []
       }
+      students: {
+        Row: {
+          course_id: string
+          id: string
+          last_msg: string | null
+          module_completed: number | null
+          name: string
+          next_day: number | null
+          next_module: number | null
+          phone: string
+        }
+        Insert: {
+          course_id: string
+          id?: string
+          last_msg?: string | null
+          module_completed?: number | null
+          name: string
+          next_day?: number | null
+          next_module?: number | null
+          phone: string
+        }
+        Update: {
+          course_id?: string
+          id?: string
+          last_msg?: string | null
+          module_completed?: number | null
+          name?: string
+          next_day?: number | null
+          next_module?: number | null
+          phone?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           avatar_url: string | null
+          course_id: string | null
           created_at: string
+          day_completed: number | null
           email: string
           id: string
+          interactive_responses: string | null
+          last_msg: string | null
+          module_completed: number | null
           name: string
+          next_day: number | null
+          next_module: number | null
+          phone: string | null
+          question_responses: string | null
+          responses: string | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
+          course_id?: string | null
           created_at?: string
+          day_completed?: number | null
           email: string
           id?: string
+          interactive_responses?: string | null
+          last_msg?: string | null
+          module_completed?: number | null
           name: string
+          next_day?: number | null
+          next_module?: number | null
+          phone?: string | null
+          question_responses?: string | null
+          responses?: string | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
+          course_id?: string | null
           created_at?: string
+          day_completed?: number | null
           email?: string
           id?: string
+          interactive_responses?: string | null
+          last_msg?: string | null
+          module_completed?: number | null
           name?: string
+          next_day?: number | null
+          next_module?: number | null
+          phone?: string | null
+          question_responses?: string | null
+          responses?: string | null
           updated_at?: string
         }
         Relationships: []

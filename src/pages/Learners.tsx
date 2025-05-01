@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Search, User, MoreHorizontal, ArrowLeft, Loader2 } from 'lucide-react';
+import { Plus, Search, User, MoreHorizontal, ArrowLeft, Loader2, FileUp, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -24,9 +25,16 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import LearnerForm from '@/components/LearnerForm';
+import LearnerImport from '@/components/LearnerImport';
 import LearnerCourses from '@/components/LearnerCourses';
 import { Learner } from '@/lib/types';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
@@ -36,12 +44,14 @@ const Learners = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [learners, setLearners] = useState<Learner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('list');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, profile, loading: authLoading } = useRequireAuth();
   
   const isNew = id === 'new';
-  const isEdit = id && id !== 'new';
+  const isImport = id === 'import';
+  const isEdit = id && id !== 'new' && id !== 'import';
   const showForm = isNew || isEdit;
   
   const currentLearner = isEdit 
@@ -285,6 +295,25 @@ const Learners = () => {
     );
   }
   
+  if (isImport) {
+    return (
+      <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
+        <div className="max-w-4xl mx-auto">
+          <Button 
+            variant="ghost" 
+            className="mb-6" 
+            onClick={() => navigate('/learners')}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Learners
+          </Button>
+          
+          <LearnerImport />
+        </div>
+      </div>
+    );
+  }
+  
   if (showForm) {
     return (
       <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
@@ -331,10 +360,16 @@ const Learners = () => {
               Manage your learners
             </p>
           </div>
-          <Button className="mt-4 sm:mt-0" onClick={() => navigate('/learners/new')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add New Learner
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-0">
+            <Button variant="outline" onClick={() => navigate('/learners/import')}>
+              <FileUp className="mr-2 h-4 w-4" />
+              Import Learners
+            </Button>
+            <Button onClick={() => navigate('/learners/new')}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add New Learner
+            </Button>
+          </div>
         </div>
         
         <div className="rounded-lg border bg-card">
