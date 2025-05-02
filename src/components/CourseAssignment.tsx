@@ -5,8 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Loader2, Calendar } from 'lucide-react';
 
-import axios, { AxiosResponse, AxiosError } from 'axios';
-import request from 'request';
+import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -28,7 +27,6 @@ import { toast } from 'sonner';
 import { Course, Learner } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addDays, parse } from 'date-fns';
-
 
 const formSchema = z.object({
   course_id: z.string().min(1, {
@@ -79,7 +77,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
     }
   }
 
-
   // Set default start date to tomorrow
   const tomorrow = addDays(new Date(), 1);
   const defaultDateString = format(tomorrow, 'yyyy-MM-dd');
@@ -129,7 +126,8 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
         const transformedCourses: Course[] = coursesData.map(course => ({
           ...course,
           days: [], // Add empty days array to satisfy the Course type
-          status: course.status as 'active' | 'archived' | 'draft' // Type assertion to match Course type
+          status: course.status as 'active' | 'archived' | 'draft', // Type assertion to match Course type
+          visibility: course.visibility as 'public' | 'private' // Type assertion for visibility
         }));
 
         setCourses(transformedCourses);
@@ -209,14 +207,14 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           course_name: courseDetails?.name || 'New course',
           start_date: format(startDate, 'PPP')
         };
-console.log(notificationData.learner_phone);
-
+        console.log(notificationData.learner_phone);
 
         // Send WhatsApp notification
         await supabase.functions.invoke('send-course-notification', {
           body: notificationData
         });
-        const sendText = async (msg, senderID) => {
+        
+        const sendText = async (msg: string, senderID: string) => {
           try {
             const response = await axios.post(
               `https://${import.meta.env.VITE_URL}/api/v1/sendSessionMessage/${senderID}`,
@@ -247,7 +245,6 @@ console.log(notificationData.learner_phone);
       console.error('Course assignment error:', error);
       toast.error('Failed to assign course');
     } finally {
-
       setIsSubmitting(false);
     }
   };

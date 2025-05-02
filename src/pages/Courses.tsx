@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -52,6 +51,7 @@ import { toast } from 'sonner';
 import CourseForm from '@/components/CourseForm';
 import CoursePromptForm from '@/components/CoursePromptForm';
 import CoursePreview from '@/components/CoursePreview';
+import CourseAssignmentDialog from '@/components/CourseAssignmentDialog';
 import { Course } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,6 +63,8 @@ const Courses = () => {
   const [previewCourse, setPreviewCourse] = useState<Course | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
+  const [assignCourse, setAssignCourse] = useState<Course | null>(null);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
   
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -358,15 +360,13 @@ const Courses = () => {
     setShowPreview(true);
   };
   
-  const handleAssignCourse = (courseId: string) => {
-    // Navigate to the assign course page
-    navigate(`/courses/assign/${courseId}`);
+  const handleAssignCourse = (course: Course) => {
+    setAssignCourse(course);
+    setShowAssignDialog(true);
   };
 
   const handlePromptSuccess = (courseId: string) => {
-    // Refresh courses or navigate to the course
     navigate(`/courses`);
-    // We could optimize by just adding the new course to state, but a refresh ensures everything is up to date
     window.location.reload();
   };
   
@@ -591,7 +591,7 @@ const Courses = () => {
                               <Archive className="h-4 w-4 mr-2" />
                               {course.status === 'active' ? 'Archive' : 'Activate'}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleAssignCourse(course.id)}>
+                            <DropdownMenuItem onClick={() => handleAssignCourse(course)}>
                               <Users className="h-4 w-4 mr-2" />
                               Assign to Learner
                             </DropdownMenuItem>
@@ -619,6 +619,12 @@ const Courses = () => {
         course={previewCourse} 
         open={showPreview} 
         onOpenChange={setShowPreview} 
+      />
+
+      <CourseAssignmentDialog
+        course={assignCourse}
+        open={showAssignDialog}
+        onOpenChange={setShowAssignDialog}
       />
     </div>
   );
