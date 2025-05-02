@@ -37,8 +37,24 @@ export interface Course {
   days: CourseDay[];
   created_at: string;
   status: 'active' | 'archived' | 'draft';
-  visibility?: 'public' | 'private';
+  visibility: 'public' | 'private';
   total_enrollments?: number; // Add this property to track enrollments
+}
+
+// Extended course type for index page
+export interface ExtendedCourse extends Course {
+  learner_count?: number;
+  learner_courses?: any[];
+}
+
+export interface AlfredCourseData {
+  id: string;
+  course_name: string;
+  day: number;
+  module_1_text?: string;
+  module_2_text?: string;
+  module_3_text?: string;
+  created_at: string;
 }
 
 export interface LearnerCourse {

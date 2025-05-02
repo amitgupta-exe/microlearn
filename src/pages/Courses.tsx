@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -52,13 +53,14 @@ import CourseForm from '@/components/CourseForm';
 import CoursePromptForm from '@/components/CoursePromptForm';
 import CoursePreview from '@/components/CoursePreview';
 import CourseAssignmentDialog from '@/components/CourseAssignmentDialog';
-import { Course } from '@/lib/types';
+import { Course, AlfredCourseData } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Courses = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [courses, setCourses] = useState<Course[]>([]);
+  const [alfredCourses, setAlfredCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [previewCourse, setPreviewCourse] = useState<Course | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -87,6 +89,7 @@ const Courses = () => {
       
       setIsLoading(true);
       try {
+        // Fetch regular courses
         const { data, error } = await supabase
           .from('courses')
           .select(`
@@ -123,6 +126,55 @@ const Courses = () => {
           }));
           
           setCourses(transformedCourses);
+        }
+
+        // Fetch alfred course data
+        const { data: alfredData, error: alfredError } = await supabase
+          .from('alfred_course_data')
+          .select('*')
+          .order('course_name')
+          .order('day');
+        
+        if (alfredError) {
+          console.error('Error fetching alfred course data:', alfredError);
+        } else if (alfredData) {
+          // Process the alfred course data to group by course name
+          const courseMap = new Map<string, any[]>();
+          
+          alfredData.forEach((item: AlfredCourseData) => {
+            if (!courseMap.has(item.course_name)) {
+              courseMap.set(item.course_name, []);
+            }
+            courseMap.get(item.course_name)?.push(item);
+          });
+
+          // Transform the grouped data into proper Course objects
+          const alfredCourses: Course[] = Array.from(courseMap.entries()).map(([courseName, days]) => {
+            // Take the first day for course info
+            const firstDay = days[0];
+            
+            return {
+              id: `alfred-${courseName.replace(/\s+/g, '-').toLowerCase()}`,
+              name: courseName,
+              description: `${courseName} - Alfred generated course`,
+              category: 'Alfred Course',
+              language: 'English',
+              days: days.map(day => ({
+                id: day.id,
+                day_number: day.day,
+                title: `Day ${day.day}`,
+                info: day.module_1_text || '',
+                module_1: day.module_1_text || '',
+                module_2: day.module_2_text || '',
+                module_3: day.module_3_text || '',
+              })),
+              created_at: firstDay.created_at,
+              status: 'active' as const,
+              visibility: 'public' as const
+            };
+          });
+
+          setAlfredCourses(alfredCourses);
         }
       } catch (error) {
         console.error('Error fetching courses:', error);
@@ -370,20 +422,33 @@ const Courses = () => {
     window.location.reload();
   };
   
-  // Apply filters
-  let filteredCourses = courses;
-  
-  // Filter by visibility
-  if (visibilityFilter !== 'all') {
-    filteredCourses = filteredCourses.filter(course => course.visibility === visibilityFilter);
+  // Apply filters and combine course lists based on visibility filter
+  let displayedCourses: Course[] = [];
+
+  if (visibilityFilter === 'all') {
+    displayedCourses = [...courses, ...alfredCourses];
+  } else if (visibilityFilter === 'public') {
+    // Show both public user courses and all Alfred courses
+    displayedCourses = [
+      ...courses.filter(course => course.visibility === 'public'),
+      ...alfredCourses
+    ];
+  } else if (visibilityFilter === 'private') {
+    // Show only user's private courses
+    displayedCourses = courses.filter(course => course.visibility === 'private');
   }
   
   // Filter by search query
-  filteredCourses = filteredCourses.filter(course => 
+  displayedCourses = displayedCourses.filter(course => 
     course.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     course.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
     course.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Helper function to check if a course is from Alfred
+  const isAlfredCourse = (course: Course) => {
+    return course.id.startsWith('alfred-');
+  };
   
   if (showForm) {
     return (
@@ -485,7 +550,7 @@ const Courses = () => {
               />
             </div>
             <div className="flex items-center text-sm text-muted-foreground">
-              {filteredCourses.length} courses
+              {displayedCourses.length} courses
             </div>
           </div>
           
@@ -512,14 +577,14 @@ const Courses = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredCourses.length === 0 ? (
+                ) : displayedCourses.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center h-32 text-muted-foreground">
                       {searchQuery ? 'No courses match your search' : 'No courses found'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCourses.map(course => (
+                  displayedCourses.map(course => (
                     <TableRow key={course.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
@@ -551,7 +616,7 @@ const Courses = () => {
                       </TableCell>
                       <TableCell>{course.days.length} days</TableCell>
                       <TableCell>
-                        <Badge variant={course.status === 'active' ? 'default' : 'outline'}>
+                        <Badge variant={course.status === 'active' ? "default" : "outline"}>
                           {course.status === 'active' ? 'Active' : 'Archived'}
                         </Badge>
                       </TableCell>
@@ -566,43 +631,53 @@ const Courses = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/courses/${course.id}`)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
+                            {!isAlfredCourse(course) && (
+                              <DropdownMenuItem onClick={() => navigate(`/courses/${course.id}`)}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => handlePreviewCourse(course)}>
                               <Eye className="h-4 w-4 mr-2" />
                               Preview
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleToggleVisibility(course.id)}>
-                              {course.visibility === 'public' ? (
-                                <>
-                                  <Lock className="h-4 w-4 mr-2" />
-                                  Make Private
-                                </>
-                              ) : (
-                                <>
-                                  <Globe className="h-4 w-4 mr-2" />
-                                  Make Public
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleArchiveCourse(course.id)}>
-                              <Archive className="h-4 w-4 mr-2" />
-                              {course.status === 'active' ? 'Archive' : 'Activate'}
-                            </DropdownMenuItem>
+                            {!isAlfredCourse(course) && (
+                              <DropdownMenuItem onClick={() => handleToggleVisibility(course.id)}>
+                                {course.visibility === 'public' ? (
+                                  <>
+                                    <Lock className="h-4 w-4 mr-2" />
+                                    Make Private
+                                  </>
+                                ) : (
+                                  <>
+                                    <Globe className="h-4 w-4 mr-2" />
+                                    Make Public
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            )}
+                            {!isAlfredCourse(course) && (
+                              <DropdownMenuItem onClick={() => handleArchiveCourse(course.id)}>
+                                <Archive className="h-4 w-4 mr-2" />
+                                {course.status === 'active' ? 'Archive' : 'Activate'}
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => handleAssignCourse(course)}>
                               <Users className="h-4 w-4 mr-2" />
                               Assign to Learner
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => handleDeleteCourse(course.id)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
+                            {!isAlfredCourse(course) && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  className="text-destructive"
+                                  onClick={() => handleDeleteCourse(course.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

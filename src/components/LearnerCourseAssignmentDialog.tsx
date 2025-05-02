@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,12 +12,14 @@ import CourseAssignment from './CourseAssignment';
 
 interface LearnerCourseAssignmentDialogProps {
   learner: Learner | null;
+  course?: Course | null; // Make course optional
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 const LearnerCourseAssignmentDialog: React.FC<LearnerCourseAssignmentDialogProps> = ({
   learner,
+  course,
   open,
   onOpenChange
 }) => {
@@ -37,12 +39,13 @@ const LearnerCourseAssignmentDialog: React.FC<LearnerCourseAssignmentDialogProps
         <DialogHeader>
           <DialogTitle>Assign Course to {learner.name}</DialogTitle>
           <DialogDescription>
-            Select a course to assign to this learner and set a start date
+            {course ? `Assign "${course.name}" to this learner and set a start date` : 'Select a course to assign to this learner and set a start date'}
           </DialogDescription>
         </DialogHeader>
         
         <CourseAssignment
           learner={learner}
+          preselectedCourse={course}
           onAssigned={handleAssigned}
           onCancel={handleCancel}
         />

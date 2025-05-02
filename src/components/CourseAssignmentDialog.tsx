@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Course, Learner } from '@/lib/types';
 import LearnerSelector from './LearnerSelector';
-import CourseAssignment from './CourseAssignment';
+import LearnerCourseAssignmentDialog from './LearnerCourseAssignmentDialog';
 
 interface CourseAssignmentDialogProps {
   course: Course | null;
@@ -56,22 +56,12 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
       )}
 
       {step === 'assign-course' && selectedLearner && course && (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Assign Course to {selectedLearner.name}</DialogTitle>
-              <DialogDescription>
-                Assign "{course.name}" to this learner and set a start date
-              </DialogDescription>
-            </DialogHeader>
-            
-            <CourseAssignment
-              learner={selectedLearner}
-              onAssigned={handleAssigned}
-              onCancel={handleCancel}
-            />
-          </DialogContent>
-        </Dialog>
+        <LearnerCourseAssignmentDialog
+          learner={selectedLearner}
+          course={course}
+          open={open}
+          onOpenChange={onOpenChange}
+        />
       )}
     </>
   );

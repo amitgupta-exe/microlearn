@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, Calendar } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -51,12 +51,14 @@ const formSchema = z.object({
 
 interface CourseAssignmentProps {
   learner: Learner;
+  preselectedCourse?: Course | null;
   onAssigned: () => void;
   onCancel: () => void;
 }
 
 const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   learner,
+  preselectedCourse,
   onAssigned,
   onCancel
 }) => {
@@ -64,18 +66,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [assignedCourseIds, setAssignedCourseIds] = useState<string[]>([]);
-
-  const token: string = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhc3Npc3RhbnRJZCI6IjY3ZDUxMjA0MGI3YWRmMGJmNWJjYzIwMCIsImNsaWVudElkIjoiNjdkNTEwYTYwMDI0ZjIwYmY0MGJmMmE5IiwiaWF0IjoxNzQzNDg1NTE4fQ.XrwL67xEU4DqrohH3sqHtqfcG3wLPUV2or8k9IzAF0I';
-  const url: string = 'https://backend.aisensy.com/direct-apis/t1/messages';
-
-  interface WhatsAppTextMessage {
-    to: string;
-    type: string;
-    recipient_type: string;
-    text: {
-      body: string;
-    }
-  }
 
   // Set default start date to tomorrow
   const tomorrow = addDays(new Date(), 1);
@@ -86,6 +76,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
     defaultValues: {
       status: 'scheduled',
       start_date_string: defaultDateString,
+      course_id: preselectedCourse ? preselectedCourse.id : undefined,
     },
   });
 
@@ -258,43 +249,45 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <div className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span className="ml-2">Loading courses...</span>
-            </div>
-          ) : availableCourses.length === 0 ? (
-            <div className="text-center text-muted-foreground py-4">
-              No available courses to assign. All courses have been assigned to this learner.
-            </div>
-          ) : (
-            <FormField
-              control={form.control}
-              name="course_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Select Course</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="glass-input">
-                        <SelectValue placeholder="Select a course" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {availableCourses.map(course => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          {!preselectedCourse && (
+            loading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="ml-2">Loading courses...</span>
+              </div>
+            ) : availableCourses.length === 0 ? (
+              <div className="text-center text-muted-foreground py-4">
+                No available courses to assign. All courses have been assigned to this learner.
+              </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="course_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Select Course</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="glass-input">
+                          <SelectValue placeholder="Select a course" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {availableCourses.map(course => (
+                          <SelectItem key={course.id} value={course.id}>
+                            {course.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )
           )}
 
           <FormField
@@ -357,7 +350,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           </Button>
           <Button
             type="submit"
-            disabled={isSubmitting || availableCourses.length === 0}
+            disabled={isSubmitting || (!preselectedCourse && availableCourses.length === 0)}
           >
             {isSubmitting ? (
               <>
