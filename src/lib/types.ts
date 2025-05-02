@@ -66,6 +66,11 @@ export interface LearnerCourse {
   status: 'scheduled' | 'in_progress' | 'completed';
 }
 
+// Extended learner course type with course included
+export interface ExtendedLearnerCourse extends LearnerCourse {
+  course: Course;
+}
+
 export interface MessageSent {
   id: string;
   learner_id: string;

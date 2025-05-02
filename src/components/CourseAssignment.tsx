@@ -80,6 +80,11 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
     },
   });
 
+  // Check if a course is from Alfred (has an alfred- prefix)
+  const isAlfredCourse = (courseId: string) => {
+    return typeof courseId === 'string' && courseId.startsWith('alfred-');
+  };
+
   // Fetch available courses
   useEffect(() => {
     const fetchCourses = async () => {
@@ -140,6 +145,73 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
       // Parse the date string to a Date object
       const startDate = parse(data.start_date_string, 'yyyy-MM-dd', new Date());
 
+      if (isAlfredCourse(data.course_id)) {
+        // For Alfred courses, we need a different approach
+        // First, let's get the course name from the ID
+        const courseId = data.course_id;
+        const courseName = preselectedCourse?.name || courseId.replace('alfred-', '').replace(/-/g, ' ');
+        
+        // We need to create a regular course first
+        const { data: newCourseData, error: newCourseError } = await supabase
+          .from('courses')
+          .insert([
+            {
+              name: courseName,
+              description: `${courseName} - Generated from Alfred course`,
+              category: 'Alfred Course',
+              language: 'English',
+              status: 'active',
+              visibility: 'public'
+            }
+          ])
+          .select('*')
+          .single();
+          
+        if (newCourseError) {
+          console.error('Error creating course from Alfred data:', newCourseError);
+          toast.error('Failed to prepare course for assignment');
+          throw newCourseError;
+        }
+
+        // Fetch Alfred course data
+        const { data: alfredData, error: alfredError } = await supabase
+          .from('alfred_course_data')
+          .select('*')
+          .eq('course_name', courseName.replace(/\s+/g, ' '))
+          .order('day');
+          
+        if (alfredError) {
+          console.error('Error fetching alfred course data:', alfredError);
+          throw alfredError;
+        }
+
+        // Create course days from Alfred data
+        if (alfredData && alfredData.length > 0) {
+          const courseDays = alfredData.map((day, index) => ({
+            course_id: newCourseData.id,
+            day_number: day.day,
+            title: `Day ${day.day}`,
+            info: day.module_1_text || 'No content available',
+            module_1: day.module_1_text || null,
+            module_2: day.module_2_text || null,
+            module_3: day.module_3_text || null
+          }));
+          
+          const { error: daysError } = await supabase
+            .from('course_days')
+            .insert(courseDays);
+            
+          if (daysError) {
+            console.error('Error creating course days:', daysError);
+            toast.error('Failed to create course days');
+            throw daysError;
+          }
+        }
+
+        // Now we assign the newly created course
+        data.course_id = newCourseData.id;
+      }
+
       const newLearnerCourse = {
         learner_id: learner.id,
         course_id: data.course_id,
@@ -190,7 +262,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
 
       // If the course is assigned successfully, send a WhatsApp notification
       try {
-        const courseDetails = courses.find(c => c.id === data.course_id);
+        const courseDetails = courses.find(c => c.id === data.course_id) || preselectedCourse;
         const notificationData = {
           learner_id: learner.id,
           learner_name: learner.name,

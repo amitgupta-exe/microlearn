@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Loader2, BookOpen, MoreHorizontal, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Learner, LearnerCourse, Course } from '@/lib/types';
+import { Learner, ExtendedLearnerCourse, Course } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import CourseAssignment from './CourseAssignment';
@@ -39,10 +40,6 @@ import {
 interface LearnerCoursesProps {
   learner: Learner;
 }
-
-type ExtendedLearnerCourse = LearnerCourse & {
-  course: Course;
-};
 
 const LearnerCourses: React.FC<LearnerCoursesProps> = ({ learner }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -67,7 +64,7 @@ const LearnerCourses: React.FC<LearnerCoursesProps> = ({ learner }) => {
         return;
       }
       
-      const transformedData = data.map(item => ({
+      const transformedData: ExtendedLearnerCourse[] = data.map(item => ({
         id: item.id,
         learner_id: item.learner_id,
         course_id: item.course_id,
@@ -82,6 +79,7 @@ const LearnerCourses: React.FC<LearnerCoursesProps> = ({ learner }) => {
           language: item.course.language,
           status: item.course.status as 'active' | 'archived' | 'draft',
           created_at: item.course.created_at,
+          visibility: item.course.visibility as 'public' | 'private',
           days: []
         }
       }));
