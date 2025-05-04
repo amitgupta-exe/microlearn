@@ -48,14 +48,24 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
   return (
     <>
       {step === 'select-learner' && (
-        <LearnerSelector
-          open={open}
-          onOpenChange={onOpenChange}
-          onSelectLearner={handleSelectLearner}
-        />
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Select Learner</DialogTitle>
+              <DialogDescription>
+                Choose a learner to assign "{course?.name}" to
+              </DialogDescription>
+            </DialogHeader>
+            <LearnerSelector
+              open={true} // This is controlled by the parent Dialog
+              onOpenChange={() => {}} // Controlled by parent Dialog
+              onSelectLearner={handleSelectLearner}
+            />
+          </DialogContent>
+        </Dialog>
       )}
 
-      {step === 'assign-course' && selectedLearner && course && (
+      {step === 'assign-course' && selectedLearner && (
         <LearnerCourseAssignmentDialog
           learner={selectedLearner}
           course={course}

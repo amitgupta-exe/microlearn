@@ -5,7 +5,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Loader2 } from 'lucide-react';
 
-import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -28,6 +27,7 @@ import { Course, Learner } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addDays, parse } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendCourseAssignmentMessage } from '@/integrations/wati/functions';
 
 const formSchema = z.object({
   course_id: z.string().min(1, {
@@ -81,6 +81,13 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
       course_id: preselectedCourse ? preselectedCourse.id : undefined,
     },
   });
+
+  useEffect(() => {
+    // Update course_id field when preselectedCourse changes
+    if (preselectedCourse) {
+      form.setValue('course_id', preselectedCourse.id);
+    }
+  }, [preselectedCourse, form]);
 
   // Check if a course is from Alfred (has an alfred- prefix)
   const isAlfredCourse = (courseId: string) => {
@@ -146,19 +153,24 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
 
       // Parse the date string to a Date object
       const startDate = parse(data.start_date_string, 'yyyy-MM-dd', new Date());
+      let courseId = data.course_id;
+      let courseName = "";
 
       if (isAlfredCourse(data.course_id)) {
         // For Alfred courses, we need a different approach
         // First, let's get the course name from the ID
-        const courseId = data.course_id;
-        const courseName = preselectedCourse?.name || courseId.replace('alfred-', '').replace(/-/g, ' ');
+        const alfredCourseId = data.course_id;
+        const alfredCourseName = preselectedCourse?.name || alfredCourseId.replace('alfred-', '').replace(/-/g, ' ');
+        courseName = alfredCourseName;
+        
+        console.log("Creating course from Alfred data:", alfredCourseName);
         
         // We need to create a regular course first
         const { data: newCourseData, error: newCourseError } = await supabase
           .from('courses')
           .insert({
-            name: courseName,
-            description: `${courseName} - Generated from Alfred course`,
+            name: alfredCourseName,
+            description: `${alfredCourseName} - Generated from Alfred course`,
             category: 'Alfred Course',
             language: 'English',
             status: 'active',
@@ -174,11 +186,13 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           throw newCourseError;
         }
 
+        console.log("New course created:", newCourseData);
+
         // Fetch Alfred course data
         const { data: alfredData, error: alfredError } = await supabase
           .from('alfred_course_data')
           .select('*')
-          .eq('course_name', courseName.replace(/\s+/g, ' '))
+          .eq('course_name', alfredCourseName)
           .order('day');
           
         if (alfredError) {
@@ -186,9 +200,11 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           throw alfredError;
         }
 
+        console.log("Alfred data fetched:", alfredData);
+
         // Create course days from Alfred data
         if (alfredData && alfredData.length > 0) {
-          const courseDays = alfredData.map((day, index) => ({
+          const courseDays = alfredData.map(day => ({
             course_id: newCourseData.id,
             day_number: day.day,
             title: `Day ${day.day}`,
@@ -207,15 +223,23 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
             toast.error('Failed to create course days');
             throw daysError;
           }
+          
+          console.log("Course days created successfully");
         }
 
         // Now we assign the newly created course
-        data.course_id = newCourseData.id;
+        courseId = newCourseData.id;
+      } else {
+        // For regular courses, find the course name
+        const selectedCourse = courses.find(c => c.id === data.course_id);
+        if (selectedCourse) {
+          courseName = selectedCourse.name;
+        }
       }
 
       const newLearnerCourse = {
         learner_id: learner.id,
-        course_id: data.course_id,
+        course_id: courseId,
         start_date: startDate.toISOString(),
         status: data.status,
         completion_percentage: data.status === 'completed' ? 100 : 0,
@@ -247,13 +271,12 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
       }
 
       // Increment total enrollments for the course
-      const selectedCourse = courses.find(c => c.id === data.course_id);
       const { error: courseUpdateError } = await supabase
         .from('courses')
         .update({
-          total_enrollments: (selectedCourse?.total_enrollments || 0) + 1
+          total_enrollments: courses.find(c => c.id === courseId)?.total_enrollments ?? 0 + 1
         })
-        .eq('id', data.course_id);
+        .eq('id', courseId);
 
       if (courseUpdateError) {
         console.error('Error updating course:', courseUpdateError);
@@ -261,24 +284,13 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
 
       console.log('Course assigned successfully:', insertedData);
 
-      // If the course is assigned successfully, send a WhatsApp notification
+      // Send WhatsApp notification using our direct function
       try {
-        const courseDetails = courses.find(c => c.id === data.course_id) || preselectedCourse;
-        const notificationData = {
-          learner_id: learner.id,
-          learner_name: learner.name,
-          learner_phone: learner.phone,
-          course_name: courseDetails?.name || 'New course',
-          course_id: data.course_id,
-          start_date: format(startDate, 'PPP'),
-          type: 'course_assigned'
-        };
-
-        // Send WhatsApp notification
-        await supabase.functions.invoke('send-course-notification', {
-          body: notificationData
-        });
-
+        await sendCourseAssignmentMessage(
+          learner.id, 
+          courseId, 
+          startDate.toISOString()
+        );
         console.log('WhatsApp notification sent successfully');
       } catch (notifyError) {
         console.error('Failed to send WhatsApp notification:', notifyError);

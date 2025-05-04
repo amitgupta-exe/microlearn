@@ -25,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import axios from 'axios';
 
 const formSchema = z.object({
   title: z.string().min(5, {
@@ -67,32 +68,174 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
       
       const { title, prompt, days } = values;
 
-      // Call our Azure OpenAI Edge Function to generate the course
-      const { data: generatedCourse, error } = await supabase.functions.invoke('generate-course', {
-        body: { 
-          prompt,
-          courseName: title,
-          numDays: days,
-          userId: user?.id
-        }
-      });
-
-      if (error) {
-        console.error("Error generating course:", error);
-        toast.error("Failed to generate course. Please try again.");
-        return;
+      // System prompt for course generation
+      const systemPrompt = `You are an expert curriculum designer who creates structured course content. 
+      Generate a ${days}-day course about "${prompt}" with each day having educational content.
+      Format your response as a valid JSON object with the following structure:
+      {
+        "course_name": "Title of the course",
+        "days": [
+          {
+            "day_number": 1,
+            "title": "Day 1: Introduction to the Topic",
+            "content": "Main content text for day 1...",
+            "module_1_text": "Text for module 1...",
+            "module_2_text": "Text for module 2...",
+            "module_3_text": "Text for module 3..."
+          },
+          ... more days
+        ]
       }
+      Each day should have educational content split into 1-3 modules.
+      Keep each module to 200-300 words maximum. Include practical examples, tips, and exercises.`;
 
-      console.log("Course generated successfully:", generatedCourse);
-      toast.success("Course generated successfully!");
-      
-      // Call onSuccess if provided
-      if (onSuccess && generatedCourse.course?.id) {
-        onSuccess(generatedCourse.course.id);
+      // Call Azure OpenAI API directly here
+      try {
+        const endpoint = "https://make002.openai.azure.com/";
+        const apiVersion = "2024-12-01-preview";
+        const deploymentName = "o4-mini";
+        
+        // Get API key from environment
+        const { data: secretData, error: secretError } = await supabase
+          .from('whatsapp_config')
+          .select('*')
+          .eq('user_id', user?.id)
+          .single();
+          
+        if (secretError) {
+          console.error('Error fetching API key:', secretError);
+          toast.error('Failed to fetch Azure OpenAI API key. Please check your configuration.');
+          return;
+        }
+        
+        // Use the API key for Azure OpenAI
+        const apiKey = secretData?.serri_api_key;
+        if (!apiKey) {
+          toast.error('No API key found. Please configure your WhatsApp settings first.');
+          return;
+        }
+        
+        // Make the API call
+        const openAIResponse = await axios.post(
+          `${endpoint}openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`,
+          {
+            messages: [
+              {
+                role: "system",
+                content: systemPrompt
+              },
+              {
+                role: "user",
+                content: prompt
+              }
+            ],
+            max_tokens: 4000,
+            temperature: 0.7,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "api-key": apiKey,
+            },
+          }
+        );
+
+        console.log("Azure OpenAI API response received:", openAIResponse.status);
+        
+        let courseContent;
+        try {
+          // Extract the JSON from the response
+          const contentText = openAIResponse.data.choices[0].message.content;
+          // Find JSON object in the response (handling possible markdown code blocks)
+          const jsonMatch = contentText.match(/```json\s*([\s\S]*?)\s*```/) || contentText.match(/```\s*([\s\S]*?)\s*```/) || [null, contentText];
+          const jsonString = jsonMatch[1] || contentText;
+          courseContent = JSON.parse(jsonString.trim());
+          
+          if (!courseContent || !courseContent.days || !Array.isArray(courseContent.days)) {
+            throw new Error("Invalid course structure");
+          }
+        } catch (error) {
+          console.error("Error parsing OpenAI response:", error);
+          toast.error('Failed to parse generated course data');
+          return;
+        }
+
+        // Save Alfred course data
+        const alfredCourseData = courseContent.days.map(day => ({
+          course_name: courseContent.course_name || title,
+          day: day.day_number,
+          module_1_text: day.module_1_text || day.content,
+          module_2_text: day.module_2_text || null,
+          module_3_text: day.module_3_text || null
+        }));
+
+        const { data: insertedData, error: insertError } = await supabase
+          .from('alfred_course_data')
+          .insert(alfredCourseData)
+          .select();
+
+        if (insertError) {
+          console.error('Error saving course data:', insertError);
+          toast.error('Failed to save generated course data');
+          return;
+        }
+
+        // Create a regular course entry
+        const { data: courseData, error: courseError } = await supabase
+          .from('courses')
+          .insert({
+            name: courseContent.course_name || title,
+            description: `AI-generated course about: ${prompt}`,
+            category: "Generated Course",
+            language: "English",
+            status: "active",
+            created_by: user?.id,
+            visibility: "private"
+          })
+          .select()
+          .single();
+
+        if (courseError) {
+          console.error("Error creating course:", courseError);
+          toast.error('Failed to create course');
+          return;
+        }
+
+        // Create course days
+        const courseDays = courseContent.days.map(day => ({
+          course_id: courseData.id,
+          day_number: day.day_number,
+          title: day.title || `Day ${day.day_number}`,
+          info: day.content || day.module_1_text,
+          module_1: day.module_1_text || null,
+          module_2: day.module_2_text || null,
+          module_3: day.module_3_text || null
+        }));
+
+        const { error: daysError } = await supabase
+          .from('course_days')
+          .insert(courseDays);
+
+        if (daysError) {
+          console.error("Error creating course days:", daysError);
+          toast.error('Failed to create course days');
+          return;
+        }
+
+        console.log("Course generated successfully:", courseData);
+        toast.success("Course generated successfully!");
+        
+        // Call onSuccess if provided
+        if (onSuccess && courseData?.id) {
+          onSuccess(courseData.id);
+        }
+      } catch (apiError: any) {
+        console.error("Error calling Azure OpenAI API:", apiError);
+        toast.error(apiError.message || "An error occurred while communicating with Azure OpenAI");
       }
     } catch (error: any) {
       console.error("Error in course generation:", error);
-      toast.error(error.message || "An error occurred while generating course.");
+      toast.error(error.message || "An error occurred while generating course");
     } finally {
       setIsLoading(false);
     }

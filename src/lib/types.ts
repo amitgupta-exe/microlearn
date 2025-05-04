@@ -47,6 +47,7 @@ export interface Course {
 export interface ExtendedCourse extends Course {
   learner_count?: number;
   learner_courses?: any[];
+  is_alfred_course?: boolean; // Flag to identify Alfred courses
 }
 
 export interface AlfredCourseData {

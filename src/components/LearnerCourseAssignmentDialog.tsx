@@ -39,13 +39,16 @@ const LearnerCourseAssignmentDialog: React.FC<LearnerCourseAssignmentDialogProps
         <DialogHeader>
           <DialogTitle>Assign Course to {learner.name}</DialogTitle>
           <DialogDescription>
-            {course ? `Assign "${course.name}" to this learner and set a start date` : 'Select a course to assign to this learner and set a start date'}
+            {course ? 
+              `Assign "${course.name}" to ${learner.name} and set a start date` : 
+              `Select a course to assign to ${learner.name} and set a start date`
+            }
           </DialogDescription>
         </DialogHeader>
         
         <CourseAssignment
           learner={learner}
-          preselectedCourse={course}
+          preselectedCourse={course || undefined}
           onAssigned={handleAssigned}
           onCancel={handleCancel}
         />
