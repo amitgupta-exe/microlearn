@@ -105,22 +105,78 @@ serve(async (req) => {
 
     // Construct the message based on the notification type
     let messageText = "";
+    let messageType = "text";
+    let messageBody = {};
     
     if (type === 'welcome') {
       messageText = `Hello ${name || "there"}! You have been successfully registered for MicroLearn training.`;
+      messageBody = {
+        to: formattedPhone,
+        type: "text",
+        recipient_type: "individual",
+        text: {
+          body: messageText
+        }
+      };
     } else if (type === 'course_assigned') {
-      messageText = `Hello ${name || "there"}! You have been assigned to the course "${course_name}" starting on ${formatDate(start_date || new Date().toISOString())}.`;
+      // Use interactive button message for course assignment
+      messageBody = {
+        to: formattedPhone,
+        type: "interactive",
+        recipient_type: "individual",
+        interactive: {
+          type: "button",
+          header: {
+            type: "text",
+            text: "Course Assignment Notification"
+          },
+          body: {
+            text: `Hi ${name || "there"}! The course "${course_name}" has been assigned to you, starting on ${formatDate(start_date || new Date().toISOString())}.`
+          },
+          footer: {
+            text: "Powered by MicroLearn"
+          },
+          action: {
+            buttons: [
+              {
+                type: "reply",
+                reply: {
+                  id: "lets-microlearn",
+                  title: "Let's MicroLearn"
+                }
+              }
+            ]
+          }
+        }
+      };
+      messageType = "interactive";
     } else if (type === 'course_day') {
       messageText = `Hello ${name || "there"}! Here is your content for today's lesson in "${course_name}":\n\n${course_day_info || "No content available"}`;
+      messageBody = {
+        to: formattedPhone,
+        type: "text",
+        recipient_type: "individual",
+        text: {
+          body: messageText
+        }
+      };
     } else if (type === 'test') {
       messageText = `This is a test message from MicroLearn. If you received this, your WhatsApp integration is working correctly.`;
+      messageBody = {
+        to: formattedPhone,
+        type: "text",
+        recipient_type: "individual",
+        text: {
+          body: messageText
+        }
+      };
     }
 
     // Send WhatsApp message using the AiSensy API
     const apiResponse = await sendAiSensyMessage(
       whatsappConfig.serri_api_key, // Use serri_api_key as the access token
-      formattedPhone,
-      messageText
+      messageBody,
+      messageType
     );
 
     console.log("AiSensy API response:", apiResponse);
@@ -172,7 +228,7 @@ function formatPhoneNumber(phone: string): string {
   if (cleaned.startsWith('1') && cleaned.length >= 10) {
     return cleaned;
   } else if (cleaned.length === 10) {
-    // Assume US/Canada number and add country code
+    // Assume Indian number and add country code
     return '91' + cleaned;
   }
   
@@ -197,13 +253,13 @@ function formatDate(isoDate: string): string {
 // Send WhatsApp message using AiSensy API
 async function sendAiSensyMessage(
   accessToken: string,
-  to: string,
-  body: string
+  messageBody: any,
+  messageType: string = "text"
 ): Promise<any> {
   try {
     // For demo or test mode, just log and return success
     if (Deno.env.get('ENVIRONMENT') === 'development') {
-      console.log(`[TEST MODE] Would send message to ${to}: ${body}`);
+      console.log(`[TEST MODE] Would send message: ${JSON.stringify(messageBody)}`);
       return { status: "success", mode: "test" };
     }
     
@@ -216,14 +272,7 @@ async function sendAiSensyMessage(
           'Authorization': accessToken,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          to: to,
-          type: "text",
-          recipient_type: "individual",
-          text: {
-            body: body
-          }
-        }),
+        body: JSON.stringify(messageBody),
       }
     );
 

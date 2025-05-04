@@ -38,7 +38,9 @@ export interface Course {
   created_at: string;
   status: 'active' | 'archived' | 'draft';
   visibility: 'public' | 'private';
-  total_enrollments?: number; // Add this property to track enrollments
+  total_enrollments?: number;
+  created_by?: string; // Make created_by optional
+  updated_at?: string; // Make updated_at optional
 }
 
 // Extended course type for index page

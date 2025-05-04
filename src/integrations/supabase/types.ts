@@ -129,6 +129,96 @@ export type Database = {
         }
         Relationships: []
       }
+      course_data: {
+        Row: {
+          airtable_id: string | null
+          "Certificate File": string | null
+          "completed courses": number | null
+          Completion_Certificate: string | null
+          "Course Completed": boolean | null
+          "Course Status": string | null
+          Created: string | null
+          Date: string | null
+          "Day Completed": number | null
+          Doubt: string | null
+          Feedback: string | null
+          Goal: string | null
+          id: number
+          Interactive_Responses: Json | null
+          "Join Waitlist": boolean | null
+          Language: string | null
+          Last_Msg: string | null
+          "Module Completed": number | null
+          Name: string | null
+          "Next Day": string | null
+          "Next Module": string | null
+          Phone: string | null
+          Progress: number | null
+          "Question Responses": Json | null
+          Responses: Json | null
+          Style: string | null
+          Topic: string | null
+        }
+        Insert: {
+          airtable_id?: string | null
+          "Certificate File"?: string | null
+          "completed courses"?: number | null
+          Completion_Certificate?: string | null
+          "Course Completed"?: boolean | null
+          "Course Status"?: string | null
+          Created?: string | null
+          Date?: string | null
+          "Day Completed"?: number | null
+          Doubt?: string | null
+          Feedback?: string | null
+          Goal?: string | null
+          id?: number
+          Interactive_Responses?: Json | null
+          "Join Waitlist"?: boolean | null
+          Language?: string | null
+          Last_Msg?: string | null
+          "Module Completed"?: number | null
+          Name?: string | null
+          "Next Day"?: string | null
+          "Next Module"?: string | null
+          Phone?: string | null
+          Progress?: number | null
+          "Question Responses"?: Json | null
+          Responses?: Json | null
+          Style?: string | null
+          Topic?: string | null
+        }
+        Update: {
+          airtable_id?: string | null
+          "Certificate File"?: string | null
+          "completed courses"?: number | null
+          Completion_Certificate?: string | null
+          "Course Completed"?: boolean | null
+          "Course Status"?: string | null
+          Created?: string | null
+          Date?: string | null
+          "Day Completed"?: number | null
+          Doubt?: string | null
+          Feedback?: string | null
+          Goal?: string | null
+          id?: number
+          Interactive_Responses?: Json | null
+          "Join Waitlist"?: boolean | null
+          Language?: string | null
+          Last_Msg?: string | null
+          "Module Completed"?: number | null
+          Name?: string | null
+          "Next Day"?: string | null
+          "Next Module"?: string | null
+          Phone?: string | null
+          Progress?: number | null
+          "Question Responses"?: Json | null
+          Responses?: Json | null
+          Style?: string | null
+          Topic?: string | null
+        }
+        Relationships: []
+      }
       course_days: {
         Row: {
           course_id: string

@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { Course, Learner } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addDays, parse } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 
 const formSchema = z.object({
   course_id: z.string().min(1, {
@@ -66,6 +67,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [assignedCourseIds, setAssignedCourseIds] = useState<string[]>([]);
+  const { user } = useAuth();
 
   // Set default start date to tomorrow
   const tomorrow = addDays(new Date(), 1);
@@ -154,16 +156,15 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
         // We need to create a regular course first
         const { data: newCourseData, error: newCourseError } = await supabase
           .from('courses')
-          .insert([
-            {
-              name: courseName,
-              description: `${courseName} - Generated from Alfred course`,
-              category: 'Alfred Course',
-              language: 'English',
-              status: 'active',
-              visibility: 'public'
-            }
-          ])
+          .insert({
+            name: courseName,
+            description: `${courseName} - Generated from Alfred course`,
+            category: 'Alfred Course',
+            language: 'English',
+            status: 'active',
+            visibility: 'public',
+            created_by: user?.id || ''
+          })
           .select('*')
           .single();
           
@@ -268,34 +269,16 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           learner_name: learner.name,
           learner_phone: learner.phone,
           course_name: courseDetails?.name || 'New course',
-          start_date: format(startDate, 'PPP')
+          course_id: data.course_id,
+          start_date: format(startDate, 'PPP'),
+          type: 'course_assigned'
         };
-        console.log(notificationData.learner_phone);
 
         // Send WhatsApp notification
         await supabase.functions.invoke('send-course-notification', {
           body: notificationData
         });
-        
-        const sendText = async (msg: string, senderID: string) => {
-          try {
-            const response = await axios.post(
-              `https://${import.meta.env.VITE_URL}/api/v1/sendSessionMessage/${senderID}`,
-              { messageText: msg },
-              {
-                headers: {
-                  'Authorization': import.meta.env.VITE_API,
-                  'Content-Type': 'application/x-www-form-urlencoded'
-                }
-              }
-            );
-            return response.data.result;
-          } catch (error) {
-            console.error('Error sending message:', error);
-          }
-        };
 
-        sendText(`hello ${notificationData.learner_name}, ${notificationData.course_name} course is assigned to you`, `+91${notificationData.learner_phone}`);
         console.log('WhatsApp notification sent successfully');
       } catch (notifyError) {
         console.error('Failed to send WhatsApp notification:', notifyError);
