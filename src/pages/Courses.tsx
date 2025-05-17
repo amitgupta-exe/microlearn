@@ -51,6 +51,7 @@ import { toast } from 'sonner';
 import CourseForm from '@/components/CourseForm';
 import CoursePromptForm from '@/components/CoursePromptForm';
 import CoursePreview from '@/components/CoursePreview';
+import CourseDetailDialog from '@/components/CourseDetailDialog';
 import CourseAssignmentDialog from '@/components/CourseAssignmentDialog';
 import { Course, AlfredCourseData } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,6 +67,8 @@ const Courses = () => {
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
   const [assignCourse, setAssignCourse] = useState<Course | null>(null);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [detailCourse, setDetailCourse] = useState<Course | null>(null);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
   
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -416,6 +419,11 @@ const Courses = () => {
     setShowAssignDialog(true);
   };
 
+  const handleCourseCardClick = (course: Course) => {
+    setDetailCourse(course);
+    setShowDetailDialog(true);
+  };
+
   const handlePromptSuccess = (courseId: string) => {
     navigate(`/courses`);
     window.location.reload();
@@ -537,7 +545,7 @@ const Courses = () => {
           </TabsList>
         </Tabs>
         
-        <div className="rounded-lg border bg-card">
+        <div className="rounded-lg border bg-card mb-8">
           <div className="p-4 flex flex-col sm:flex-row gap-4 justify-between">
             <div className="relative w-full sm:max-w-xs">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -552,140 +560,136 @@ const Courses = () => {
               {displayedCourses.length} courses
             </div>
           </div>
-          
-          <div className="overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[250px]">Course</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Language</TableHead>
-                  <TableHead>Visibility</TableHead>
-                  <TableHead>Days</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center h-32">
-                      <div className="flex justify-center items-center h-full">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : displayedCourses.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center h-32 text-muted-foreground">
-                      {searchQuery ? 'No courses match your search' : 'No courses found'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  displayedCourses.map(course => (
-                    <TableRow key={course.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                            <BookOpen size={14} />
-                          </div>
-                          <div>
-                            <div>{course.name}</div>
-                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                              {course.description}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{course.category}</TableCell>
-                      <TableCell>{course.language}</TableCell>
-                      <TableCell>
-                        {course.visibility === 'public' ? (
-                          <div className="flex items-center gap-1">
-                            <Globe size={14} className="text-green-500" />
-                            <span>Public</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <Lock size={14} className="text-gray-500" />
-                            <span>Private</span>
-                          </div>
+        </div>
+        
+        {/* Grid View of Course Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {isLoading ? (
+            <div className="col-span-full flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : displayedCourses.length === 0 ? (
+            <div className="col-span-full flex justify-center items-center h-64 text-muted-foreground">
+              {searchQuery ? 'No courses match your search' : 'No courses found'}
+            </div>
+          ) : (
+            displayedCourses.map(course => (
+              <Card 
+                key={course.id} 
+                className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => handleCourseCardClick(course)}
+              >
+                <div className="bg-gradient-to-r from-primary/15 to-primary/5 p-4 border-b">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                      <BookOpen size={14} />
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {!isAlfredCourse(course) && (
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/courses/${course.id}`);
+                          }}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
                         )}
-                      </TableCell>
-                      <TableCell>{course.days.length} days</TableCell>
-                      <TableCell>
-                        <Badge variant={course.status === 'active' ? "default" : "outline"}>
-                          {course.status === 'active' ? 'Active' : 'Archived'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(course.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {!isAlfredCourse(course) && (
-                              <DropdownMenuItem onClick={() => navigate(`/courses/${course.id}`)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onClick={() => handlePreviewCourse(course)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Preview
-                            </DropdownMenuItem>
-                            {!isAlfredCourse(course) && (
-                              <DropdownMenuItem onClick={() => handleToggleVisibility(course.id)}>
-                                {course.visibility === 'public' ? (
-                                  <>
-                                    <Lock className="h-4 w-4 mr-2" />
-                                    Make Private
-                                  </>
-                                ) : (
-                                  <>
-                                    <Globe className="h-4 w-4 mr-2" />
-                                    Make Public
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            )}
-                            {!isAlfredCourse(course) && (
-                              <DropdownMenuItem onClick={() => handleArchiveCourse(course.id)}>
-                                <Archive className="h-4 w-4 mr-2" />
-                                {course.status === 'active' ? 'Archive' : 'Activate'}
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onClick={() => handleAssignCourse(course)}>
-                              <Users className="h-4 w-4 mr-2" />
-                              Assign to Learner
-                            </DropdownMenuItem>
-                            {!isAlfredCourse(course) && (
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handlePreviewCourse(course);
+                        }}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          WhatsApp Preview
+                        </DropdownMenuItem>
+                        {!isAlfredCourse(course) && (
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleVisibility(course.id);
+                          }}>
+                            {course.visibility === 'public' ? (
                               <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  className="text-destructive"
-                                  onClick={() => handleDeleteCourse(course.id)}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
+                                <Lock className="h-4 w-4 mr-2" />
+                                Make Private
+                              </>
+                            ) : (
+                              <>
+                                <Globe className="h-4 w-4 mr-2" />
+                                Make Public
                               </>
                             )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                          </DropdownMenuItem>
+                        )}
+                        {!isAlfredCourse(course) && (
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleArchiveCourse(course.id);
+                          }}>
+                            <Archive className="h-4 w-4 mr-2" />
+                            {course.status === 'active' ? 'Archive' : 'Activate'}
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleAssignCourse(course);
+                        }}>
+                          <Users className="h-4 w-4 mr-2" />
+                          Assign to Learner
+                        </DropdownMenuItem>
+                        {!isAlfredCourse(course) && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteCourse(course.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <h3 className="font-medium text-lg line-clamp-1">{course.name}</h3>
+                </div>
+                <CardContent className="p-4">
+                  <div className="text-sm text-muted-foreground mb-4 line-clamp-2 h-10">
+                    {course.description}
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={course.status === 'active' ? "default" : "outline"} className="text-xs">
+                        {course.status === 'active' ? 'Active' : 'Archived'}
+                      </Badge>
+                      <span>{course.days.length} days</span>
+                    </div>
+                    <div>
+                      {course.visibility === 'public' ? (
+                        <div className="flex items-center gap-1">
+                          <Globe size={12} className="text-green-500" />
+                          <span>Public</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <Lock size={12} className="text-gray-500" />
+                          <span>Private</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
       
@@ -693,6 +697,12 @@ const Courses = () => {
         course={previewCourse} 
         open={showPreview} 
         onOpenChange={setShowPreview} 
+      />
+
+      <CourseDetailDialog
+        course={detailCourse}
+        open={showDetailDialog}
+        onOpenChange={setShowDetailDialog}
       />
 
       <CourseAssignmentDialog

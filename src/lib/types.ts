@@ -1,19 +1,19 @@
-export interface User {
+export interface Course {
   id: string;
-  email: string;
   name: string;
-  avatar_url?: string;
+  description: string;
+  category: string;
+  language: string;
+  days: CourseDay[];
+  created_at: string;
+  status: 'active' | 'archived' | 'draft';
+  visibility: 'public' | 'private';
+  total_enrollments?: number;
 }
 
-export interface Learner {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  courses?: Course[]; // Make courses optional
-  created_at: string;
-  status: 'active' | 'inactive';
-  total_courses?: number; // New field to track total courses
+export interface ExtendedCourse extends Course {
+  learner_count: number;
+  learner_courses?: LearnerCourse[];
 }
 
 export interface CourseDay {
@@ -27,28 +27,27 @@ export interface CourseDay {
   module_3?: string;
 }
 
-export interface Course {
+export interface Learner {
   id: string;
   name: string;
-  description: string;
-  category: string;
-  language: string;
-  days: CourseDay[];
+  phone: string;
+  email: string;
+  status: string;
   created_at: string;
-  status: 'active' | 'archived' | 'draft';
-  visibility: 'public' | 'private';
-  total_enrollments?: number;
-  created_by?: string; // Make created_by optional
-  updated_at?: string; // Make updated_at optional
+  total_courses: number;
+  courses?: LearnerCourse[];
 }
 
-// Extended course type for index page
-export interface ExtendedCourse extends Omit<Course, 'visibility'> {
-  learner_count?: number;
-  learner_courses?: any[];
-  visibility: 'public' | 'private' | string; // Allow broader types than the base Course type
-  is_alfred_course?: boolean; // Flag to identify Alfred courses
-  is_cop_course?: boolean; // Flag to identify COP courses
+export interface LearnerCourse {
+  id: string;
+  learner_id: string;
+  course_id: string;
+  start_date: string;
+  status: string;
+  completion_percentage: number;
+  created_at: string;
+  course?: Course;
+  learner?: Learner;
 }
 
 export interface AlfredCourseData {
@@ -59,71 +58,4 @@ export interface AlfredCourseData {
   module_2_text?: string;
   module_3_text?: string;
   created_at: string;
-}
-
-export interface COPCourseData {
-  id: string;
-  request_id: string;
-  day: number;
-  module_1?: string;
-  module_2?: string;
-  module_3?: string;
-  topic_name: string;
-  created_at: string;
-}
-
-export interface CourseGenerationRequest {
-  request_id: string;
-  course_title: string;
-  topic: string;
-  goal: string;
-  style: string;
-  language: string;
-  created_at: string;
-  created_by: string;
-}
-
-export interface LearnerCourse {
-  id: string;
-  learner_id: string;
-  course_id: string;
-  start_date: string;
-  completion_percentage: number;
-  status: 'scheduled' | 'in_progress' | 'completed';
-}
-
-// Extended learner course type with course included
-export interface ExtendedLearnerCourse extends LearnerCourse {
-  course: Course;
-}
-
-export interface MessageSent {
-  id: string;
-  learner_id: string;
-  course_id: string;
-  course_day_id: string;
-  sent_at: string;
-  type: 'whatsapp' | 'email';
-  status: 'sent' | 'delivered' | 'read' | 'failed';
-}
-
-export interface WatiConfig {
-  id?: string;
-  user_id: string;
-  serri_api_key: string; // Using the existing database column name for now
-  serri_endpoint?: string; // Optional as we might not need this anymore
-  is_configured: boolean;
-}
-
-export interface AnalyticsData {
-  total_learners: number;
-  active_courses: number;
-  messages_sent: {
-    total: number;
-    whatsapp: number;
-    email: number;
-  };
-  completion_rate: number;
-  messages_per_day: { date: string; count: number }[];
-  learners_per_course: { course: string; count: number }[];
 }

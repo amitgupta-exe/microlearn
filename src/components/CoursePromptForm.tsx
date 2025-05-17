@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -24,7 +25,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import axios from 'axios';
 import {
   Select,
   SelectContent,
@@ -32,6 +32,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 
 const formSchema = z.object({
   course_title: z.string().min(5, {
@@ -58,12 +70,21 @@ interface CoursePromptFormProps {
   onCancel: () => void;
 }
 
+type CoursePreviewData = {
+  [key: string]: {
+    [key: string]: {
+      content: string;
+    };
+  };
+};
+
 const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
   onSuccess,
   onCancel
 }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewData, setPreviewData] = useState<CoursePreviewData | null>(null);
+  const [currentPreviewTab, setCurrentPreviewTab] = useState("preview");
   const { user } = useAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -97,31 +118,16 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
         .select()
         .single();
         
-        if (requestError) {
-          console.error('Error saving course request:', requestError);
-          toast.error('Failed to save course generation request');
-          return;
-        }
-        
-        // Call Azure OpenAI API
+      if (requestError) {
+        console.error('Error saving course request:', requestError);
+        toast.error('Failed to save course generation request');
+        return;
+      }
+      
+      // This is a mock API call that would normally hit your backend
       try {
-        // const openAIResponse = await fetch('http://localhost:3002/openai', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({
-          //     style: values.style,
-          //     goal: values.goal,
-          //     topic: values.topic,
-          //     language: values.language
-          //   })
-          // });
-          
-          // const json = await openAIResponse.json();
-          // const courseContent = json.data; // Use the data property directly
-          
-          // console.log("Azure OpenAI API response received:", openAIResponse.status);
-          
-          const courseContent = {
+        // For now, we'll use our mock data for demonstration purposes
+        const courseContent = {
           "Day 1": {
             "Day 1 - Module 1": {
               "content": "🎉 Welcome to Day 1 of your Ping Pong micro-course! Let's start by understanding the basics. Ping Pong, also known as table tennis, is a fast-paced sport that enhances your reflexes and precision. The game is played by two or four players hitting a lightweight ball back and forth using small paddles. The objective is to score points by making the ball land on the opponent's side without them returning it. Understanding the rules is the first step to mastering the game. A standard match is played to 11 points, and players must win by at least a 2-point margin. The game begins with a serve, and players alternate serves every two points. Keep these fundamentals in mind as we dive deeper into the game. Are you ready to serve up some fun? Let's get started! 🏓"
@@ -155,45 +161,10 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
               "content": "📝 Let's review what you've learned over the past three days. From basic rules and grip techniques to advanced footwork and spin strategies, you've built a solid foundation in Ping Pong. Reflect on how each skill contributes to your overall goal of mastering the game. For your final actionable task, combine everything you've learned into a cohesive practice session. Start with warm-up drills focusing on grip and basic strokes. Move on to practicing your serves with different spins and placements. Incorporate footwork exercises to enhance your movement around the table. Then, apply advanced techniques like spin variation and strategic placement in simulated matches. Record your practice sessions to track your progress and identify areas for improvement. Set specific goals for your future training to continue developing your skills. Celebrate your achievements over these three days and stay motivated to keep learning and playing Ping Pong. You've made great strides—keep up the excellent work! 🏆"
             }
           }
-        }
+        };
 
         console.log(courseContent);
-
-
-        if (!courseContent || !courseContent["Day 1"]) {
-          toast.error("Invalid course structure");
-          return;
-        }
-
-
         setPreviewData(courseContent);
-
-
-        // // Parse the course content
-        // let courseContent;
-        // try {
-        //   // Extract the JSON from the response
-        //   const contentText = await openAIResponse.json();
-
-        //   try {
-        //     courseContent = JSON.parse(jsonString.trim());
-        //     setPreviewData(courseContent);
-        //   } catch (e) {
-        //     console.error("Failed to parse extracted JSON from OpenAI:", e, jsonString);
-        //     toast.error("Failed to parse course content");
-        //     return;
-        //   }
-
-        //   if (!courseContent || !courseContent.Day1) {
-        //     throw new Error("Invalid course structure");
-        //   }
-        // } catch (error) {
-        //   console.error("Error parsing OpenAI response:", error);
-        //   toast.error('Failed to parse generated course data');
-        //   return;
-        // }
-
-
 
         // Store course data in the database
         const insertPromises = [];
@@ -246,7 +217,7 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
         const courseDays = [];
 
         for (let dayNum = 1; dayNum <= 3; dayNum++) {
-          const dayKey = `Day${dayNum}`;
+          const dayKey = `Day ${dayNum}`;
           const modules = courseContent[dayKey];
 
           if (modules) {
@@ -280,8 +251,8 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
           onSuccess(courseData.id);
         }
       } catch (apiError: any) {
-        console.error("Error calling Azure OpenAI API:", apiError);
-        toast.error(apiError.message || "An error occurred while communicating with Azure OpenAI");
+        console.error("Error calling API:", apiError);
+        toast.error(apiError.message || "An error occurred while communicating with the API");
       }
     } catch (error: any) {
       console.error("Error in course generation:", error);
@@ -291,41 +262,106 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
     }
   };
 
-  const renderPreview = () => {
+  const renderPreviewWhatsApp = () => {
     if (!previewData) return null;
 
     return (
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-4 bg-[#ECE5DD] p-4 rounded-lg">
         <h3 className="text-lg font-medium">WhatsApp Preview</h3>
-        <div className="space-y-4">
-          {[1, 2, 3].map(dayNum => {
-            const dayKey = `Day${dayNum}`;
-            const modules = previewData[dayKey];
-
-            if (!modules) return null;
-
+        <div className="space-y-8">
+          {Object.keys(previewData).map(dayKey => {
+            const dayModules = previewData[dayKey];
+            
             return (
-              <div key={dayNum} className="space-y-2">
-                <h4 className="font-medium">Day {dayNum}</h4>
+              <div key={dayKey} className="space-y-4">
+                <h4 className="font-medium bg-[#128C7E] text-white px-3 py-1.5 rounded-md inline-block">{dayKey}</h4>
 
-                {[1, 2, 3].map(moduleNum => {
-                  const moduleKey = `Day ${dayNum} - Module ${moduleNum}`;
-                  const module = modules[moduleKey];
-
-                  if (!module) return null;
-
-                  return (
-                    <div key={moduleKey} className="bg-[#DCF8C6] p-4 rounded-lg max-w-[80%] space-y-2">
-                      <p className="font-medium">{module.title}</p>
-                      <p className="text-sm">{module.content}</p>
-                      <p className="text-xs text-right text-gray-500">12:34 PM ✓✓</p>
-                    </div>
-                  );
-                })}
+                <div className="space-y-4">
+                  {Object.keys(dayModules).map(moduleKey => {
+                    const module = dayModules[moduleKey];
+                    const messageTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    
+                    return (
+                      <div key={moduleKey} className="flex justify-end">
+                        <div className="bg-[#DCF8C6] p-4 rounded-lg max-w-[85%] shadow-sm">
+                          <p className="whitespace-pre-wrap">{module.content}</p>
+                          <p className="text-xs text-right text-gray-500 mt-1 flex justify-end items-center">
+                            {messageTime} <span className="ml-1">✓✓</span>
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
         </div>
+      </div>
+    );
+  };
+
+  const renderPreviewEditable = () => {
+    if (!previewData) return null;
+
+    return (
+      <div className="mt-6 space-y-4">
+        <h3 className="text-lg font-medium">Course Content Preview</h3>
+        
+        <Accordion type="single" collapsible className="w-full">
+          {Object.keys(previewData).map((dayKey, dayIndex) => {
+            const dayNumber = dayIndex + 1;
+            const dayModules = previewData[dayKey];
+            
+            return (
+              <AccordionItem key={dayKey} value={`day-${dayNumber}`}>
+                <AccordionTrigger>
+                  <div className="flex items-center">
+                    <span className="bg-primary/10 text-primary w-8 h-8 rounded-full flex items-center justify-center mr-3">
+                      {dayNumber}
+                    </span>
+                    <span>{dayKey}</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4">
+                  {Object.keys(dayModules).map((moduleKey, moduleIndex) => {
+                    const module = dayModules[moduleKey];
+                    
+                    return (
+                      <div key={moduleKey} className="border rounded-lg p-4">
+                        <h5 className="font-medium mb-2">{moduleKey}</h5>
+                        <div className="bg-muted/20 p-3 rounded-md">
+                          <p className="whitespace-pre-wrap text-sm">{module.content}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
+      </div>
+    );
+  };
+
+  const renderPreview = () => {
+    if (!previewData) return null;
+
+    return (
+      <div className="mt-6">
+        <Tabs defaultValue="preview" onValueChange={setCurrentPreviewTab}>
+          <TabsList>
+            <TabsTrigger value="preview">WhatsApp Preview</TabsTrigger>
+            <TabsTrigger value="editable">Course Structure</TabsTrigger>
+          </TabsList>
+          <TabsContent value="preview" className="mt-4">
+            {renderPreviewWhatsApp()}
+          </TabsContent>
+          <TabsContent value="editable" className="mt-4">
+            {renderPreviewEditable()}
+          </TabsContent>
+        </Tabs>
       </div>
     );
   };
