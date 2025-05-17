@@ -24,37 +24,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   useEffect(() => {
-    // First set up the auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        console.log('Auth state changed:', event);
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    // Then check for existing session 
-    const getSession = async () => {
+    const initAuth = async () => {
+      // Start with loading state
+      setLoading(true);
+      
       try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('Error getting session:', error);
-          throw error;
-        }
-        
-        setSession(data.session);
-        setUser(data.session?.user ?? null);
-      } catch (error) {
-        console.error('Session retrieval error:', error);
+        // First get the current session
+        const { data: sessionData } = await supabase.auth.getSession();
+        setSession(sessionData.session);
+        setUser(sessionData.session?.user ?? null);
+      } catch (err) {
+        console.error('Error getting session:', err);
       } finally {
-        // Only set loading to false once we've tried to get the session
+        // Important: Always set loading to false after initialization
         setLoading(false);
       }
     };
 
-    getSession();
+    // Setup the auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        console.log('Auth state changed:', event);
+        // Don't set loading to true here - that causes a flicker
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+      }
+    );
 
+    // Initialize auth state
+    initAuth();
+
+    // Cleanup subscription 
     return () => {
       subscription.unsubscribe();
     };

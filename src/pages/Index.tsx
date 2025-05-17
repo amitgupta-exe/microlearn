@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Users, BookOpen, MessageCircle, ArrowRight, Plus, Loader2 } from 'lucide-react';
 import DashboardCard from '@/components/DashboardCard';
@@ -12,12 +11,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { Course } from '@/lib/types';
+import { ExtendedCourse } from '@/lib/types';
 import { cn } from '@/lib/utils';
-
-interface ExtendedCourse extends Course {
-  learner_count?: number;
-}
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -77,10 +72,11 @@ const Index = () => {
         }
         
         // Process the recent courses data to count learners
-        const recentCourses = recentCoursesData ? recentCoursesData.map(course => ({
+        const recentCourses: ExtendedCourse[] = recentCoursesData ? recentCoursesData.map(course => ({
           ...course,
           days: [],
           status: course.status as 'active' | 'archived' | 'draft',
+          visibility: course.visibility as 'public' | 'private' | string, // Ensure proper casting of visibility
           learner_count: Array.isArray(course.learner_courses) ? course.learner_courses.length : 0
         })) : [];
         

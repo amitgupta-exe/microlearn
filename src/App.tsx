@@ -26,7 +26,7 @@ console.log(import.meta.env.VITE_URL);
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
-  // Don't render anything while loading to prevent flash of login page
+  // Show loading indicator while checking auth state
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -35,8 +35,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  // Only redirect when we're sure there's no user
-  if (!user && !loading) {
+  // Only redirect when auth check is complete and there's no user
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
@@ -47,7 +47,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
-  // Don't render anything while loading to prevent flash of redirect
+  // Show loading indicator while checking auth state
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -56,14 +56,15 @@ const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  // Only redirect when we're sure there's a user
-  if (user && !loading) {
+  // Only redirect when auth check is complete and there is a user
+  if (user) {
     return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
 };
 
+// Main App Routes component
 const AppRoutes = () => {
   const { user, loading } = useAuth();
   
