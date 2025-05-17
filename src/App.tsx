@@ -26,6 +26,7 @@ console.log(import.meta.env.VITE_URL);
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
+  // Don't render anything while loading to prevent flash of login page
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -34,7 +35,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  if (!user) {
+  // Only redirect when we're sure there's no user
+  if (!user && !loading) {
     return <Navigate to="/login" replace />;
   }
 
@@ -45,6 +47,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
+  // Don't render anything while loading to prevent flash of redirect
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -53,7 +56,8 @@ const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  if (user) {
+  // Only redirect when we're sure there's a user
+  if (user && !loading) {
     return <Navigate to="/" replace />;
   }
 
@@ -163,17 +167,6 @@ const AppRoutes = () => {
           </div>
         </ProtectedRoute>
       } />
-      {/* Commenting out WhatsApp route as requested */}
-      {/* <Route path="/whatsapp" element={
-        <ProtectedRoute>
-          <div className="flex w-full min-h-screen">
-            <Sidebar user={user} />
-            <div className="flex-1 overflow-auto">
-              <WhatsApp />
-            </div>
-          </div>
-        </ProtectedRoute>
-      } /> */}
       <Route path="/settings" element={
         <ProtectedRoute>
           <div className="flex w-full min-h-screen">

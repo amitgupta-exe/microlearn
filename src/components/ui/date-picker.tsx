@@ -4,8 +4,8 @@ import { Calendar as CalendarPrimitive } from "@/components/ui/calendar"
 
 interface DatePickerProps {
   mode: "single" | "range" | "multiple"
-  selected: Date | Date[] | DateRange | undefined
-  onSelect: (date: Date | DateRange | Date[] | undefined) => void
+  selected: Date | Date[] | { from: Date; to?: Date } | undefined
+  onSelect: (date: Date | { from: Date; to?: Date } | Date[] | undefined) => void
   disabledDate?: (date: Date) => boolean
   initialFocus?: boolean
   className?: string
@@ -26,9 +26,9 @@ export function DatePicker({
 }: DatePickerProps) {
   return (
     <CalendarPrimitive
-      mode={mode}
+      mode={mode as any}
       selected={selected}
-      onSelect={onSelect}
+      onSelect={onSelect as any}
       disabled={disabledDate}
       initialFocus={initialFocus}
       className={className}
