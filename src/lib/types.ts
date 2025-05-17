@@ -44,9 +44,10 @@ export interface Course {
 }
 
 // Extended course type for index page
-export interface ExtendedCourse extends Course {
+export interface ExtendedCourse extends Omit<Course, 'visibility'> {
   learner_count?: number;
   learner_courses?: any[];
+  visibility: string; // Allow broader types than the base Course type
   is_alfred_course?: boolean; // Flag to identify Alfred courses
   is_cop_course?: boolean; // Flag to identify COP courses
 }

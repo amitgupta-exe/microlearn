@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Calendar } from "lucide-react"
+import { Calendar } from "lucide-react";
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -14,10 +15,9 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Calendar as CalendarIcon } from "lucide-react"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
-import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import { Course, Learner } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +29,8 @@ const formSchema = z.object({
   startDate: z.date(),
   courseId: z.string().uuid(),
 });
+
+type FormData = z.infer<typeof formSchema>;
 
 interface CourseAssignmentProps {
   learner: Learner;
@@ -47,7 +49,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(preselectedCourse || null);
   const { user } = useAuth();
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       startDate: new Date(),
@@ -94,26 +96,25 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
           status: 'scheduled',
         });
 
-      // After successful course assignment, send WhatsApp notification
-      if (result?.error) {
-        toast.error("Failed to assign course");
-      } else {
-        toast.success("Course assigned successfully!");
-        
-        // Send WhatsApp notification
-        try {
-          await sendCourseAssignmentNotification(
-            learner.name, 
-            selectedCourse.name, 
-            learner.phone
-          );
-        } catch (error) {
-          console.error("Error sending WhatsApp notification:", error);
-        }
-        
-        if (onAssigned) {
-          onAssigned();
-        }
+      if (error) {
+        throw error;
+      }
+
+      toast.success("Course assigned successfully!");
+      
+      // Send WhatsApp notification
+      try {
+        await sendCourseAssignmentNotification(
+          learner.name, 
+          selectedCourse.name, 
+          learner.phone
+        );
+      } catch (error) {
+        console.error("Error sending WhatsApp notification:", error);
+      }
+      
+      if (onAssigned) {
+        onAssigned();
       }
     } catch (error: any) {
       console.error('Error assigning course:', error);
@@ -145,7 +146,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                       ) : (
                         <span>Pick a date</span>
                       )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      <Calendar className="ml-auto h-4 w-4 opacity-50" />
                     </Button>
                   </FormControl>
                 </PopoverTrigger>
