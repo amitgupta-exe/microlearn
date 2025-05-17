@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -50,7 +49,7 @@ const formSchema = z.object({
   }).max(500, {
     message: "Goal must not exceed 500 characters."
   }),
-  style: z.enum(["Professional", "Casual", "Informational"]), 
+  style: z.enum(["Professional", "Casual", "Informational"]),
   language: z.enum(["English", "Hindi", "Marathi"]),
 });
 
@@ -81,7 +80,7 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
-      
+
       const { course_title, topic, goal, style, language } = values;
 
       // Save the course generation request
@@ -97,153 +96,112 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
         })
         .select()
         .single();
-
-      if (requestError) {
-        console.error('Error saving course request:', requestError);
-        toast.error('Failed to save course generation request');
-        return;
-      }
-
-      // System prompt for course generation
-      const systemPrompt = `You are an expert curriculum designer who creates structured course content. 
-      Generate a 3-day course about "${topic}" with the goal of "${goal}". Use a ${style} communication style in ${language} language.
-      Each day should have exactly 3 educational modules.
-      Format your response as a valid JSON object with the following structure:
-      {
-        "Day1": {
-          "Day 1 - Module 1": {
-            "title": "Introduction to the Topic",
-            "content": "Main content text for module 1..."
-          },
-          "Day 1 - Module 2": {
-            "title": "Key Concepts",
-            "content": "Main content text for module 2..."
-          },
-          "Day 1 - Module 3": {
-            "title": "Practical Application",
-            "content": "Main content text for module 3..."
-          }
-        },
-        "Day2": {
-          "Day 2 - Module 1": {
-            "title": "Advanced Concepts",
-            "content": "Main content text for module 1..."
-          },
-          "Day 2 - Module 2": {
-            "title": "Case Studies",
-            "content": "Main content text for module 2..."
-          },
-          "Day 2 - Module 3": {
-            "title": "Exercises",
-            "content": "Main content text for module 3..."
-          }
-        },
-        "Day3": {
-          "Day 3 - Module 1": {
-            "title": "Recap and Review",
-            "content": "Main content text for module 1..."
-          },
-          "Day 3 - Module 2": {
-            "title": "Advanced Applications",
-            "content": "Main content text for module 2..."
-          },
-          "Day 3 - Module 3": {
-            "title": "Next Steps",
-            "content": "Main content text for module 3..."
-          }
+        
+        if (requestError) {
+          console.error('Error saving course request:', requestError);
+          toast.error('Failed to save course generation request');
+          return;
         }
-      }
-      Keep each module to 200-300 words maximum. Include practical examples, tips, and exercises.
-      Ensure the content is appropriate for the specified style and language.`;
-
-      // Call Azure OpenAI API
+        
+        // Call Azure OpenAI API
       try {
-        const endpoint = "https://make002.openai.azure.com/";
-        const apiVersion = "2024-12-01-preview";
-        const deploymentName = "o4-mini";
-        
-        // Get API key from environment
-        const { data: secretData, error: secretError } = await supabase
-          .from('whatsapp_config')
-          .select('*')
-          .eq('user_id', user?.id)
-          .single();
+        // const openAIResponse = await fetch('http://localhost:3002/openai', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({
+          //     style: values.style,
+          //     goal: values.goal,
+          //     topic: values.topic,
+          //     language: values.language
+          //   })
+          // });
           
-        if (secretError) {
-          console.error('Error fetching API key:', secretError);
-          toast.error('Failed to fetch Azure OpenAI API key. Please check your configuration.');
-          return;
-        }
-        
-        // Use the API key for Azure OpenAI
-        const apiKey = secretData?.serri_api_key;
-        if (!apiKey) {
-          toast.error('No API key found. Please configure your WhatsApp settings first.');
-          return;
-        }
-        
-        // Make the API call
-        const openAIResponse = await axios.post(
-          `${endpoint}openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`,
-          {
-            messages: [
-              {
-                role: "system",
-                content: systemPrompt
-              },
-              {
-                role: "user",
-                content: `Create a 3-day course about "${topic}" with goal "${goal}" in ${style} style using ${language} language.`
-              }
-            ],
-            max_tokens: 3000,
-            temperature: 0.7,
-          },
-          {
-            headers: {
-              "Content-Type": "application/json",
-              "api-key": apiKey,
+          // const json = await openAIResponse.json();
+          // const courseContent = json.data; // Use the data property directly
+          
+          // console.log("Azure OpenAI API response received:", openAIResponse.status);
+          
+          const courseContent = {
+          "Day 1": {
+            "Day 1 - Module 1": {
+              "content": "🎉 Welcome to Day 1 of your Ping Pong micro-course! Let's start by understanding the basics. Ping Pong, also known as table tennis, is a fast-paced sport that enhances your reflexes and precision. The game is played by two or four players hitting a lightweight ball back and forth using small paddles. The objective is to score points by making the ball land on the opponent's side without them returning it. Understanding the rules is the first step to mastering the game. A standard match is played to 11 points, and players must win by at least a 2-point margin. The game begins with a serve, and players alternate serves every two points. Keep these fundamentals in mind as we dive deeper into the game. Are you ready to serve up some fun? Let's get started! 🏓"
             },
+            "Day 1 - Module 2": {
+              "content": "🤚 Today, we'll focus on grip techniques, essential for effective play. There are two main types of grips: the shakehand grip and the penhold grip. The shakehand grip resembles a handshake, offering a versatile range of motions. It's popular among beginners due to its ease of use and comfort. The penhold grip, on the other hand, allows for greater wrist flexibility and is favored by players who prefer close-to-the-table play. Each grip affects your control and power differently. Experimenting with both can help you find what suits your style best. Proper grip is crucial for executing various strokes and adapting during a match. Practice holding the paddle correctly to ensure consistency and prevent unnecessary strain. Remember, the right grip sets the foundation for your game. Keep practicing, and you'll see improvement in no time! 💪"
+            },
+            "Day 1 - Module 3": {
+              "content": "🧠 Let's take a moment to reflect on what you've learned today. Understanding the basic rules and mastering your grip are the first steps towards becoming a skilled Ping Pong player. Think about how these elements apply to your goal of learning Ping Pong. For your actionable task, spend today practicing your grip techniques. Try both the shakehand and penhold grips to see which feels more natural. Focus on maintaining a relaxed yet firm hold, allowing for fluid movements. Practice simple forehand and backhand strokes to get comfortable with your grip. If possible, find a partner to start rallying and apply what you've learned. Consistent practice will help reinforce these foundational skills. Stay motivated and enjoy your learning journey!"
+            }
+          },
+          "Day 2": {
+            "Day 2 - Module 1": {
+              "content": "🏓 Welcome to Day 2! Today, we'll dive into basic strokes, the building blocks of Ping Pong. The forehand and backhand are the two primary strokes you'll use in every game. The forehand stroke involves swinging the paddle from the side of your dominant hand, generating power and control. It's great for aggressive plays and attacking shots. The backhand stroke, conversely, uses the opposite side of the paddle, allowing for versatile defensive moves. Mastering these strokes improves your ability to handle different ball speeds and placements. Proper technique involves consistent paddle angle and timing. Practice each stroke slowly at first, focusing on accuracy before increasing speed. Incorporate these strokes into your daily practice to build muscle memory. Remember, repetition is key to developing smooth and effective movements. Keep practicing, and your confidence will grow! 💥"
+            },
+            "Day 2 - Module 2": {
+              "content": "🚀 Now, let's explore serving techniques, a crucial aspect of gaining an advantage in Ping Pong. A good serve can set the tone for the entire point. Start with the basic serve: toss the ball at least six inches in the air and strike it so it bounces on your side before crossing over to your opponent's side. Experiment with variations like the backspin, topspin, and sidespin serves to add unpredictability. Backspin causes the ball to drop faster, making it harder for your opponent to return aggressively. Topspin makes the ball dip quickly, forcing your opponent to react swiftly. Sidespin can cause the ball to curve, challenging your opponent's positioning. Pay attention to your paddle angle and contact point to control the spin and placement. Consistent practice will help you develop reliable and diverse serves. A strong serve can give you the upper hand in matches, so dedicate time to mastering this skill. Keep experimenting and refining your techniques! 🎯"
+            },
+            "Day 2 - Module 3": {
+              "content": "🧩 Time to reflect on today's lessons. Understanding and practicing basic strokes and serving techniques are vital for your Ping Pong development. Consider how mastering these skills will help you achieve your goal of learning Ping Pong. For your actionable task, dedicate time today to practice your forehand and backhand strokes. Focus on smooth, controlled movements and proper paddle angles. Then, work on your serving techniques, experimenting with different spins and placements. Try to set up a practice routine that incorporates both strokes and serves. If possible, play with a partner to simulate game conditions and apply your skills in real-time. Track your progress by noting areas that need improvement and celebrate your successes. Consistent practice will solidify these foundational skills, paving the way for more advanced techniques. Stay dedicated and enjoy the process of improvement!"
+            }
+          },
+          "Day 3": {
+            "Day 3 - Module 1": {
+              "content": "🌟 Welcome to Day 3! Today, we'll focus on footwork and positioning, essential for effective movement during a match. Good footwork allows you to reach the ball quickly and maintain balance. Start by practicing the basic side-to-side movement, allowing you to cover the table efficiently. Incorporate small, swift steps rather than large, cumbersome movements. Staying light on your feet helps you react better to your opponent's shots. Positioning yourself correctly can give you better angles for both offense and defense. Always aim to be in a ready stance, with knees slightly bent and weight on the balls of your feet. Practice moving to different areas of the table and returning to your starting position quickly. Effective footwork enhances your ability to execute strokes with precision and power. Incorporate footwork drills into your practice sessions to build agility and coordination. Remember, staying mobile and well-positioned gives you a strategic advantage! 🏃‍♂️"
+            },
+            "Day 3 - Module 2": {
+              "content": "🎯 Let's move on to advanced techniques that can elevate your Ping Pong game. Spin is a game-changer, allowing you to control the ball's trajectory and confuse your opponent. Mastering topspin and backspin can make your shots more unpredictable and challenging to return. Placement is another advanced skill—aiming your shots to different parts of the table forces your opponent to move and adjust constantly. Developing a variety of serves and returning techniques keeps your gameplay dynamic and adaptable. Strategies such as varying the speed and spin of your shots can disrupt your opponent's rhythm. Learning to read your opponent's moves and anticipating their shots enhances your defensive and offensive plays. Incorporate spin drills into your practice to gain better control over the ball's movement. Experiment with different shot combinations to find what works best for your playing style. Advanced techniques require patience and consistent practice, but they significantly improve your competitiveness. Stay focused and keep pushing your boundaries! 💡"
+            },
+            "Day 3 - Module 3": {
+              "content": "📝 Let's review what you've learned over the past three days. From basic rules and grip techniques to advanced footwork and spin strategies, you've built a solid foundation in Ping Pong. Reflect on how each skill contributes to your overall goal of mastering the game. For your final actionable task, combine everything you've learned into a cohesive practice session. Start with warm-up drills focusing on grip and basic strokes. Move on to practicing your serves with different spins and placements. Incorporate footwork exercises to enhance your movement around the table. Then, apply advanced techniques like spin variation and strategic placement in simulated matches. Record your practice sessions to track your progress and identify areas for improvement. Set specific goals for your future training to continue developing your skills. Celebrate your achievements over these three days and stay motivated to keep learning and playing Ping Pong. You've made great strides—keep up the excellent work! 🏆"
+            }
           }
-        );
+        }
 
-        console.log("Azure OpenAI API response received:", openAIResponse.status);
-        
-        // Parse the course content
-        let courseContent;
-        try {
-          // Extract the JSON from the response
-          const contentText = openAIResponse.data.choices[0].message.content;
-          
-          // Find JSON object in the response (handling possible markdown code blocks)
-          const jsonMatch = contentText.match(/```json\s*([\s\S]*?)\s*```/) || contentText.match(/```\s*([\s\S]*?)\s*```/) || [null, contentText];
-          const jsonString = jsonMatch[1] || contentText;
-          
-          try {
-            courseContent = JSON.parse(jsonString.trim());
-            setPreviewData(courseContent);
-          } catch (e) {
-            console.error("Failed to parse extracted JSON from OpenAI:", e, jsonString);
-            toast.error("Failed to parse course content");
-            return;
-          }
-          
-          if (!courseContent || !courseContent.Day1) {
-            throw new Error("Invalid course structure");
-          }
-        } catch (error) {
-          console.error("Error parsing OpenAI response:", error);
-          toast.error('Failed to parse generated course data');
+        console.log(courseContent);
+
+
+        if (!courseContent || !courseContent["Day 1"]) {
+          toast.error("Invalid course structure");
           return;
         }
+
+
+        setPreviewData(courseContent);
+
+
+        // // Parse the course content
+        // let courseContent;
+        // try {
+        //   // Extract the JSON from the response
+        //   const contentText = await openAIResponse.json();
+
+        //   try {
+        //     courseContent = JSON.parse(jsonString.trim());
+        //     setPreviewData(courseContent);
+        //   } catch (e) {
+        //     console.error("Failed to parse extracted JSON from OpenAI:", e, jsonString);
+        //     toast.error("Failed to parse course content");
+        //     return;
+        //   }
+
+        //   if (!courseContent || !courseContent.Day1) {
+        //     throw new Error("Invalid course structure");
+        //   }
+        // } catch (error) {
+        //   console.error("Error parsing OpenAI response:", error);
+        //   toast.error('Failed to parse generated course data');
+        //   return;
+        // }
+
+
 
         // Store course data in the database
         const insertPromises = [];
-        
+
         for (let dayNum = 1; dayNum <= 3; dayNum++) {
-          const dayKey = `Day${dayNum}`;
+          const dayKey = `Day ${dayNum}`;
           const modules = courseContent[dayKey];
-          
+
           if (modules) {
             const insertObj = {
               request_id: requestData.request_id,
@@ -253,16 +211,16 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
               module_3: modules[`Day ${dayNum} - Module 3`] ? modules[`Day ${dayNum} - Module 3`].content : null,
               topic_name: topic
             };
-            
+
             insertPromises.push(
               supabase.from('website_cop_courses').insert(insertObj)
             );
           }
         }
-        
+
         // Wait for all inserts to complete
         await Promise.all(insertPromises);
-        
+
         // Create a regular course entry
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
@@ -286,11 +244,11 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
 
         // Create course days
         const courseDays = [];
-        
+
         for (let dayNum = 1; dayNum <= 3; dayNum++) {
           const dayKey = `Day${dayNum}`;
           const modules = courseContent[dayKey];
-          
+
           if (modules) {
             courseDays.push({
               course_id: courseData.id,
@@ -316,7 +274,7 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
 
         console.log("Course generated successfully:", courseData);
         toast.success("Course generated successfully!");
-        
+
         // Call onSuccess if provided
         if (onSuccess && courseData?.id) {
           onSuccess(courseData.id);
@@ -335,7 +293,7 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
 
   const renderPreview = () => {
     if (!previewData) return null;
-    
+
     return (
       <div className="mt-6 space-y-4">
         <h3 className="text-lg font-medium">WhatsApp Preview</h3>
@@ -343,19 +301,19 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
           {[1, 2, 3].map(dayNum => {
             const dayKey = `Day${dayNum}`;
             const modules = previewData[dayKey];
-            
+
             if (!modules) return null;
-            
+
             return (
               <div key={dayNum} className="space-y-2">
                 <h4 className="font-medium">Day {dayNum}</h4>
-                
+
                 {[1, 2, 3].map(moduleNum => {
                   const moduleKey = `Day ${dayNum} - Module ${moduleNum}`;
                   const module = modules[moduleKey];
-                  
+
                   if (!module) return null;
-                  
+
                   return (
                     <div key={moduleKey} className="bg-[#DCF8C6] p-4 rounded-lg max-w-[80%] space-y-2">
                       <p className="font-medium">{module.title}</p>
@@ -390,10 +348,10 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
                 <FormItem>
                   <FormLabel>Course Title</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="Enter a title for your course" 
+                    <Input
+                      placeholder="Enter a title for your course"
                       className="glass-input"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -408,8 +366,8 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
                 <FormItem>
                   <FormLabel>Topic</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="The primary topic of the course" 
+                    <Input
+                      placeholder="The primary topic of the course"
                       className="glass-input"
                       {...field}
                     />
@@ -426,8 +384,8 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
                 <FormItem>
                   <FormLabel>Goal</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="What is the learning goal for this course?" 
+                    <Textarea
+                      placeholder="What is the learning goal for this course?"
                       className="min-h-[100px] glass-input"
                       {...field}
                     />
@@ -444,8 +402,8 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Style</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
+                    <Select
+                      onValueChange={field.onChange}
                       defaultValue={field.value}
                     >
                       <FormControl>
@@ -470,8 +428,8 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Language</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
+                    <Select
+                      onValueChange={field.onChange}
                       defaultValue={field.value}
                     >
                       <FormControl>
@@ -492,8 +450,8 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
             </div>
 
             <div className="flex justify-end space-x-2">
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 variant="outline"
                 onClick={onCancel}
                 disabled={isLoading}
