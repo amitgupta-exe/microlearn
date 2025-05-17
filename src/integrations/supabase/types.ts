@@ -269,6 +269,39 @@ export type Database = {
           },
         ]
       }
+      course_generation_requests: {
+        Row: {
+          course_title: string
+          created_at: string | null
+          created_by: string | null
+          goal: string
+          language: string
+          request_id: string
+          style: string
+          topic: string
+        }
+        Insert: {
+          course_title: string
+          created_at?: string | null
+          created_by?: string | null
+          goal: string
+          language: string
+          request_id?: string
+          style: string
+          topic: string
+        }
+        Update: {
+          course_title?: string
+          created_at?: string | null
+          created_by?: string | null
+          goal?: string
+          language?: string
+          request_id?: string
+          style?: string
+          topic?: string
+        }
+        Relationships: []
+      }
       course_name: {
         Row: {
           day: number
@@ -490,6 +523,47 @@ export type Database = {
           },
         ]
       }
+      generated_courses: {
+        Row: {
+          created_at: string | null
+          day: number
+          id: string
+          module_1: string | null
+          module_2: string | null
+          module_3: string | null
+          request_id: string | null
+          topic_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          day: number
+          id?: string
+          module_1?: string | null
+          module_2?: string | null
+          module_3?: string | null
+          request_id?: string | null
+          topic_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          day?: number
+          id?: string
+          module_1?: string | null
+          module_2?: string | null
+          module_3?: string | null
+          request_id?: string | null
+          topic_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_courses_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "registration_requests"
+            referencedColumns: ["request_id"]
+          },
+        ]
+      }
       learner_courses: {
         Row: {
           completion_percentage: number
@@ -661,6 +735,42 @@ export type Database = {
         }
         Relationships: []
       }
+      registration_requests: {
+        Row: {
+          created_at: string | null
+          generated: boolean
+          goal: string
+          language: string
+          name: string
+          number: string
+          request_id: string
+          style: string
+          topic: string
+        }
+        Insert: {
+          created_at?: string | null
+          generated?: boolean
+          goal: string
+          language: string
+          name: string
+          number: string
+          request_id?: string
+          style: string
+          topic: string
+        }
+        Update: {
+          created_at?: string | null
+          generated?: boolean
+          goal?: string
+          language?: string
+          name?: string
+          number?: string
+          request_id?: string
+          style?: string
+          topic?: string
+        }
+        Relationships: []
+      }
       students: {
         Row: {
           course_id: string
@@ -691,6 +801,96 @@ export type Database = {
           next_day?: number | null
           next_module?: number | null
           phone?: string
+        }
+        Relationships: []
+      }
+      user_inputs: {
+        Row: {
+          "Certificate File": string | null
+          "completed courses": number | null
+          Completion_Certificate: string | null
+          "Course Completed": boolean | null
+          "Course Status": string | null
+          Created: string | null
+          Date: string | null
+          "Day Completed": number | null
+          Doubt: string | null
+          Feedback: string | null
+          Goal: string | null
+          id: number
+          Interactive_Responses: Json | null
+          "Join Waitlist": boolean | null
+          Language: string | null
+          Last_Msg: string | null
+          "Module Completed": number | null
+          Name: string | null
+          "Next Day": string | null
+          "Next Module": string | null
+          Phone: string | null
+          Progress: number | null
+          "Question Responses": Json | null
+          record_id: string | null
+          Responses: Json | null
+          Style: string | null
+          Topic: string | null
+        }
+        Insert: {
+          "Certificate File"?: string | null
+          "completed courses"?: number | null
+          Completion_Certificate?: string | null
+          "Course Completed"?: boolean | null
+          "Course Status"?: string | null
+          Created?: string | null
+          Date?: string | null
+          "Day Completed"?: number | null
+          Doubt?: string | null
+          Feedback?: string | null
+          Goal?: string | null
+          id?: number
+          Interactive_Responses?: Json | null
+          "Join Waitlist"?: boolean | null
+          Language?: string | null
+          Last_Msg?: string | null
+          "Module Completed"?: number | null
+          Name?: string | null
+          "Next Day"?: string | null
+          "Next Module"?: string | null
+          Phone?: string | null
+          Progress?: number | null
+          "Question Responses"?: Json | null
+          record_id?: string | null
+          Responses?: Json | null
+          Style?: string | null
+          Topic?: string | null
+        }
+        Update: {
+          "Certificate File"?: string | null
+          "completed courses"?: number | null
+          Completion_Certificate?: string | null
+          "Course Completed"?: boolean | null
+          "Course Status"?: string | null
+          Created?: string | null
+          Date?: string | null
+          "Day Completed"?: number | null
+          Doubt?: string | null
+          Feedback?: string | null
+          Goal?: string | null
+          id?: number
+          Interactive_Responses?: Json | null
+          "Join Waitlist"?: boolean | null
+          Language?: string | null
+          Last_Msg?: string | null
+          "Module Completed"?: number | null
+          Name?: string | null
+          "Next Day"?: string | null
+          "Next Module"?: string | null
+          Phone?: string | null
+          Progress?: number | null
+          "Question Responses"?: Json | null
+          record_id?: string | null
+          Responses?: Json | null
+          Style?: string | null
+          Topic?: string | null
         }
         Relationships: []
       }
@@ -748,6 +948,39 @@ export type Database = {
           question_responses?: string | null
           responses?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      website_cop_courses: {
+        Row: {
+          created_at: string | null
+          day: number
+          id: string
+          module_1: string | null
+          module_2: string | null
+          module_3: string | null
+          request_id: string | null
+          topic_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          day: number
+          id?: string
+          module_1?: string | null
+          module_2?: string | null
+          module_3?: string | null
+          request_id?: string | null
+          topic_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          day?: number
+          id?: string
+          module_1?: string | null
+          module_2?: string | null
+          module_3?: string | null
+          request_id?: string | null
+          topic_name?: string | null
         }
         Relationships: []
       }

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -521,7 +520,7 @@ const Courses = () => {
           <div className="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-0">
             <Button variant="outline" onClick={() => navigate('/courses/prompt')}>
               <MessageSquareText className="mr-2 h-4 w-4" />
-              Course from Prompt
+              Course On Prompt
             </Button>
             <Button onClick={() => navigate('/courses/new')}>
               <Plus className="mr-2 h-4 w-4" />

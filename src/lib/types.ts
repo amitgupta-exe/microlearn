@@ -48,6 +48,7 @@ export interface ExtendedCourse extends Course {
   learner_count?: number;
   learner_courses?: any[];
   is_alfred_course?: boolean; // Flag to identify Alfred courses
+  is_cop_course?: boolean; // Flag to identify COP courses
 }
 
 export interface AlfredCourseData {
@@ -58,6 +59,28 @@ export interface AlfredCourseData {
   module_2_text?: string;
   module_3_text?: string;
   created_at: string;
+}
+
+export interface COPCourseData {
+  id: string;
+  request_id: string;
+  day: number;
+  module_1?: string;
+  module_2?: string;
+  module_3?: string;
+  topic_name: string;
+  created_at: string;
+}
+
+export interface CourseGenerationRequest {
+  request_id: string;
+  course_title: string;
+  topic: string;
+  goal: string;
+  style: string;
+  language: string;
+  created_at: string;
+  created_by: string;
 }
 
 export interface LearnerCourse {
