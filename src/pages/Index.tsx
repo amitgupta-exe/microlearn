@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { ExtendedCourse } from '@/lib/types';
+import { ExtendedCourse, LearnerCourse } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const Index = () => {
@@ -61,7 +61,7 @@ const Index = () => {
           .from('courses')
           .select(`
             *,
-            learner_courses:learner_courses(learner_id)
+            learner_courses:learner_courses(*)
           `)
           .eq('status', 'active')
           .order('created_at', { ascending: false })
@@ -72,13 +72,29 @@ const Index = () => {
         }
         
         // Process the recent courses data to count learners
-        const recentCourses: ExtendedCourse[] = recentCoursesData ? recentCoursesData.map(course => ({
-          ...course,
-          days: [],
-          status: course.status as 'active' | 'archived' | 'draft',
-          visibility: course.visibility as 'public' | 'private' | string, // Ensure proper casting of visibility
-          learner_count: Array.isArray(course.learner_courses) ? course.learner_courses.length : 0
-        })) : [];
+        const recentCourses: ExtendedCourse[] = recentCoursesData ? recentCoursesData.map(course => {
+          // Properly construct learner_courses with full type information
+          const learnerCourses: LearnerCourse[] = Array.isArray(course.learner_courses) 
+            ? course.learner_courses.map((lc: any) => ({
+                id: lc.id,
+                learner_id: lc.learner_id,
+                course_id: lc.course_id,
+                start_date: lc.start_date,
+                status: lc.status,
+                completion_percentage: lc.completion_percentage,
+                created_at: lc.created_at
+              }))
+            : [];
+            
+          return {
+            ...course,
+            days: [],
+            status: course.status as 'active' | 'archived' | 'draft',
+            visibility: course.visibility as 'public' | 'private',
+            learner_count: learnerCourses.length,
+            learner_courses: learnerCourses
+          };
+        }) : [];
         
         setDashboardData({
           totalLearners: learnersCount || 0,

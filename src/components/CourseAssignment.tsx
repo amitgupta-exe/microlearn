@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
 import { Course, Learner } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -69,7 +68,13 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
         }
 
         if (data) {
-          setCourses(data as Course[]);
+          // Fix: Cast the data to unknown first, then to Course[]
+          const coursesWithDays = (data as unknown as Course[]).map(course => ({
+            ...course,
+            days: [], // Initialize with empty days array
+          }));
+          
+          setCourses(coursesWithDays);
         }
       } catch (error) {
         console.error('Error fetching courses:', error);
@@ -155,7 +160,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                     mode="single"
                     selected={field.value}
                     onSelect={field.onChange}
-                    disabledDate={(date) => date < new Date()}
+                    disabled={(date) => date < new Date()} // Fix: Use the correct prop
                     initialFocus
                   />
                 </PopoverContent>

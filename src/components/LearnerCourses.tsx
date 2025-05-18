@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Learner, ExtendedLearnerCourse, Course } from '@/lib/types';
+import { Learner, LearnerCourse, ExtendedLearnerCourse, Course } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import CourseAssignment from './CourseAssignment';
@@ -71,6 +71,7 @@ const LearnerCourses: React.FC<LearnerCoursesProps> = ({ learner }) => {
         start_date: item.start_date,
         completion_percentage: item.completion_percentage,
         status: item.status as 'scheduled' | 'in_progress' | 'completed',
+        created_at: item.created_at,
         course: {
           id: item.course.id,
           name: item.course.name,

@@ -1,3 +1,4 @@
+
 export interface Course {
   id: string;
   name: string;
@@ -50,6 +51,10 @@ export interface LearnerCourse {
   learner?: Learner;
 }
 
+export interface ExtendedLearnerCourse extends LearnerCourse {
+  course: Course;
+}
+
 export interface AlfredCourseData {
   id: string;
   course_name: string;
@@ -58,4 +63,14 @@ export interface AlfredCourseData {
   module_2_text?: string;
   module_3_text?: string;
   created_at: string;
+}
+
+export interface WatiConfig {
+  id: string;
+  serri_endpoint: string;
+  serri_api_key: string;
+  is_configured: boolean;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
 }

@@ -35,8 +35,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  // Only redirect when auth check is complete and there's no user
-  if (!user) {
+  // Only redirect after loading is complete and there's no user
+  if (!loading && !user) {
     return <Navigate to="/login" replace />;
   }
 
@@ -56,8 +56,8 @@ const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  // Only redirect when auth check is complete and there is a user
-  if (user) {
+  // Only redirect after loading is complete and there is a user
+  if (!loading && user) {
     return <Navigate to="/" replace />;
   }
 

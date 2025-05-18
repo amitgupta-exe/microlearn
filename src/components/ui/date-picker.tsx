@@ -17,7 +17,7 @@ interface DatePickerProps {
   selected?: Date | Date[] | undefined;
   onSelect?: (date: Date | Date[] | undefined) => void;
   disabled?: boolean;
-  disabledDate?: (date: Date) => boolean;
+  disabled?: (date: Date) => boolean;  // Replace disabledDate with disabled
   initialFocus?: boolean;
   className?: string;
 }
@@ -27,7 +27,6 @@ export function DatePicker({
   selected,
   onSelect,
   disabled,
-  disabledDate,
   initialFocus,
   className,
 }: DatePickerProps) {
@@ -38,8 +37,8 @@ export function DatePicker({
         selected={selected}
         onSelect={onSelect as any}
         disabled={disabled}
-        disabledDate={disabledDate}
         initialFocus={initialFocus}
+        className="p-3 pointer-events-auto"
       />
     </div>
   );

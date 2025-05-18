@@ -24,34 +24,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   useEffect(() => {
+    // First set up the auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, currentSession) => {
+        // Don't set loading to true here, that causes the flicker
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+      }
+    );
+
+    // Then check for an existing session
     const initAuth = async () => {
-      // Start with loading state
-      setLoading(true);
-      
       try {
-        // First get the current session
         const { data: sessionData } = await supabase.auth.getSession();
         setSession(sessionData.session);
         setUser(sessionData.session?.user ?? null);
       } catch (err) {
         console.error('Error getting session:', err);
       } finally {
-        // Important: Always set loading to false after initialization
         setLoading(false);
       }
     };
 
-    // Setup the auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        console.log('Auth state changed:', event);
-        // Don't set loading to true here - that causes a flicker
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-      }
-    );
-
-    // Initialize auth state
     initAuth();
 
     // Cleanup subscription 
