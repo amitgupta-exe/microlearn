@@ -68,11 +68,10 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
         }
 
         if (data) {
-          // Fix: Cast the data to unknown first, then to Course[]
-          const coursesWithDays = (data as unknown as Course[]).map(course => ({
+          const coursesWithDays = data.map(course => ({
             ...course,
-            days: [], // Initialize with empty days array
-          }));
+            days: [],
+          })) as Course[];
           
           setCourses(coursesWithDays);
         }
@@ -107,7 +106,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
 
       toast.success("Course assigned successfully!");
       
-      // Send WhatsApp notification
       try {
         await sendCourseAssignmentNotification(
           learner.name, 
@@ -160,7 +158,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                     mode="single"
                     selected={field.value}
                     onSelect={field.onChange}
-                    disabled={(date) => date < new Date()} // Fix: Use the correct prop
+                    disabled={(date) => date < new Date()}
                     initialFocus
                   />
                 </PopoverContent>

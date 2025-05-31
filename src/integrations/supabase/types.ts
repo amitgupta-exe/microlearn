@@ -452,6 +452,120 @@ export type Database = {
         }
         Relationships: []
       }
+      course_progress: {
+        Row: {
+          completed_at: string | null
+          course_id: string | null
+          course_name: string | null
+          created_at: string | null
+          current_day: number | null
+          day1_module1: boolean | null
+          day1_module2: boolean | null
+          day1_module3: boolean | null
+          day2_module1: boolean | null
+          day2_module2: boolean | null
+          day2_module3: boolean | null
+          day3_module1: boolean | null
+          day3_module2: boolean | null
+          day3_module3: boolean | null
+          feedback: string | null
+          id: string
+          is_active: boolean | null
+          last_module_completed_at: string | null
+          last_reminder_sent_at: string | null
+          learner_id: string | null
+          learner_name: string | null
+          notes: string | null
+          phone_number: string | null
+          progress_percent: number | null
+          reminder_count: number | null
+          reminder_count_day1: number | null
+          reminder_count_day2: number | null
+          reminder_count_day3: number | null
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          course_id?: string | null
+          course_name?: string | null
+          created_at?: string | null
+          current_day?: number | null
+          day1_module1?: boolean | null
+          day1_module2?: boolean | null
+          day1_module3?: boolean | null
+          day2_module1?: boolean | null
+          day2_module2?: boolean | null
+          day2_module3?: boolean | null
+          day3_module1?: boolean | null
+          day3_module2?: boolean | null
+          day3_module3?: boolean | null
+          feedback?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_module_completed_at?: string | null
+          last_reminder_sent_at?: string | null
+          learner_id?: string | null
+          learner_name?: string | null
+          notes?: string | null
+          phone_number?: string | null
+          progress_percent?: number | null
+          reminder_count?: number | null
+          reminder_count_day1?: number | null
+          reminder_count_day2?: number | null
+          reminder_count_day3?: number | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          course_id?: string | null
+          course_name?: string | null
+          created_at?: string | null
+          current_day?: number | null
+          day1_module1?: boolean | null
+          day1_module2?: boolean | null
+          day1_module3?: boolean | null
+          day2_module1?: boolean | null
+          day2_module2?: boolean | null
+          day2_module3?: boolean | null
+          day3_module1?: boolean | null
+          day3_module2?: boolean | null
+          day3_module3?: boolean | null
+          feedback?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_module_completed_at?: string | null
+          last_reminder_sent_at?: string | null
+          learner_id?: string | null
+          learner_name?: string | null
+          notes?: string | null
+          phone_number?: string | null
+          progress_percent?: number | null
+          reminder_count?: number | null
+          reminder_count_day1?: number | null
+          reminder_count_day2?: number | null
+          reminder_count_day3?: number | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_progress_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "generated_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_progress_learner_id_fkey"
+            columns: ["learner_id"]
+            isOneToOne: false
+            referencedRelation: "registration_requests"
+            referencedColumns: ["request_id"]
+          },
+        ]
+      }
       course_prompt_templates: {
         Row: {
           created_at: string
@@ -737,6 +851,7 @@ export type Database = {
       }
       registration_requests: {
         Row: {
+          approval_status: string | null
           created_at: string | null
           generated: boolean
           goal: string
@@ -748,6 +863,7 @@ export type Database = {
           topic: string
         }
         Insert: {
+          approval_status?: string | null
           created_at?: string | null
           generated?: boolean
           goal: string
@@ -759,6 +875,7 @@ export type Database = {
           topic: string
         }
         Update: {
+          approval_status?: string | null
           created_at?: string | null
           generated?: boolean
           goal?: string
@@ -983,44 +1100,6 @@ export type Database = {
           topic_name?: string | null
         }
         Relationships: []
-      }
-      whatsapp_config: {
-        Row: {
-          created_at: string
-          id: string
-          is_configured: boolean
-          serri_api_key: string
-          serri_endpoint: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_configured?: boolean
-          serri_api_key: string
-          serri_endpoint?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_configured?: boolean
-          serri_api_key?: string
-          serri_endpoint?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_config_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Views: {

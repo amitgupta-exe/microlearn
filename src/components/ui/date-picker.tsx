@@ -16,8 +16,7 @@ interface DatePickerProps {
   mode?: "single" | "range" | "multiple";
   selected?: Date | Date[] | undefined;
   onSelect?: (date: Date | Date[] | undefined) => void;
-  disabled?: boolean;
-  disabled?: (date: Date) => boolean;  // Replace disabledDate with disabled
+  disabled?: boolean | ((date: Date) => boolean);
   initialFocus?: boolean;
   className?: string;
 }

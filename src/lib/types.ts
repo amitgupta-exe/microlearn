@@ -74,3 +74,16 @@ export interface WatiConfig {
   created_at: string;
   updated_at: string;
 }
+
+export interface RegistrationRequest {
+  request_id: string;
+  name: string;
+  number: string;
+  language: string;
+  topic: string;
+  style: string;
+  goal: string;
+  generated: boolean;
+  created_at: string;
+  approval_status: 'pending' | 'approved' | 'rejected';
+}

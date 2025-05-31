@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,20 +12,21 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Sidebar from "./components/Sidebar";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { SuperAdminProvider, useSuperAdmin } from "./contexts/SuperAdminContext";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AuthCallback from "./pages/AuthCallback";
+import SuperAdminLogin from "./pages/SuperAdminLogin";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 
 const queryClient = new QueryClient();
-console.log(import.meta.env.VITE_URL);
 
 // Protected route wrapper component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
-  // Show loading indicator while checking auth state
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -35,9 +35,19 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  // Only redirect after loading is complete and there's no user
   if (!loading && !user) {
     return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Super admin protected route
+const SuperAdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isSuperAdmin } = useSuperAdmin();
+  
+  if (!isSuperAdmin) {
+    return <Navigate to="/superadmin/login" replace />;
   }
 
   return <>{children}</>;
@@ -47,7 +57,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
-  // Show loading indicator while checking auth state
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -56,7 +65,6 @@ const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  // Only redirect after loading is complete and there is a user
   if (!loading && user) {
     return <Navigate to="/" replace />;
   }
@@ -78,6 +86,14 @@ const AppRoutes = () => {
 
   return (
     <Routes>
+      {/* Super Admin Routes */}
+      <Route path="/superadmin/login" element={<SuperAdminLogin />} />
+      <Route path="/superadmin/requests" element={
+        <SuperAdminRoute>
+          <SuperAdminDashboard />
+        </SuperAdminRoute>
+      } />
+
       {/* Auth Routes */}
       <Route path="/login" element={
         <PublicOnlyRoute>
@@ -190,9 +206,11 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AuthProvider>
-            <AppRoutes />
-          </AuthProvider>
+          <SuperAdminProvider>
+            <AuthProvider>
+              <AppRoutes />
+            </AuthProvider>
+          </SuperAdminProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
