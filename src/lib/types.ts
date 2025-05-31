@@ -65,16 +65,6 @@ export interface AlfredCourseData {
   created_at: string;
 }
 
-export interface WatiConfig {
-  id: string;
-  serri_endpoint: string;
-  serri_api_key: string;
-  is_configured: boolean;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface RegistrationRequest {
   request_id: string;
   name: string;

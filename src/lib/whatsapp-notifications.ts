@@ -2,6 +2,13 @@
 import { supabase } from '@/integrations/supabase/client';
 import axios from 'axios';
 
+// For now, we'll use environment variables or hardcoded values
+// since whatsapp_config table doesn't exist yet
+const WHATSAPP_CONFIG = {
+  serri_endpoint: 'your-endpoint.com',
+  serri_api_key: 'your-api-key'
+};
+
 /**
  * Send a message via WhatsApp
  * @param msg The message to send
@@ -9,23 +16,11 @@ import axios from 'axios';
  */
 export const sendText = async (msg: string, phone: string): Promise<void> => {
   try {
-    // Get WhatsApp config
-    const { data: config, error: configError } = await supabase
-      .from('whatsapp_config')
-      .select('*')
-      .limit(1)
-      .single();
-
-    if (configError || !config) {
-      console.error('Error fetching WhatsApp config:', configError);
-      return;
-    }
-
     const options = {
       method: 'POST',
-      url: `https://${config.serri_endpoint}/api/v1/sendSessionMessage/${phone}`,
+      url: `https://${WHATSAPP_CONFIG.serri_endpoint}/api/v1/sendSessionMessage/${phone}`,
       headers: {
-        'Authorization': config.serri_api_key,
+        'Authorization': WHATSAPP_CONFIG.serri_api_key,
         'Content-Type': 'application/json',
       },
       data: {
@@ -54,23 +49,11 @@ export const sendInteractiveButtonsMessage = async (
   phone: string
 ): Promise<void> => {
   try {
-    // Get WhatsApp config
-    const { data: config, error: configError } = await supabase
-      .from('whatsapp_config')
-      .select('*')
-      .limit(1)
-      .single();
-
-    if (configError || !config) {
-      console.error('Error fetching WhatsApp config:', configError);
-      return;
-    }
-
     const options = {
       method: 'POST',
-      url: `https://${config.serri_endpoint}/api/v1/sendInteractiveButtonsMessage?whatsappNumber=${phone}`,
+      url: `https://${WHATSAPP_CONFIG.serri_endpoint}/api/v1/sendInteractiveButtonsMessage?whatsappNumber=${phone}`,
       headers: {
-        'Authorization': config.serri_api_key,
+        'Authorization': WHATSAPP_CONFIG.serri_api_key,
         'Content-Type': 'application/json',
       },
       data: {
