@@ -368,50 +368,44 @@ export type Database = {
       }
       courses: {
         Row: {
+          course_name: string
           created_at: string
           created_by: string
           day: number
-          description: string
           id: string
           module_1: string | null
           module_2: string | null
           module_3: string | null
-          name: string
           origin: string
           status: string
-          topic_name: string | null
           updated_at: string
           visibility: string
         }
         Insert: {
+          course_name: string
           created_at?: string
           created_by: string
           day?: number
-          description: string
           id?: string
           module_1?: string | null
           module_2?: string | null
           module_3?: string | null
-          name: string
           origin?: string
           status: string
-          topic_name?: string | null
           updated_at?: string
           visibility?: string
         }
         Update: {
+          course_name?: string
           created_at?: string
           created_by?: string
           day?: number
-          description?: string
           id?: string
           module_1?: string | null
           module_2?: string | null
           module_3?: string | null
-          name?: string
           origin?: string
           status?: string
-          topic_name?: string | null
           updated_at?: string
           visibility?: string
         }

@@ -107,12 +107,12 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
       try {
         // Send notification based on whether it's an overwrite or new assignment
         const notificationMessage = learner.assigned_course_id 
-          ? `Your previous course has been suspended. New course assigned: ${selectedCourse.name}. Press Let's MicroLearn to start learning.`
-          : `${selectedCourse.name} course is assigned to you. Press Let's MicroLearn to start learning.`;
+          ? `Your previous course has been suspended. New course assigned: ${selectedCourse.course_name}. Press Let's MicroLearn to start learning.`
+          : `${selectedCourse.course_name} course is assigned to you. Press Let's MicroLearn to start learning.`;
           
         await sendCourseAssignmentNotification(
           learner.name, 
-          selectedCourse.name, 
+          selectedCourse.course_name, 
           learner.phone
         );
       } catch (error) {
@@ -165,8 +165,8 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
                 }}
               >
                 <div className="text-left">
-                  <div className="font-medium">{course.name}</div>
-                  <div className="text-sm text-muted-foreground">{course.description}</div>
+                  <div className="font-medium">{course.course_name}</div>
+                  <div className="text-sm text-muted-foreground">Day {course.day}</div>
                 </div>
               </Button>
             ))}

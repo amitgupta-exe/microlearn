@@ -1,8 +1,7 @@
 
 export interface Course {
   id: string;
-  name: string;
-  description: string;
+  course_name: string;
   day: number;
   module_1?: string;
   module_2?: string;

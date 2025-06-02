@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, Search, User, MoreHorizontal, ArrowLeft, Loader2, FileUp, Users } from 'lucide-react';
@@ -170,7 +169,6 @@ const Learners = () => {
       
       const learnerWithCourses: Learner = {
         ...createdLearner,
-        courses: [],
         status: createdLearner.status as 'active' | 'inactive'
       };
       
@@ -435,7 +433,7 @@ const Learners = () => {
                       <TableCell>
                         {learner.assigned_course ? (
                           <Badge variant="secondary">
-                            {learner.assigned_course.name}
+                            {learner.assigned_course.course_name}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground">No course assigned</span>
