@@ -44,7 +44,6 @@ const Learners = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [learners, setLearners] = useState<Learner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('list');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, profile, loading: authLoading } = useRequireAuth();
@@ -93,9 +92,13 @@ const Learners = () => {
           }
         }
         
+        // Fetch learners with their assigned courses
         const { data, error } = await supabase
           .from('learners')
-          .select('*')
+          .select(`
+            *,
+            assigned_course:courses(*)
+          `)
           .eq('created_by', user.id)
           .order('created_at', { ascending: false });
           
@@ -107,7 +110,6 @@ const Learners = () => {
         
         const learnersWithCourses = data.map(learner => ({
           ...learner,
-          courses: [],
           status: learner.status as 'active' | 'inactive'
         }));
         
@@ -357,7 +359,7 @@ const Learners = () => {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Learners</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your learners
+              Manage your learners and their course assignments
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-0">
@@ -395,6 +397,7 @@ const Learners = () => {
                   <TableHead className="w-[250px]">Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
+                  <TableHead>Assigned Course</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -403,7 +406,7 @@ const Learners = () => {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center h-32">
+                    <TableCell colSpan={7} className="text-center h-32">
                       <div className="flex items-center justify-center">
                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
                         <span className="ml-2">Loading learners...</span>
@@ -412,7 +415,7 @@ const Learners = () => {
                   </TableRow>
                 ) : filteredLearners.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center h-32 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center h-32 text-muted-foreground">
                       {searchQuery ? 'No learners match your search' : 'No learners found. Create your first one!'}
                     </TableCell>
                   </TableRow>
@@ -429,6 +432,15 @@ const Learners = () => {
                       </TableCell>
                       <TableCell>{learner.email}</TableCell>
                       <TableCell>{learner.phone}</TableCell>
+                      <TableCell>
+                        {learner.assigned_course ? (
+                          <Badge variant="secondary">
+                            {learner.assigned_course.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">No course assigned</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={learner.status === 'active' ? 'default' : 'outline'}>
                           {learner.status === 'active' ? 'Active' : 'Inactive'}

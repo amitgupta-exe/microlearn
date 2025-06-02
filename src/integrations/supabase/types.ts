@@ -219,56 +219,6 @@ export type Database = {
         }
         Relationships: []
       }
-      course_days: {
-        Row: {
-          course_id: string
-          created_at: string
-          day_number: number
-          id: string
-          info: string
-          media_link: string | null
-          module_1: string | null
-          module_2: string | null
-          module_3: string | null
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          course_id: string
-          created_at?: string
-          day_number: number
-          id?: string
-          info: string
-          media_link?: string | null
-          module_1?: string | null
-          module_2?: string | null
-          module_3?: string | null
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          course_id?: string
-          created_at?: string
-          day_number?: number
-          id?: string
-          info?: string
-          media_link?: string | null
-          module_1?: string | null
-          module_2?: string | null
-          module_3?: string | null
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "course_days_course_id_fkey"
-            columns: ["course_id"]
-            isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       course_generation_requests: {
         Row: {
           course_title: string
@@ -299,156 +249,6 @@ export type Database = {
           request_id?: string
           style?: string
           topic?: string
-        }
-        Relationships: []
-      }
-      course_name: {
-        Row: {
-          day: number
-          id: string
-          module_1_answer: string | null
-          module_1_ibody: string | null
-          module_1_ibuttons: string | null
-          module_1_link: string | null
-          module_1_list: string | null
-          module_1_ltitle: string | null
-          module_1_next: string | null
-          module_1_question: string | null
-          module_1_text: string | null
-          module_2_answer: string | null
-          module_2_ibody: string | null
-          module_2_ibuttons: string | null
-          module_2_link: string | null
-          module_2_list: string | null
-          module_2_ltitle: string | null
-          module_2_next: string | null
-          module_2_question: string | null
-          module_2_text: string | null
-          module_3_answer: string | null
-          module_3_ibody: string | null
-          module_3_ibuttons: string | null
-          module_3_link: string | null
-          module_3_list: string | null
-          module_3_ltitle: string | null
-          module_3_next: string | null
-          module_3_question: string | null
-          module_3_text: string | null
-          module_4_answer: string | null
-          module_4_ibody: string | null
-          module_4_ibuttons: string | null
-          module_4_link: string | null
-          module_4_list: string | null
-          module_4_ltitle: string | null
-          module_4_next: string | null
-          module_4_question: string | null
-          module_4_text: string | null
-          module_5_answer: string | null
-          module_5_ibody: string | null
-          module_5_ibuttons: string | null
-          module_5_link: string | null
-          module_5_list: string | null
-          module_5_ltitle: string | null
-          module_5_next: string | null
-          module_5_question: string | null
-          module_5_text: string | null
-        }
-        Insert: {
-          day: number
-          id?: string
-          module_1_answer?: string | null
-          module_1_ibody?: string | null
-          module_1_ibuttons?: string | null
-          module_1_link?: string | null
-          module_1_list?: string | null
-          module_1_ltitle?: string | null
-          module_1_next?: string | null
-          module_1_question?: string | null
-          module_1_text?: string | null
-          module_2_answer?: string | null
-          module_2_ibody?: string | null
-          module_2_ibuttons?: string | null
-          module_2_link?: string | null
-          module_2_list?: string | null
-          module_2_ltitle?: string | null
-          module_2_next?: string | null
-          module_2_question?: string | null
-          module_2_text?: string | null
-          module_3_answer?: string | null
-          module_3_ibody?: string | null
-          module_3_ibuttons?: string | null
-          module_3_link?: string | null
-          module_3_list?: string | null
-          module_3_ltitle?: string | null
-          module_3_next?: string | null
-          module_3_question?: string | null
-          module_3_text?: string | null
-          module_4_answer?: string | null
-          module_4_ibody?: string | null
-          module_4_ibuttons?: string | null
-          module_4_link?: string | null
-          module_4_list?: string | null
-          module_4_ltitle?: string | null
-          module_4_next?: string | null
-          module_4_question?: string | null
-          module_4_text?: string | null
-          module_5_answer?: string | null
-          module_5_ibody?: string | null
-          module_5_ibuttons?: string | null
-          module_5_link?: string | null
-          module_5_list?: string | null
-          module_5_ltitle?: string | null
-          module_5_next?: string | null
-          module_5_question?: string | null
-          module_5_text?: string | null
-        }
-        Update: {
-          day?: number
-          id?: string
-          module_1_answer?: string | null
-          module_1_ibody?: string | null
-          module_1_ibuttons?: string | null
-          module_1_link?: string | null
-          module_1_list?: string | null
-          module_1_ltitle?: string | null
-          module_1_next?: string | null
-          module_1_question?: string | null
-          module_1_text?: string | null
-          module_2_answer?: string | null
-          module_2_ibody?: string | null
-          module_2_ibuttons?: string | null
-          module_2_link?: string | null
-          module_2_list?: string | null
-          module_2_ltitle?: string | null
-          module_2_next?: string | null
-          module_2_question?: string | null
-          module_2_text?: string | null
-          module_3_answer?: string | null
-          module_3_ibody?: string | null
-          module_3_ibuttons?: string | null
-          module_3_link?: string | null
-          module_3_list?: string | null
-          module_3_ltitle?: string | null
-          module_3_next?: string | null
-          module_3_question?: string | null
-          module_3_text?: string | null
-          module_4_answer?: string | null
-          module_4_ibody?: string | null
-          module_4_ibuttons?: string | null
-          module_4_link?: string | null
-          module_4_list?: string | null
-          module_4_ltitle?: string | null
-          module_4_next?: string | null
-          module_4_question?: string | null
-          module_4_text?: string | null
-          module_5_answer?: string | null
-          module_5_ibody?: string | null
-          module_5_ibuttons?: string | null
-          module_5_link?: string | null
-          module_5_list?: string | null
-          module_5_ltitle?: string | null
-          module_5_next?: string | null
-          module_5_question?: string | null
-          module_5_text?: string | null
         }
         Relationships: []
       }
@@ -566,64 +366,52 @@ export type Database = {
           },
         ]
       }
-      course_prompt_templates: {
-        Row: {
-          created_at: string
-          id: string
-          name: string
-          prompt: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          name: string
-          prompt: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          name?: string
-          prompt?: string
-        }
-        Relationships: []
-      }
       courses: {
         Row: {
-          category: string
           created_at: string
           created_by: string
+          day: number
           description: string
           id: string
-          language: string
+          module_1: string | null
+          module_2: string | null
+          module_3: string | null
           name: string
+          origin: string
           status: string
-          total_enrollments: number
+          topic_name: string | null
           updated_at: string
           visibility: string
         }
         Insert: {
-          category: string
           created_at?: string
           created_by: string
+          day?: number
           description: string
           id?: string
-          language: string
+          module_1?: string | null
+          module_2?: string | null
+          module_3?: string | null
           name: string
+          origin?: string
           status: string
-          total_enrollments?: number
+          topic_name?: string | null
           updated_at?: string
           visibility?: string
         }
         Update: {
-          category?: string
           created_at?: string
           created_by?: string
+          day?: number
           description?: string
           id?: string
-          language?: string
+          module_1?: string | null
+          module_2?: string | null
+          module_3?: string | null
           name?: string
+          origin?: string
           status?: string
-          total_enrollments?: number
+          topic_name?: string | null
           updated_at?: string
           visibility?: string
         }
@@ -678,56 +466,9 @@ export type Database = {
           },
         ]
       }
-      learner_courses: {
-        Row: {
-          completion_percentage: number
-          course_id: string
-          created_at: string
-          id: string
-          learner_id: string
-          start_date: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          completion_percentage?: number
-          course_id: string
-          created_at?: string
-          id?: string
-          learner_id: string
-          start_date: string
-          status: string
-          updated_at?: string
-        }
-        Update: {
-          completion_percentage?: number
-          course_id?: string
-          created_at?: string
-          id?: string
-          learner_id?: string
-          start_date?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "learner_courses_course_id_fkey"
-            columns: ["course_id"]
-            isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "learner_courses_learner_id_fkey"
-            columns: ["learner_id"]
-            isOneToOne: false
-            referencedRelation: "learners"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       learners: {
         Row: {
+          assigned_course_id: string | null
           created_at: string
           created_by: string
           email: string
@@ -735,10 +476,10 @@ export type Database = {
           name: string
           phone: string
           status: string
-          total_courses: number
           updated_at: string
         }
         Insert: {
+          assigned_course_id?: string | null
           created_at?: string
           created_by: string
           email: string
@@ -746,10 +487,10 @@ export type Database = {
           name: string
           phone: string
           status: string
-          total_courses?: number
           updated_at?: string
         }
         Update: {
+          assigned_course_id?: string | null
           created_at?: string
           created_by?: string
           email?: string
@@ -757,10 +498,16 @@ export type Database = {
           name?: string
           phone?: string
           status?: string
-          total_courses?: number
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "learners_assigned_course_id_fkey"
+            columns: ["assigned_course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "learners_created_by_fkey"
             columns: ["created_by"]
@@ -769,85 +516,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      messages: {
-        Row: {
-          course_day_id: string
-          course_id: string
-          created_at: string
-          id: string
-          learner_id: string
-          sent_at: string
-          status: string
-          type: string
-        }
-        Insert: {
-          course_day_id: string
-          course_id: string
-          created_at?: string
-          id?: string
-          learner_id: string
-          sent_at?: string
-          status: string
-          type: string
-        }
-        Update: {
-          course_day_id?: string
-          course_id?: string
-          created_at?: string
-          id?: string
-          learner_id?: string
-          sent_at?: string
-          status?: string
-          type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "messages_course_day_id_fkey"
-            columns: ["course_day_id"]
-            isOneToOne: false
-            referencedRelation: "course_days"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "messages_course_id_fkey"
-            columns: ["course_id"]
-            isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "messages_learner_id_fkey"
-            columns: ["learner_id"]
-            isOneToOne: false
-            referencedRelation: "learners"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          full_name: string | null
-          id: string
-          updated_at: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
-          id: string
-          updated_at?: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
-          id?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       registration_requests: {
         Row: {
@@ -885,129 +553,6 @@ export type Database = {
           request_id?: string
           style?: string
           topic?: string
-        }
-        Relationships: []
-      }
-      students: {
-        Row: {
-          course_id: string
-          id: string
-          last_msg: string | null
-          module_completed: number | null
-          name: string
-          next_day: number | null
-          next_module: number | null
-          phone: string
-        }
-        Insert: {
-          course_id: string
-          id?: string
-          last_msg?: string | null
-          module_completed?: number | null
-          name: string
-          next_day?: number | null
-          next_module?: number | null
-          phone: string
-        }
-        Update: {
-          course_id?: string
-          id?: string
-          last_msg?: string | null
-          module_completed?: number | null
-          name?: string
-          next_day?: number | null
-          next_module?: number | null
-          phone?: string
-        }
-        Relationships: []
-      }
-      user_inputs: {
-        Row: {
-          "Certificate File": string | null
-          "completed courses": number | null
-          Completion_Certificate: string | null
-          "Course Completed": boolean | null
-          "Course Status": string | null
-          Created: string | null
-          Date: string | null
-          "Day Completed": number | null
-          Doubt: string | null
-          Feedback: string | null
-          Goal: string | null
-          id: number
-          Interactive_Responses: Json | null
-          "Join Waitlist": boolean | null
-          Language: string | null
-          Last_Msg: string | null
-          "Module Completed": number | null
-          Name: string | null
-          "Next Day": string | null
-          "Next Module": string | null
-          Phone: string | null
-          Progress: number | null
-          "Question Responses": Json | null
-          record_id: string | null
-          Responses: Json | null
-          Style: string | null
-          Topic: string | null
-        }
-        Insert: {
-          "Certificate File"?: string | null
-          "completed courses"?: number | null
-          Completion_Certificate?: string | null
-          "Course Completed"?: boolean | null
-          "Course Status"?: string | null
-          Created?: string | null
-          Date?: string | null
-          "Day Completed"?: number | null
-          Doubt?: string | null
-          Feedback?: string | null
-          Goal?: string | null
-          id?: number
-          Interactive_Responses?: Json | null
-          "Join Waitlist"?: boolean | null
-          Language?: string | null
-          Last_Msg?: string | null
-          "Module Completed"?: number | null
-          Name?: string | null
-          "Next Day"?: string | null
-          "Next Module"?: string | null
-          Phone?: string | null
-          Progress?: number | null
-          "Question Responses"?: Json | null
-          record_id?: string | null
-          Responses?: Json | null
-          Style?: string | null
-          Topic?: string | null
-        }
-        Update: {
-          "Certificate File"?: string | null
-          "completed courses"?: number | null
-          Completion_Certificate?: string | null
-          "Course Completed"?: boolean | null
-          "Course Status"?: string | null
-          Created?: string | null
-          Date?: string | null
-          "Day Completed"?: number | null
-          Doubt?: string | null
-          Feedback?: string | null
-          Goal?: string | null
-          id?: number
-          Interactive_Responses?: Json | null
-          "Join Waitlist"?: boolean | null
-          Language?: string | null
-          Last_Msg?: string | null
-          "Module Completed"?: number | null
-          Name?: string | null
-          "Next Day"?: string | null
-          "Next Module"?: string | null
-          Phone?: string | null
-          Progress?: number | null
-          "Question Responses"?: Json | null
-          record_id?: string | null
-          Responses?: Json | null
-          Style?: string | null
-          Topic?: string | null
         }
         Relationships: []
       }

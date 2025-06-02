@@ -3,29 +3,21 @@ export interface Course {
   id: string;
   name: string;
   description: string;
-  category: string;
-  language: string;
-  days: CourseDay[];
-  created_at: string;
-  status: 'active' | 'archived' | 'draft';
+  day: number;
+  module_1?: string;
+  module_2?: string;
+  module_3?: string;
+  topic_name?: string;
+  origin: 'migrated_from_airtable' | 'alfred' | 'microlearn_manual' | 'microlearn_cop';
   visibility: 'public' | 'private';
-  total_enrollments?: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  status: 'active' | 'archived' | 'draft';
 }
 
 export interface ExtendedCourse extends Course {
   learner_count: number;
-  learner_courses?: LearnerCourse[];
-}
-
-export interface CourseDay {
-  id: string;
-  day_number: number;
-  title: string;
-  info: string;
-  media_link?: string;
-  module_1?: string;
-  module_2?: string;
-  module_3?: string;
 }
 
 export interface Learner {
@@ -33,36 +25,12 @@ export interface Learner {
   name: string;
   phone: string;
   email: string;
-  status: string;
+  status: 'active' | 'inactive';
+  assigned_course_id?: string;
   created_at: string;
-  total_courses: number;
-  courses?: LearnerCourse[];
-}
-
-export interface LearnerCourse {
-  id: string;
-  learner_id: string;
-  course_id: string;
-  start_date: string;
-  status: string;
-  completion_percentage: number;
-  created_at: string;
-  course?: Course;
-  learner?: Learner;
-}
-
-export interface ExtendedLearnerCourse extends LearnerCourse {
-  course: Course;
-}
-
-export interface AlfredCourseData {
-  id: string;
-  course_name: string;
-  day: number;
-  module_1_text?: string;
-  module_2_text?: string;
-  module_3_text?: string;
-  created_at: string;
+  updated_at: string;
+  created_by: string;
+  assigned_course?: Course;
 }
 
 export interface RegistrationRequest {
@@ -76,4 +44,14 @@ export interface RegistrationRequest {
   generated: boolean;
   created_at: string;
   approval_status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface AlfredCourseData {
+  id: string;
+  course_name: string;
+  day: number;
+  module_1_text?: string;
+  module_2_text?: string;
+  module_3_text?: string;
+  created_at: string;
 }

@@ -23,6 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 import { sendCourseAssignmentNotification } from '@/lib/whatsapp-notifications';
+import CourseOverwriteDialog from './CourseOverwriteDialog';
 
 const formSchema = z.object({
   startDate: z.date(),
@@ -46,6 +47,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
 }) => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(preselectedCourse || null);
+  const [showOverwriteDialog, setShowOverwriteDialog] = useState(false);
   const { user } = useAuth();
 
   const form = useForm<FormData>({
@@ -61,19 +63,15 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
       try {
         const { data, error } = await supabase
           .from('courses')
-          .select('*');
+          .select('*')
+          .eq('status', 'active');
 
         if (error) {
           throw error;
         }
 
         if (data) {
-          const coursesWithDays = data.map(course => ({
-            ...course,
-            days: [],
-          })) as Course[];
-          
-          setCourses(coursesWithDays);
+          setCourses(data as Course[]);
         }
       } catch (error) {
         console.error('Error fetching courses:', error);
@@ -84,21 +82,21 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
     fetchCourses();
   }, []);
 
-  const handleSubmit = async (data: FormData) => {
+  const handleAssignCourse = async () => {
     if (!user || !selectedCourse) {
       toast.error('You must be logged in to assign a course');
       return;
     }
 
     try {
-      const { data: result, error } = await supabase
-        .from('learner_courses')
-        .insert({
-          learner_id: learner.id,
-          course_id: selectedCourse.id,
-          start_date: data.startDate.toISOString(),
-          status: 'scheduled',
-        });
+      // Update learner's assigned course
+      const { error } = await supabase
+        .from('learners')
+        .update({
+          assigned_course_id: selectedCourse.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', learner.id);
 
       if (error) {
         throw error;
@@ -107,6 +105,11 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
       toast.success("Course assigned successfully!");
       
       try {
+        // Send notification based on whether it's an overwrite or new assignment
+        const notificationMessage = learner.assigned_course_id 
+          ? `Your previous course has been suspended. New course assigned: ${selectedCourse.name}. Press Let's MicroLearn to start learning.`
+          : `${selectedCourse.name} course is assigned to you. Press Let's MicroLearn to start learning.`;
+          
         await sendCourseAssignmentNotification(
           learner.name, 
           selectedCourse.name, 
@@ -125,66 +128,66 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
     }
   };
 
+  const handleSubmit = async (data: FormData) => {
+    if (!selectedCourse) {
+      toast.error('Please select a course');
+      return;
+    }
+
+    // Check if learner already has a course assigned
+    if (learner.assigned_course_id && learner.assigned_course) {
+      setShowOverwriteDialog(true);
+    } else {
+      await handleAssignCourse();
+    }
+  };
+
+  const handleOverwriteConfirm = async () => {
+    setShowOverwriteDialog(false);
+    await handleAssignCourse();
+  };
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="startDate"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Start Date</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-[240px] pl-3 text-left font-normal",
-                        !field.value && "text-muted-foreground"
-                      )}
-                    >
-                      {field.value ? (
-                        format(field.value, "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                      <Calendar className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <DatePicker
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
+    <>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <div className="grid gap-4">
+            <FormLabel>Select Course</FormLabel>
+            {courses.map((course) => (
+              <Button
+                key={course.id}
+                type="button"
+                variant="outline"
+                className={`w-full justify-start ${selectedCourse?.id === course.id ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : ''}`}
+                onClick={() => {
+                  setSelectedCourse(course);
+                  form.setValue('courseId', course.id);
+                }}
+              >
+                <div className="text-left">
+                  <div className="font-medium">{course.name}</div>
+                  <div className="text-sm text-muted-foreground">{course.description}</div>
+                </div>
+              </Button>
+            ))}
+          </div>
+
+          <Button type="submit" disabled={!selectedCourse}>
+            Assign Course
+          </Button>
+        </form>
+      </Form>
+
+      {selectedCourse && (
+        <CourseOverwriteDialog
+          open={showOverwriteDialog}
+          onOpenChange={setShowOverwriteDialog}
+          learner={learner}
+          newCourse={selectedCourse}
+          onConfirm={handleOverwriteConfirm}
         />
-
-        <div className="grid gap-4">
-          <FormLabel>Select Course</FormLabel>
-          {courses.map((course) => (
-            <Button
-              key={course.id}
-              variant="outline"
-              className={`w-full justify-start ${selectedCourse?.id === course.id ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : ''}`}
-              onClick={() => setSelectedCourse(course)}
-            >
-              {course.name}
-            </Button>
-          ))}
-        </div>
-
-        <Button type="submit">Assign Course</Button>
-      </form>
-    </Form>
+      )}
+    </>
   );
 };
 
