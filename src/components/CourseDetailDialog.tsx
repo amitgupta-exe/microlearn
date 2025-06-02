@@ -14,31 +14,31 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface CourseDetailDialogProps {
-  course: Course | null;
+  courses: Course[] | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 const CourseDetailDialog: React.FC<CourseDetailDialogProps> = ({
-  course,
+  courses,
   open,
   onOpenChange
 }) => {
-  if (!course) return null;
+  if (!courses || courses.length === 0) return null;
+
+  const courseName = courses[0].course_name;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>{course.name}</DialogTitle>
+          <DialogTitle>{courseName}</DialogTitle>
           <DialogDescription>
-            {course.category} • {course.language} • {course.visibility === 'public' ? 'Public' : 'Private'} Course
+            3 Day Course • {courses[0].visibility === 'public' ? 'Public' : 'Private'} Course
           </DialogDescription>
         </DialogHeader>
         
         <div className="mt-4 overflow-y-auto flex-1 pr-2">
-          <p className="text-muted-foreground mb-6">{course.description}</p>
-          
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="mb-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -49,53 +49,44 @@ const CourseDetailDialog: React.FC<CourseDetailDialogProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-muted/50 p-4 rounded-lg">
                   <h4 className="font-medium text-sm mb-2">Total Days</h4>
-                  <p className="text-2xl font-semibold">{course.days.length}</p>
+                  <p className="text-2xl font-semibold">{courses.length}</p>
                 </div>
                 <div className="bg-muted/50 p-4 rounded-lg">
                   <h4 className="font-medium text-sm mb-2">Status</h4>
                   <div className="flex items-center">
-                    <div className={`h-2 w-2 rounded-full mr-2 ${course.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                    <p className="text-sm font-medium">{course.status.charAt(0).toUpperCase() + course.status.slice(1)}</p>
+                    <div className={`h-2 w-2 rounded-full mr-2 ${courses[0].status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                    <p className="text-sm font-medium">{courses[0].status.charAt(0).toUpperCase() + courses[0].status.slice(1)}</p>
                   </div>
                 </div>
               </div>
             </TabsContent>
             
             <TabsContent value="modules" className="space-y-6">
-              {course.days.map((day) => (
-                <div key={day.id} className="border rounded-lg">
+              {courses.map((dayContent) => (
+                <div key={dayContent.id} className="border rounded-lg">
                   <div className="bg-muted/30 p-4 font-medium">
-                    Day {day.day_number}: {day.title}
+                    Day {dayContent.day}: {courseName}
                   </div>
                   <div className="p-4 space-y-4">
-                    <p className="text-sm text-muted-foreground">{day.info}</p>
                     
-                    {day.module_1 && (
+                    {dayContent.module_1 && (
                       <div className="border-l-2 border-primary pl-4 py-2">
                         <h4 className="font-medium text-sm mb-1">Module 1</h4>
-                        <p className="text-sm">{day.module_1}</p>
+                        <p className="text-sm">{dayContent.module_1}</p>
                       </div>
                     )}
                     
-                    {day.module_2 && (
+                    {dayContent.module_2 && (
                       <div className="border-l-2 border-primary/70 pl-4 py-2">
                         <h4 className="font-medium text-sm mb-1">Module 2</h4>
-                        <p className="text-sm">{day.module_2}</p>
+                        <p className="text-sm">{dayContent.module_2}</p>
                       </div>
                     )}
                     
-                    {day.module_3 && (
+                    {dayContent.module_3 && (
                       <div className="border-l-2 border-primary/50 pl-4 py-2">
                         <h4 className="font-medium text-sm mb-1">Module 3</h4>
-                        <p className="text-sm">{day.module_3}</p>
-                      </div>
-                    )}
-                    
-                    {day.media_link && (
-                      <div className="mt-2 flex items-center">
-                        <div className="bg-muted text-xs p-1.5 rounded">
-                          Media: {day.media_link}
-                        </div>
+                        <p className="text-sm">{dayContent.module_3}</p>
                       </div>
                     )}
                   </div>

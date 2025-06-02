@@ -1,62 +1,29 @@
 
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Calendar } from "lucide-react";
 import { toast } from 'sonner';
-
 import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { Course, Learner } from '@/lib/types';
+import { Course, Learner, CourseProgress } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { format } from 'date-fns';
-import { DatePicker } from '@/components/ui/date-picker';
-import { sendCourseAssignmentNotification } from '@/lib/whatsapp-notifications';
 import CourseOverwriteDialog from './CourseOverwriteDialog';
-
-const formSchema = z.object({
-  startDate: z.date(),
-  courseId: z.string().uuid(),
-});
-
-type FormData = z.infer<typeof formSchema>;
 
 interface CourseAssignmentProps {
   learner: Learner;
-  preselectedCourse?: Course;
+  preselectedCourses?: Course[];
   onAssigned?: () => void;
   onCancel: () => void;
 }
 
 const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   learner,
-  preselectedCourse,
+  preselectedCourses,
   onAssigned,
   onCancel
 }) => {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(preselectedCourse || null);
+  const [courseGroups, setCourseGroups] = useState<{[key: string]: Course[]}>({});
+  const [selectedCourses, setSelectedCourses] = useState<Course[] | null>(preselectedCourses || null);
   const [showOverwriteDialog, setShowOverwriteDialog] = useState(false);
   const { user } = useAuth();
-
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      startDate: new Date(),
-      courseId: preselectedCourse?.id || '',
-    },
-  });
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -64,14 +31,25 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
         const { data, error } = await supabase
           .from('courses')
           .select('*')
-          .eq('status', 'active');
+          .eq('status', 'active')
+          .order('course_name')
+          .order('day');
 
         if (error) {
           throw error;
         }
 
         if (data) {
-          setCourses(data as Course[]);
+          // Group courses by request_id or course_name
+          const grouped: {[key: string]: Course[]} = {};
+          data.forEach((course) => {
+            const key = course.request_id || course.course_name;
+            if (!grouped[key]) {
+              grouped[key] = [];
+            }
+            grouped[key].push(course as Course);
+          });
+          setCourseGroups(grouped);
         }
       } catch (error) {
         console.error('Error fetching courses:', error);
@@ -83,41 +61,65 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
   }, []);
 
   const handleAssignCourse = async () => {
-    if (!user || !selectedCourse) {
-      toast.error('You must be logged in to assign a course');
+    if (!user || !selectedCourses || selectedCourses.length === 0) {
+      toast.error('You must be logged in and select a course');
       return;
     }
 
     try {
+      // If learner has an existing course, mark it as suspended
+      if (learner.assigned_course_id) {
+        await supabase
+          .from('course_progress')
+          .update({ status: 'suspended' })
+          .eq('learner_id', learner.id)
+          .eq('course_id', learner.assigned_course_id);
+      }
+
       // Update learner's assigned course
-      const { error } = await supabase
+      const { error: learnerError } = await supabase
         .from('learners')
         .update({
-          assigned_course_id: selectedCourse.id,
+          assigned_course_id: selectedCourses[0].id,
           updated_at: new Date().toISOString(),
         })
         .eq('id', learner.id);
 
-      if (error) {
-        throw error;
+      if (learnerError) {
+        throw learnerError;
       }
 
-      toast.success("Course assigned successfully!");
-      
+      // Create course progress entry
+      const { error: progressError } = await supabase
+        .from('course_progress')
+        .insert({
+          learner_id: learner.id,
+          course_id: selectedCourses[0].id,
+          status: 'not_started'
+        });
+
+      if (progressError) {
+        throw progressError;
+      }
+
+      // Send WhatsApp message
       try {
-        // Send notification based on whether it's an overwrite or new assignment
-        const notificationMessage = learner.assigned_course_id 
-          ? `Your previous course has been suspended. New course assigned: ${selectedCourse.course_name}. Press Let's MicroLearn to start learning.`
-          : `${selectedCourse.course_name} course is assigned to you. Press Let's MicroLearn to start learning.`;
-          
-        await sendCourseAssignmentNotification(
-          learner.name, 
-          selectedCourse.course_name, 
-          learner.phone
-        );
+        await fetch('/api/whatsapp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phone: learner.phone,
+            message: `${selectedCourses[0].course_name} course is assigned to you. Press Let's MicroLearn to start learning.`,
+            learner_name: learner.name
+          })
+        });
       } catch (error) {
         console.error("Error sending WhatsApp notification:", error);
       }
+
+      toast.success("Course assigned successfully!");
       
       if (onAssigned) {
         onAssigned();
@@ -128,8 +130,8 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
     }
   };
 
-  const handleSubmit = async (data: FormData) => {
-    if (!selectedCourse) {
+  const handleSubmit = async () => {
+    if (!selectedCourses) {
       toast.error('Please select a course');
       return;
     }
@@ -149,41 +151,41 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
 
   return (
     <>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          <div className="grid gap-4">
-            <FormLabel>Select Course</FormLabel>
-            {courses.map((course) => (
-              <Button
-                key={course.id}
-                type="button"
-                variant="outline"
-                className={`w-full justify-start ${selectedCourse?.id === course.id ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : ''}`}
-                onClick={() => {
-                  setSelectedCourse(course);
-                  form.setValue('courseId', course.id);
-                }}
-              >
-                <div className="text-left">
-                  <div className="font-medium">{course.course_name}</div>
-                  <div className="text-sm text-muted-foreground">Day {course.day}</div>
-                </div>
-              </Button>
-            ))}
-          </div>
+      <div className="space-y-6">
+        <div className="grid gap-4">
+          <label className="font-medium">Select Course</label>
+          {Object.entries(courseGroups).map(([key, courses]) => (
+            <Button
+              key={key}
+              type="button"
+              variant="outline"
+              className={`w-full justify-start ${selectedCourses && selectedCourses[0]?.course_name === courses[0].course_name ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : ''}`}
+              onClick={() => setSelectedCourses(courses)}
+            >
+              <div className="text-left">
+                <div className="font-medium">{courses[0].course_name}</div>
+                <div className="text-sm text-muted-foreground">{courses.length} days</div>
+              </div>
+            </Button>
+          ))}
+        </div>
 
-          <Button type="submit" disabled={!selectedCourse}>
+        <div className="flex gap-2">
+          <Button onClick={onCancel} variant="outline">
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={!selectedCourses}>
             Assign Course
           </Button>
-        </form>
-      </Form>
+        </div>
+      </div>
 
-      {selectedCourse && (
+      {selectedCourses && (
         <CourseOverwriteDialog
           open={showOverwriteDialog}
           onOpenChange={setShowOverwriteDialog}
           learner={learner}
-          newCourse={selectedCourse}
+          newCourse={selectedCourses[0]}
           onConfirm={handleOverwriteConfirm}
         />
       )}

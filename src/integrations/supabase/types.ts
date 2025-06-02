@@ -9,216 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      alfred_course_data: {
-        Row: {
-          course_name: string
-          created_at: string
-          day: number
-          id: string
-          module_1_text: string | null
-          module_2_text: string | null
-          module_3_text: string | null
-        }
-        Insert: {
-          course_name: string
-          created_at?: string
-          day: number
-          id?: string
-          module_1_text?: string | null
-          module_2_text?: string | null
-          module_3_text?: string | null
-        }
-        Update: {
-          course_name?: string
-          created_at?: string
-          day?: number
-          id?: string
-          module_1_text?: string | null
-          module_2_text?: string | null
-          module_3_text?: string | null
-        }
-        Relationships: []
-      }
-      cop_students: {
-        Row: {
-          airtable_id: string | null
-          "Certificate File": string | null
-          "completed courses": number | null
-          Completion_Certificate: string | null
-          "Course Completed": boolean | null
-          "Course Status": string | null
-          Created: string | null
-          Date: string | null
-          "Day Completed": number | null
-          Doubt: string | null
-          Feedback: string | null
-          Goal: string | null
-          id: number
-          Interactive_Responses: Json | null
-          "Join Waitlist": boolean | null
-          Language: string | null
-          Last_Msg: string | null
-          "Module Completed": number | null
-          Name: string | null
-          "Next Day": string | null
-          "Next Module": string | null
-          Phone: string | null
-          Progress: number | null
-          "Question Responses": Json | null
-          Responses: Json | null
-          Style: string | null
-          Topic: string | null
-        }
-        Insert: {
-          airtable_id?: string | null
-          "Certificate File"?: string | null
-          "completed courses"?: number | null
-          Completion_Certificate?: string | null
-          "Course Completed"?: boolean | null
-          "Course Status"?: string | null
-          Created?: string | null
-          Date?: string | null
-          "Day Completed"?: number | null
-          Doubt?: string | null
-          Feedback?: string | null
-          Goal?: string | null
-          id?: number
-          Interactive_Responses?: Json | null
-          "Join Waitlist"?: boolean | null
-          Language?: string | null
-          Last_Msg?: string | null
-          "Module Completed"?: number | null
-          Name?: string | null
-          "Next Day"?: string | null
-          "Next Module"?: string | null
-          Phone?: string | null
-          Progress?: number | null
-          "Question Responses"?: Json | null
-          Responses?: Json | null
-          Style?: string | null
-          Topic?: string | null
-        }
-        Update: {
-          airtable_id?: string | null
-          "Certificate File"?: string | null
-          "completed courses"?: number | null
-          Completion_Certificate?: string | null
-          "Course Completed"?: boolean | null
-          "Course Status"?: string | null
-          Created?: string | null
-          Date?: string | null
-          "Day Completed"?: number | null
-          Doubt?: string | null
-          Feedback?: string | null
-          Goal?: string | null
-          id?: number
-          Interactive_Responses?: Json | null
-          "Join Waitlist"?: boolean | null
-          Language?: string | null
-          Last_Msg?: string | null
-          "Module Completed"?: number | null
-          Name?: string | null
-          "Next Day"?: string | null
-          "Next Module"?: string | null
-          Phone?: string | null
-          Progress?: number | null
-          "Question Responses"?: Json | null
-          Responses?: Json | null
-          Style?: string | null
-          Topic?: string | null
-        }
-        Relationships: []
-      }
-      course_data: {
-        Row: {
-          airtable_id: string | null
-          "Certificate File": string | null
-          "completed courses": number | null
-          Completion_Certificate: string | null
-          "Course Completed": boolean | null
-          "Course Status": string | null
-          Created: string | null
-          Date: string | null
-          "Day Completed": number | null
-          Doubt: string | null
-          Feedback: string | null
-          Goal: string | null
-          id: number
-          Interactive_Responses: Json | null
-          "Join Waitlist": boolean | null
-          Language: string | null
-          Last_Msg: string | null
-          "Module Completed": number | null
-          Name: string | null
-          "Next Day": string | null
-          "Next Module": string | null
-          Phone: string | null
-          Progress: number | null
-          "Question Responses": Json | null
-          Responses: Json | null
-          Style: string | null
-          Topic: string | null
-        }
-        Insert: {
-          airtable_id?: string | null
-          "Certificate File"?: string | null
-          "completed courses"?: number | null
-          Completion_Certificate?: string | null
-          "Course Completed"?: boolean | null
-          "Course Status"?: string | null
-          Created?: string | null
-          Date?: string | null
-          "Day Completed"?: number | null
-          Doubt?: string | null
-          Feedback?: string | null
-          Goal?: string | null
-          id?: number
-          Interactive_Responses?: Json | null
-          "Join Waitlist"?: boolean | null
-          Language?: string | null
-          Last_Msg?: string | null
-          "Module Completed"?: number | null
-          Name?: string | null
-          "Next Day"?: string | null
-          "Next Module"?: string | null
-          Phone?: string | null
-          Progress?: number | null
-          "Question Responses"?: Json | null
-          Responses?: Json | null
-          Style?: string | null
-          Topic?: string | null
-        }
-        Update: {
-          airtable_id?: string | null
-          "Certificate File"?: string | null
-          "completed courses"?: number | null
-          Completion_Certificate?: string | null
-          "Course Completed"?: boolean | null
-          "Course Status"?: string | null
-          Created?: string | null
-          Date?: string | null
-          "Day Completed"?: number | null
-          Doubt?: string | null
-          Feedback?: string | null
-          Goal?: string | null
-          id?: number
-          Interactive_Responses?: Json | null
-          "Join Waitlist"?: boolean | null
-          Language?: string | null
-          Last_Msg?: string | null
-          "Module Completed"?: number | null
-          Name?: string | null
-          "Next Day"?: string | null
-          "Next Module"?: string | null
-          Phone?: string | null
-          Progress?: number | null
-          "Question Responses"?: Json | null
-          Responses?: Json | null
-          Style?: string | null
-          Topic?: string | null
-        }
-        Relationships: []
-      }
       course_generation_requests: {
         Row: {
           course_title: string
@@ -351,13 +141,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "course_progress_course_id_fkey"
-            columns: ["course_id"]
-            isOneToOne: false
-            referencedRelation: "generated_courses"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "course_progress_learner_id_fkey"
             columns: ["learner_id"]
             isOneToOne: false
@@ -377,7 +160,7 @@ export type Database = {
           module_2: string | null
           module_3: string | null
           origin: string
-          status: string
+          request_id: string | null
           updated_at: string
           visibility: string
         }
@@ -391,7 +174,7 @@ export type Database = {
           module_2?: string | null
           module_3?: string | null
           origin?: string
-          status: string
+          request_id?: string | null
           updated_at?: string
           visibility?: string
         }
@@ -405,7 +188,7 @@ export type Database = {
           module_2?: string | null
           module_3?: string | null
           origin?: string
-          status?: string
+          request_id?: string | null
           updated_at?: string
           visibility?: string
         }
@@ -416,47 +199,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
-          },
-        ]
-      }
-      generated_courses: {
-        Row: {
-          created_at: string | null
-          day: number
-          id: string
-          module_1: string | null
-          module_2: string | null
-          module_3: string | null
-          request_id: string | null
-          topic_name: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          day: number
-          id?: string
-          module_1?: string | null
-          module_2?: string | null
-          module_3?: string | null
-          request_id?: string | null
-          topic_name?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          day?: number
-          id?: string
-          module_1?: string | null
-          module_2?: string | null
-          module_3?: string | null
-          request_id?: string | null
-          topic_name?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "generated_courses_request_id_fkey"
-            columns: ["request_id"]
-            isOneToOne: false
-            referencedRelation: "registration_requests"
-            referencedColumns: ["request_id"]
           },
         ]
       }
@@ -604,39 +346,6 @@ export type Database = {
           question_responses?: string | null
           responses?: string | null
           updated_at?: string
-        }
-        Relationships: []
-      }
-      website_cop_courses: {
-        Row: {
-          created_at: string | null
-          day: number
-          id: string
-          module_1: string | null
-          module_2: string | null
-          module_3: string | null
-          request_id: string | null
-          topic_name: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          day: number
-          id?: string
-          module_1?: string | null
-          module_2?: string | null
-          module_3?: string | null
-          request_id?: string | null
-          topic_name?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          day?: number
-          id?: string
-          module_1?: string | null
-          module_2?: string | null
-          module_3?: string | null
-          request_id?: string | null
-          topic_name?: string | null
         }
         Relationships: []
       }

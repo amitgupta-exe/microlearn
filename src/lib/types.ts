@@ -6,17 +6,13 @@ export interface Course {
   module_1?: string;
   module_2?: string;
   module_3?: string;
-  topic_name?: string;
   origin: 'migrated_from_airtable' | 'alfred' | 'microlearn_manual' | 'microlearn_cop';
   visibility: 'public' | 'private';
   created_at: string;
   updated_at: string;
   created_by: string;
   status: 'active' | 'archived' | 'draft';
-}
-
-export interface ExtendedCourse extends Course {
-  learner_count: number;
+  request_id?: string;
 }
 
 export interface Learner {
@@ -45,12 +41,11 @@ export interface RegistrationRequest {
   approval_status: 'pending' | 'approved' | 'rejected';
 }
 
-export interface AlfredCourseData {
+export interface CourseProgress {
   id: string;
-  course_name: string;
-  day: number;
-  module_1_text?: string;
-  module_2_text?: string;
-  module_3_text?: string;
+  learner_id: string;
+  course_id: string;
+  status: 'not_started' | 'in_progress' | 'completed' | 'suspended';
   created_at: string;
+  updated_at: string;
 }

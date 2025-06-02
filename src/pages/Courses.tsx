@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -13,19 +14,10 @@ import {
   Users,
   Globe,
   Lock,
-  MessageSquareText,
-  PenLine
+  MessageSquareText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,9 +28,6 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import {
   Tabs,
@@ -53,21 +42,20 @@ import CoursePromptForm from '@/components/CoursePromptForm';
 import CoursePreview from '@/components/CoursePreview';
 import CourseDetailDialog from '@/components/CourseDetailDialog';
 import CourseAssignmentDialog from '@/components/CourseAssignmentDialog';
-import { Course, AlfredCourseData } from '@/lib/types';
+import { Course } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Courses = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [alfredCourses, setAlfredCourses] = useState<Course[]>([]);
+  const [courseGroups, setCourseGroups] = useState<{[key: string]: Course[]}>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [previewCourse, setPreviewCourse] = useState<Course | null>(null);
+  const [previewCourses, setPreviewCourses] = useState<Course[] | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
-  const [assignCourse, setAssignCourse] = useState<Course | null>(null);
+  const [assignCourses, setAssignCourses] = useState<Course[] | null>(null);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
-  const [detailCourse, setDetailCourse] = useState<Course | null>(null);
+  const [detailCourses, setDetailCourses] = useState<Course[] | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   
   const { id } = useParams<{ id: string }>();
@@ -80,10 +68,6 @@ const Courses = () => {
   const showForm = isNew || isEdit;
   const showPromptForm = isPrompt;
   
-  const currentCourse = isEdit 
-    ? courses.find(course => course.id === id) 
-    : undefined;
-  
   // Fetch courses from Supabase
   useEffect(() => {
     const fetchCourses = async () => {
@@ -91,92 +75,28 @@ const Courses = () => {
       
       setIsLoading(true);
       try {
-        // Fetch regular courses
         const { data, error } = await supabase
           .from('courses')
-          .select(`
-            *,
-            days:course_days(*)
-          `)
-          .order('created_at', { ascending: false });
+          .select('*')
+          .order('course_name')
+          .order('day');
         
         if (error) {
           throw error;
         }
         
         if (data) {
-          // Transform the data to match our Course type
-          const transformedCourses: Course[] = data.map(course => ({
-            id: course.id,
-            name: course.name,
-            description: course.description,
-            category: course.category,
-            language: course.language,
-            days: course.days.map((day: any) => ({
-              id: day.id,
-              day_number: day.day_number,
-              title: day.title,
-              info: day.info,
-              media_link: day.media_link || undefined,
-              module_1: day.module_1 || '',
-              module_2: day.module_2 || '',
-              module_3: day.module_3 || ''
-            })),
-            created_at: course.created_at,
-            status: course.status as 'active' | 'archived' | 'draft',
-            visibility: course.visibility as 'public' | 'private'
-          }));
-          
-          setCourses(transformedCourses);
-        }
-
-        // Fetch alfred course data
-        const { data: alfredData, error: alfredError } = await supabase
-          .from('alfred_course_data')
-          .select('*')
-          .order('course_name')
-          .order('day');
-        
-        if (alfredError) {
-          console.error('Error fetching alfred course data:', alfredError);
-        } else if (alfredData) {
-          // Process the alfred course data to group by course name
-          const courseMap = new Map<string, any[]>();
-          
-          alfredData.forEach((item: AlfredCourseData) => {
-            if (!courseMap.has(item.course_name)) {
-              courseMap.set(item.course_name, []);
+          // Group courses by request_id or course_name
+          const grouped: {[key: string]: Course[]} = {};
+          data.forEach((course) => {
+            const key = course.request_id || course.course_name;
+            if (!grouped[key]) {
+              grouped[key] = [];
             }
-            courseMap.get(item.course_name)?.push(item);
+            grouped[key].push(course as Course);
           });
-
-          // Transform the grouped data into proper Course objects
-          const alfredCourses: Course[] = Array.from(courseMap.entries()).map(([courseName, days]) => {
-            // Take the first day for course info
-            const firstDay = days[0];
-            
-            return {
-              id: `alfred-${courseName.replace(/\s+/g, '-').toLowerCase()}`,
-              name: courseName,
-              description: `${courseName} - Alfred generated course`,
-              category: 'Alfred Course',
-              language: 'English',
-              days: days.map(day => ({
-                id: day.id,
-                day_number: day.day,
-                title: `Day ${day.day}`,
-                info: day.module_1_text || '',
-                module_1: day.module_1_text || '',
-                module_2: day.module_2_text || '',
-                module_3: day.module_3_text || '',
-              })),
-              created_at: firstDay.created_at,
-              status: 'active' as const,
-              visibility: 'public' as const
-            };
-          });
-
-          setAlfredCourses(alfredCourses);
+          
+          setCourseGroups(grouped);
         }
       } catch (error) {
         console.error('Error fetching courses:', error);
@@ -196,156 +116,57 @@ const Courses = () => {
     }
     
     try {
-      // Insert new course
-      const { data: courseData, error: courseError } = await supabase
-        .from('courses')
-        .insert({
-          name: data.name,
-          description: data.description,
-          category: data.category,
-          language: data.language,
-          status: 'active',
+      const requestId = crypto.randomUUID();
+      
+      // Create 3 course entries for 3 days
+      const courseEntries = [];
+      for (let day = 1; day <= 3; day++) {
+        const dayData = data.days[day - 1];
+        courseEntries.push({
+          course_name: data.course_name,
+          day: day,
+          module_1: dayData.module_1,
+          module_2: dayData.module_2,
+          module_3: dayData.module_3,
+          visibility: data.visibility,
           created_by: user.id,
-          visibility: 'private' // Default to private
-        })
-        .select()
-        .single();
+          request_id: requestId,
+          status: 'active',
+          origin: 'microlearn_manual'
+        });
+      }
       
-      if (courseError) throw courseError;
+      const { error } = await supabase
+        .from('courses')
+        .insert(courseEntries);
       
-      // Insert course days
-      const daysToInsert = data.days.map((day: any, index: number) => ({
-        course_id: courseData.id,
-        day_number: index + 1,
-        title: day.title,
-        info: day.info,
-        media_link: day.media_link || null,
-      }));
+      if (error) throw error;
       
-      const { data: daysData, error: daysError } = await supabase
-        .from('course_days')
-        .insert(daysToInsert)
-        .select();
-      
-      if (daysError) throw daysError;
-      
-      // Format the new course to match our Course type
-      const newCourse: Course = {
-        id: courseData.id,
-        name: courseData.name,
-        description: courseData.description,
-        category: courseData.category,
-        language: courseData.language,
-        days: daysData.map((day: any) => ({
-          id: day.id,
-          day_number: day.day_number,
-          title: day.title,
-          info: day.info,
-          media_link: day.media_link || undefined,
-        })),
-        created_at: courseData.created_at,
-        status: courseData.status as 'active' | 'archived' | 'draft',
-        visibility: courseData.visibility as 'public' | 'private'
-      };
-      
-      setCourses([newCourse, ...courses]);
       navigate('/courses');
       toast.success('Course created successfully');
+      
+      // Refresh courses
+      window.location.reload();
     } catch (error: any) {
       console.error('Error creating course:', error);
       toast.error(`Failed to create course: ${error.message}`);
     }
   };
   
-  const handleUpdateCourse = async (data: any) => {
-    if (!user || !currentCourse) {
-      toast.error('You must be logged in to update a course');
-      return;
-    }
-    
-    try {
-      // Update course
-      const { error: courseError } = await supabase
-        .from('courses')
-        .update({
-          name: data.name,
-          description: data.description,
-          category: data.category,
-          language: data.language,
-        })
-        .eq('id', currentCourse.id);
-      
-      if (courseError) throw courseError;
-      
-      // Delete existing days
-      const { error: deleteError } = await supabase
-        .from('course_days')
-        .delete()
-        .eq('course_id', currentCourse.id);
-      
-      if (deleteError) throw deleteError;
-      
-      // Insert new days
-      const daysToInsert = data.days.map((day: any, index: number) => ({
-        course_id: currentCourse.id,
-        day_number: index + 1,
-        title: day.title,
-        info: day.info,
-        media_link: day.media_link || null,
-        module_1: day.module_1 || null,
-        module_2: day.module_2 || null,
-        module_3: day.module_3 || null
-      }));
-      
-      const { data: daysData, error: daysError } = await supabase
-        .from('course_days')
-        .insert(daysToInsert)
-        .select();
-      
-      if (daysError) throw daysError;
-      
-      // Update local state
-      const updatedCourses = courses.map(course => 
-        course.id === currentCourse.id 
-          ? { 
-              ...course, 
-              name: data.name,
-              description: data.description,
-              category: data.category,
-              language: data.language,
-              days: daysData.map((day: any) => ({
-                id: day.id,
-                day_number: day.day_number,
-                title: day.title,
-                info: day.info,
-                media_link: day.media_link || undefined,
-                module_1: day.module_1 || '',
-                module_2: day.module_2 || '',
-                module_3: day.module_3 || ''
-              })),
-            } 
-          : course
-      );
-      
-      setCourses(updatedCourses);
-      navigate('/courses');
-      toast.success('Course updated successfully');
-    } catch (error: any) {
-      console.error('Error updating course:', error);
-      toast.error(`Failed to update course: ${error.message}`);
-    }
-  };
-  
-  const handleDeleteCourse = async (id: string) => {
+  const handleDeleteCourse = async (requestId: string) => {
     try {
       const { error } = await supabase
         .from('courses')
         .delete()
-        .eq('id', id);
+        .eq('request_id', requestId);
       
       if (error) throw error;
       
-      setCourses(courses.filter(course => course.id !== id));
+      // Remove from local state
+      const updatedGroups = { ...courseGroups };
+      delete updatedGroups[requestId];
+      setCourseGroups(updatedGroups);
+      
       toast.success('Course deleted successfully');
     } catch (error: any) {
       console.error('Error deleting course:', error);
@@ -353,27 +174,28 @@ const Courses = () => {
     }
   };
   
-  const handleArchiveCourse = async (id: string) => {
-    const course = courses.find(c => c.id === id);
-    if (!course) return;
+  const handleArchiveCourse = async (requestId: string) => {
+    const courses = courseGroups[requestId];
+    if (!courses) return;
     
-    const newStatus = course.status === 'active' ? 'archived' : 'active';
+    const newStatus = courses[0].status === 'active' ? 'archived' : 'active';
     
     try {
       const { error } = await supabase
         .from('courses')
         .update({ status: newStatus })
-        .eq('id', id);
+        .eq('request_id', requestId);
       
       if (error) throw error;
       
-      const updatedCourses = courses.map(course => 
-        course.id === id 
-          ? { ...course, status: newStatus as 'active' | 'archived' | 'draft' } 
-          : course
-      );
+      // Update local state
+      const updatedGroups = { ...courseGroups };
+      updatedGroups[requestId] = courses.map(course => ({
+        ...course,
+        status: newStatus as 'active' | 'archived' | 'draft'
+      }));
+      setCourseGroups(updatedGroups);
       
-      setCourses(updatedCourses);
       toast.success(`Course ${newStatus === 'active' ? 'activated' : 'archived'} successfully`);
     } catch (error: any) {
       console.error(`Error ${newStatus === 'active' ? 'activating' : 'archiving'} course:`, error);
@@ -381,27 +203,28 @@ const Courses = () => {
     }
   };
 
-  const handleToggleVisibility = async (id: string) => {
-    const course = courses.find(c => c.id === id);
-    if (!course) return;
+  const handleToggleVisibility = async (requestId: string) => {
+    const courses = courseGroups[requestId];
+    if (!courses) return;
     
-    const newVisibility = course.visibility === 'public' ? 'private' : 'public';
+    const newVisibility = courses[0].visibility === 'public' ? 'private' : 'public';
     
     try {
       const { error } = await supabase
         .from('courses')
         .update({ visibility: newVisibility })
-        .eq('id', id);
+        .eq('request_id', requestId);
       
       if (error) throw error;
       
-      const updatedCourses = courses.map(course => 
-        course.id === id 
-          ? { ...course, visibility: newVisibility as 'public' | 'private' } 
-          : course
-      );
+      // Update local state
+      const updatedGroups = { ...courseGroups };
+      updatedGroups[requestId] = courses.map(course => ({
+        ...course,
+        visibility: newVisibility as 'public' | 'private'
+      }));
+      setCourseGroups(updatedGroups);
       
-      setCourses(updatedCourses);
       toast.success(`Course is now ${newVisibility}`);
     } catch (error: any) {
       console.error(`Error changing course visibility:`, error);
@@ -409,53 +232,39 @@ const Courses = () => {
     }
   };
   
-  const handlePreviewCourse = (course: Course) => {
-    setPreviewCourse(course);
+  const handlePreviewCourse = (courses: Course[]) => {
+    setPreviewCourses(courses);
     setShowPreview(true);
   };
   
-  const handleAssignCourse = (course: Course) => {
-    setAssignCourse(course);
+  const handleAssignCourse = (courses: Course[]) => {
+    setAssignCourses(courses);
     setShowAssignDialog(true);
   };
 
-  const handleCourseCardClick = (course: Course) => {
-    setDetailCourse(course);
+  const handleCourseCardClick = (courses: Course[]) => {
+    setDetailCourses(courses);
     setShowDetailDialog(true);
   };
 
-  const handlePromptSuccess = (courseId: string) => {
+  const handlePromptSuccess = () => {
     navigate(`/courses`);
     window.location.reload();
   };
   
-  // Apply filters and combine course lists based on visibility filter
-  let displayedCourses: Course[] = [];
-
-  if (visibilityFilter === 'all') {
-    displayedCourses = [...courses, ...alfredCourses];
-  } else if (visibilityFilter === 'public') {
-    // Show both public user courses and all Alfred courses
-    displayedCourses = [
-      ...courses.filter(course => course.visibility === 'public'),
-      ...alfredCourses
-    ];
-  } else if (visibilityFilter === 'private') {
-    // Show only user's private courses
-    displayedCourses = courses.filter(course => course.visibility === 'private');
+  // Apply filters
+  let displayedGroups = Object.entries(courseGroups);
+  
+  if (visibilityFilter !== 'all') {
+    displayedGroups = displayedGroups.filter(([_, courses]) => 
+      courses[0].visibility === visibilityFilter
+    );
   }
   
   // Filter by search query
-  displayedCourses = displayedCourses.filter(course => 
-    course.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    course.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    course.category.toLowerCase().includes(searchQuery.toLowerCase())
+  displayedGroups = displayedGroups.filter(([_, courses]) => 
+    courses[0].course_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  // Helper function to check if a course is from Alfred
-  const isAlfredCourse = (course: Course) => {
-    return course.id.startsWith('alfred-');
-  };
   
   if (showForm) {
     return (
@@ -470,24 +279,10 @@ const Courses = () => {
             Back to Courses
           </Button>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>{isNew ? 'Create New Course' : 'Edit Course'}</CardTitle>
-              <CardDescription>
-                {isNew 
-                  ? 'Create a new course with daily content'
-                  : 'Update course information and content'
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CourseForm
-                course={currentCourse}
-                onSubmit={isNew ? handleCreateCourse : handleUpdateCourse}
-                onCancel={() => navigate('/courses')}
-              />
-            </CardContent>
-          </Card>
+          <CourseForm
+            onSubmit={handleCreateCourse}
+            onCancel={() => navigate('/courses')}
+          />
         </div>
       </div>
     );
@@ -557,7 +352,7 @@ const Courses = () => {
               />
             </div>
             <div className="flex items-center text-sm text-muted-foreground">
-              {displayedCourses.length} courses
+              {displayedGroups.length} courses
             </div>
           </div>
         </div>
@@ -568,16 +363,16 @@ const Courses = () => {
             <div className="col-span-full flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
             </div>
-          ) : displayedCourses.length === 0 ? (
+          ) : displayedGroups.length === 0 ? (
             <div className="col-span-full flex justify-center items-center h-64 text-muted-foreground">
               {searchQuery ? 'No courses match your search' : 'No courses found'}
             </div>
           ) : (
-            displayedCourses.map(course => (
+            displayedGroups.map(([key, courses]) => (
               <Card 
-                key={course.id} 
+                key={key}
                 className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => handleCourseCardClick(course)}
+                onClick={() => handleCourseCardClick(courses)}
               >
                 <div className="bg-gradient-to-r from-primary/15 to-primary/5 p-4 border-b">
                   <div className="flex justify-between items-start mb-2">
@@ -591,89 +386,72 @@ const Courses = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {!isAlfredCourse(course) && (
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/courses/${course.id}`);
-                          }}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                        )}
                         <DropdownMenuItem onClick={(e) => {
                           e.stopPropagation();
-                          handlePreviewCourse(course);
+                          handlePreviewCourse(courses);
                         }}>
                           <Eye className="h-4 w-4 mr-2" />
                           WhatsApp Preview
                         </DropdownMenuItem>
-                        {!isAlfredCourse(course) && (
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleVisibility(course.id);
-                          }}>
-                            {course.visibility === 'public' ? (
-                              <>
-                                <Lock className="h-4 w-4 mr-2" />
-                                Make Private
-                              </>
-                            ) : (
-                              <>
-                                <Globe className="h-4 w-4 mr-2" />
-                                Make Public
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                        )}
-                        {!isAlfredCourse(course) && (
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            handleArchiveCourse(course.id);
-                          }}>
-                            <Archive className="h-4 w-4 mr-2" />
-                            {course.status === 'active' ? 'Archive' : 'Activate'}
-                          </DropdownMenuItem>
-                        )}
                         <DropdownMenuItem onClick={(e) => {
                           e.stopPropagation();
-                          handleAssignCourse(course);
+                          handleToggleVisibility(key);
+                        }}>
+                          {courses[0].visibility === 'public' ? (
+                            <>
+                              <Lock className="h-4 w-4 mr-2" />
+                              Make Private
+                            </>
+                          ) : (
+                            <>
+                              <Globe className="h-4 w-4 mr-2" />
+                              Make Public
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleArchiveCourse(key);
+                        }}>
+                          <Archive className="h-4 w-4 mr-2" />
+                          {courses[0].status === 'active' ? 'Archive' : 'Activate'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleAssignCourse(courses);
                         }}>
                           <Users className="h-4 w-4 mr-2" />
                           Assign to Learner
                         </DropdownMenuItem>
-                        {!isAlfredCourse(course) && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteCourse(course.id);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </>
-                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className="text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCourse(key);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <h3 className="font-medium text-lg line-clamp-1">{course.name}</h3>
+                  <h3 className="font-medium text-lg line-clamp-1">{courses[0].course_name}</h3>
                 </div>
                 <CardContent className="p-4">
                   <div className="text-sm text-muted-foreground mb-4 line-clamp-2 h-10">
-                    {course.description}
+                    {courses.length} day course with modules
                   </div>
                   <div className="flex justify-between items-center text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
-                      <Badge variant={course.status === 'active' ? "default" : "outline"} className="text-xs">
-                        {course.status === 'active' ? 'Active' : 'Archived'}
+                      <Badge variant={courses[0].status === 'active' ? "default" : "outline"} className="text-xs">
+                        {courses[0].status === 'active' ? 'Active' : 'Archived'}
                       </Badge>
-                      <span>{course.days.length} days</span>
+                      <span>{courses.length} days</span>
                     </div>
                     <div>
-                      {course.visibility === 'public' ? (
+                      {courses[0].visibility === 'public' ? (
                         <div className="flex items-center gap-1">
                           <Globe size={12} className="text-green-500" />
                           <span>Public</span>
@@ -694,19 +472,19 @@ const Courses = () => {
       </div>
       
       <CoursePreview 
-        course={previewCourse} 
+        courses={previewCourses} 
         open={showPreview} 
         onOpenChange={setShowPreview} 
       />
 
       <CourseDetailDialog
-        course={detailCourse}
+        courses={detailCourses}
         open={showDetailDialog}
         onOpenChange={setShowDetailDialog}
       />
 
       <CourseAssignmentDialog
-        course={assignCourse}
+        courses={assignCourses}
         open={showAssignDialog}
         onOpenChange={setShowAssignDialog}
       />
