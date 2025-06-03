@@ -34,7 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import LearnerForm from '@/components/LearnerForm';
 import LearnerImport from '@/components/LearnerImport';
-import LearnerCourses from '@/components/LearnerCourses';
+import AssignLearnerToCourse from '@/components/AssignLearnerToCourse';
 import { Learner } from '@/lib/types';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,6 +56,9 @@ const Learners = () => {
     ? learners.find(learner => learner.id === id) 
     : undefined;
   
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedLearner, setSelectedLearner] = useState<Learner | null>(null);
+
   useEffect(() => {
     const fetchLearners = async () => {
       if (!user) return;
@@ -288,7 +291,6 @@ const Learners = () => {
               </CardContent>
             </Card>
             
-            <LearnerCourses learner={currentLearner} />
           </div>
         </div>
       </div>
@@ -352,7 +354,7 @@ const Learners = () => {
   
   return (
     <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
-      <div className="max-w-[1400px] mx-auto">
+      <div className="max-w-[900px] mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Learners</h1>
@@ -371,110 +373,92 @@ const Learners = () => {
             </Button>
           </div>
         </div>
-        
-        <div className="rounded-lg border bg-card">
-          <div className="p-4 flex flex-col sm:flex-row gap-4 justify-between">
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search learners..."
-                className="pl-8 glass-input"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+
+        {/* Heading Row */}
+        <div className="grid grid-cols-4 gap-4 px-4 py-2 font-semibold border-b bg-muted rounded-t">
+          <div>Name</div>
+          <div>Email</div>
+          <div>Phone</div>
+          <div>Assigned Course</div>
+        </div>
+
+        {/* Learner Cards */}
+        <div className="flex flex-col gap-2">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2">Loading learners...</span>
             </div>
-            <div className="flex items-center text-sm text-muted-foreground">
-              {filteredLearners.length} learners
+          ) : filteredLearners.length === 0 ? (
+            <div className="text-center h-32 text-muted-foreground flex items-center justify-center">
+              {searchQuery ? 'No learners match your search' : 'No learners found. Create your first one!'}
             </div>
-          </div>
-          
-          <div className="overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[250px]">Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Assigned Course</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center h-32">
-                      <div className="flex items-center justify-center">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                        <span className="ml-2">Loading learners...</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : filteredLearners.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center h-32 text-muted-foreground">
-                      {searchQuery ? 'No learners match your search' : 'No learners found. Create your first one!'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredLearners.map(learner => (
-                    <TableRow key={learner.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                            <User size={14} />
-                          </div>
-                          {learner.name}
-                        </div>
-                      </TableCell>
-                      <TableCell>{learner.email}</TableCell>
-                      <TableCell>{learner.phone}</TableCell>
-                      <TableCell>
-                        {learner.assigned_course ? (
-                          <Badge variant="secondary">
-                            {learner.assigned_course.course_name}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">No course assigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={learner.status === 'active' ? 'default' : 'outline'}>
-                          {learner.status === 'active' ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(learner.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/learners/${learner.id}`)}>
-                              Manage
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleDeleteLearner(learner.id)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          ) : (
+            filteredLearners.map(learner => (
+              <div
+                key={learner.id}
+                className="grid grid-cols-4 gap-4 items-center px-4 py-3 border-b bg-card rounded"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <User size={14} />
+                  </div>
+                  {learner.name}
+                </div>
+                <div>{learner.email}</div>
+                <div>{learner.phone}</div>
+                <div className="flex items-center gap-2">
+                  {learner.assigned_course ? (
+                    <Badge variant="secondary">
+                      {learner.assigned_course.course_name}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground">No course assigned</span>
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => navigate(`/learners/${learner.id}`)}>
+                        Manage
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedLearner(learner);
+                          setAssignDialogOpen(true);
+                        }}
+                      >
+                        Assign a Course
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => handleDeleteLearner(learner.id)}
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
+
+      {/* Assign a Course Dialog */}
+      <AssignLearnerToCourse
+        learner={selectedLearner}
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        onAssigned={() => {
+          setAssignDialogOpen(false);
+          setSelectedLearner(null);
+          // Optionally refetch learners here
+        }}
+      />
     </div>
   );
 };

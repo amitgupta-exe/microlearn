@@ -1,15 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Search, 
-  MoreHorizontal, 
-  ArrowLeft, 
-  Eye, 
-  Archive, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  MoreHorizontal,
+  ArrowLeft,
+  Eye,
+  Archive,
+  Edit,
+  Trash2,
   BookOpen,
   Users,
   Globe,
@@ -38,17 +37,18 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import CourseForm from '@/components/CourseForm';
-import CoursePromptForm from '@/components/CoursePromptForm';
+// import CoursePromptForm from '@/components/CoursePromptForm';
 import CoursePreview from '@/components/CoursePreview';
 import CourseDetailDialog from '@/components/CourseDetailDialog';
-import CourseAssignmentDialog from '@/components/CourseAssignmentDialog';
+// import CourseAssignmentDialog from '@/components/CourseAssignmentDialog';
+import AssignCourseToLearner from '@/components/AssignCourseToLearner';
 import { Course } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Courses = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [courseGroups, setCourseGroups] = useState<{[key: string]: Course[]}>({});
+  const [courseGroups, setCourseGroups] = useState<{ [key: string]: Course[] }>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [previewCourses, setPreviewCourses] = useState<Course[] | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -57,22 +57,24 @@ const Courses = () => {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [detailCourses, setDetailCourses] = useState<Course[] | null>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
-  
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const isNew = id === 'new';
   const isPrompt = id === 'prompt';
   const isEdit = id && id !== 'new' && id !== 'prompt';
   const showForm = isNew || isEdit;
   const showPromptForm = isPrompt;
-  
+
   // Fetch courses from Supabase
   useEffect(() => {
     const fetchCourses = async () => {
       if (!user) return;
-      
+
       setIsLoading(true);
       try {
         const { data, error } = await supabase
@@ -80,14 +82,14 @@ const Courses = () => {
           .select('*')
           .order('course_name')
           .order('day');
-        
+
         if (error) {
           throw error;
         }
-        
+
         if (data) {
           // Group courses by request_id or course_name
-          const grouped: {[key: string]: Course[]} = {};
+          const grouped: { [key: string]: Course[] } = {};
           data.forEach((course) => {
             const key = course.request_id || course.course_name;
             if (!grouped[key]) {
@@ -95,7 +97,7 @@ const Courses = () => {
             }
             grouped[key].push(course as Course);
           });
-          
+
           setCourseGroups(grouped);
         }
       } catch (error) {
@@ -105,19 +107,19 @@ const Courses = () => {
         setIsLoading(false);
       }
     };
-    
+
     fetchCourses();
   }, [user]);
-  
+
   const handleCreateCourse = async (data: any) => {
     if (!user) {
       toast.error('You must be logged in to create a course');
       return;
     }
-    
+
     try {
       const requestId = crypto.randomUUID();
-      
+
       // Create 3 course entries for 3 days
       const courseEntries = [];
       for (let day = 1; day <= 3; day++) {
@@ -128,23 +130,23 @@ const Courses = () => {
           module_1: dayData.module_1,
           module_2: dayData.module_2,
           module_3: dayData.module_3,
-          visibility: data.visibility,
+          visibility: "public",
           created_by: user.id,
           request_id: requestId,
-          status: 'active',
-          origin: 'microlearn_manual'
+          origin: 'microlearn_manual',
+          created_at: new Date().toISOString()
         });
       }
-      
+
       const { error } = await supabase
         .from('courses')
         .insert(courseEntries);
-      
+
       if (error) throw error;
-      
+
       navigate('/courses');
       toast.success('Course created successfully');
-      
+
       // Refresh courses
       window.location.reload();
     } catch (error: any) {
@@ -152,71 +154,44 @@ const Courses = () => {
       toast.error(`Failed to create course: ${error.message}`);
     }
   };
-  
+
   const handleDeleteCourse = async (requestId: string) => {
     try {
       const { error } = await supabase
         .from('courses')
         .delete()
         .eq('request_id', requestId);
-      
+
       if (error) throw error;
-      
+
       // Remove from local state
       const updatedGroups = { ...courseGroups };
       delete updatedGroups[requestId];
       setCourseGroups(updatedGroups);
-      
+
       toast.success('Course deleted successfully');
     } catch (error: any) {
       console.error('Error deleting course:', error);
       toast.error(`Failed to delete course: ${error.message}`);
     }
   };
-  
-  const handleArchiveCourse = async (requestId: string) => {
-    const courses = courseGroups[requestId];
-    if (!courses) return;
-    
-    const newStatus = courses[0].status === 'active' ? 'archived' : 'active';
-    
-    try {
-      const { error } = await supabase
-        .from('courses')
-        .update({ status: newStatus })
-        .eq('request_id', requestId);
-      
-      if (error) throw error;
-      
-      // Update local state
-      const updatedGroups = { ...courseGroups };
-      updatedGroups[requestId] = courses.map(course => ({
-        ...course,
-        status: newStatus as 'active' | 'archived' | 'draft'
-      }));
-      setCourseGroups(updatedGroups);
-      
-      toast.success(`Course ${newStatus === 'active' ? 'activated' : 'archived'} successfully`);
-    } catch (error: any) {
-      console.error(`Error ${newStatus === 'active' ? 'activating' : 'archiving'} course:`, error);
-      toast.error(`Failed to ${newStatus === 'active' ? 'activate' : 'archive'} course: ${error.message}`);
-    }
-  };
+
+
 
   const handleToggleVisibility = async (requestId: string) => {
     const courses = courseGroups[requestId];
     if (!courses) return;
-    
+
     const newVisibility = courses[0].visibility === 'public' ? 'private' : 'public';
-    
+
     try {
       const { error } = await supabase
         .from('courses')
         .update({ visibility: newVisibility })
         .eq('request_id', requestId);
-      
+
       if (error) throw error;
-      
+
       // Update local state
       const updatedGroups = { ...courseGroups };
       updatedGroups[requestId] = courses.map(course => ({
@@ -224,19 +199,19 @@ const Courses = () => {
         visibility: newVisibility as 'public' | 'private'
       }));
       setCourseGroups(updatedGroups);
-      
+
       toast.success(`Course is now ${newVisibility}`);
     } catch (error: any) {
       console.error(`Error changing course visibility:`, error);
       toast.error(`Failed to change course visibility: ${error.message}`);
     }
   };
-  
+
   const handlePreviewCourse = (courses: Course[]) => {
     setPreviewCourses(courses);
     setShowPreview(true);
   };
-  
+
   const handleAssignCourse = (courses: Course[]) => {
     setAssignCourses(courses);
     setShowAssignDialog(true);
@@ -251,34 +226,34 @@ const Courses = () => {
     navigate(`/courses`);
     window.location.reload();
   };
-  
+
   // Apply filters
   let displayedGroups = Object.entries(courseGroups);
-  
+
   if (visibilityFilter !== 'all') {
-    displayedGroups = displayedGroups.filter(([_, courses]) => 
+    displayedGroups = displayedGroups.filter(([_, courses]) =>
       courses[0].visibility === visibilityFilter
     );
   }
-  
+
   // Filter by search query
-  displayedGroups = displayedGroups.filter(([_, courses]) => 
+  displayedGroups = displayedGroups.filter(([_, courses]) =>
     courses[0].course_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
+
   if (showForm) {
     return (
       <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
         <div className="max-w-5xl mx-auto">
-          <Button 
-            variant="ghost" 
-            className="mb-6" 
+          <Button
+            variant="ghost"
+            className="mb-6"
             onClick={() => navigate('/courses')}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Courses
           </Button>
-          
+
           <CourseForm
             onSubmit={handleCreateCourse}
             onCancel={() => navigate('/courses')}
@@ -292,24 +267,24 @@ const Courses = () => {
     return (
       <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
         <div className="max-w-5xl mx-auto">
-          <Button 
-            variant="ghost" 
-            className="mb-6" 
+          <Button
+            variant="ghost"
+            className="mb-6"
             onClick={() => navigate('/courses')}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Courses
           </Button>
-          
-          <CoursePromptForm
+
+          {/* <CoursePromptForm
             onCancel={() => navigate('/courses')}
             onSuccess={handlePromptSuccess}
-          />
+          /> */}
         </div>
       </div>
     );
   }
-  
+
   return (
     <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
       <div className="max-w-[1400px] mx-auto">
@@ -331,7 +306,7 @@ const Courses = () => {
             </Button>
           </div>
         </div>
-        
+
         <Tabs defaultValue="all" className="mb-6" onValueChange={(value) => setVisibilityFilter(value as any)}>
           <TabsList>
             <TabsTrigger value="all">All Courses</TabsTrigger>
@@ -339,7 +314,7 @@ const Courses = () => {
             <TabsTrigger value="public">Public Courses</TabsTrigger>
           </TabsList>
         </Tabs>
-        
+
         <div className="rounded-lg border bg-card mb-8">
           <div className="p-4 flex flex-col sm:flex-row gap-4 justify-between">
             <div className="relative w-full sm:max-w-xs">
@@ -356,7 +331,7 @@ const Courses = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Grid View of Course Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {isLoading ? (
@@ -369,7 +344,7 @@ const Courses = () => {
             </div>
           ) : (
             displayedGroups.map(([key, courses]) => (
-              <Card 
+              <Card
                 key={key}
                 className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => handleCourseCardClick(courses)}
@@ -409,22 +384,19 @@ const Courses = () => {
                             </>
                           )}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => {
-                          e.stopPropagation();
-                          handleArchiveCourse(key);
-                        }}>
-                          <Archive className="h-4 w-4 mr-2" />
-                          {courses[0].status === 'active' ? 'Archive' : 'Activate'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => {
-                          e.stopPropagation();
-                          handleAssignCourse(courses);
-                        }}>
+
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCourse(courses[0]);
+                            setAssignDialogOpen(true);
+                          }}
+                        >
                           <Users className="h-4 w-4 mr-2" />
                           Assign to Learner
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="text-destructive"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -445,9 +417,6 @@ const Courses = () => {
                   </div>
                   <div className="flex justify-between items-center text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
-                      <Badge variant={courses[0].status === 'active' ? "default" : "outline"} className="text-xs">
-                        {courses[0].status === 'active' ? 'Active' : 'Archived'}
-                      </Badge>
                       <span>{courses.length} days</span>
                     </div>
                     <div>
@@ -470,11 +439,11 @@ const Courses = () => {
           )}
         </div>
       </div>
-      
-      <CoursePreview 
-        courses={previewCourses} 
-        open={showPreview} 
-        onOpenChange={setShowPreview} 
+
+      <CoursePreview
+        courses={previewCourses}
+        open={showPreview}
+        onOpenChange={setShowPreview}
       />
 
       <CourseDetailDialog
@@ -483,10 +452,16 @@ const Courses = () => {
         onOpenChange={setShowDetailDialog}
       />
 
-      <CourseAssignmentDialog
-        courses={assignCourses}
-        open={showAssignDialog}
-        onOpenChange={setShowAssignDialog}
+
+      <AssignCourseToLearner
+        course={selectedCourse}
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        onAssigned={() => {
+          setAssignDialogOpen(false);
+          setSelectedCourse(null);
+          // Optionally refetch courses or learners here
+        }}
       />
     </div>
   );

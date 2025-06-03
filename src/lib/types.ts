@@ -1,18 +1,16 @@
-
 export interface Course {
-  id: string;
-  course_name: string;
-  day: number;
+  id?: string;
+  request_id?: string;
+  course_name?: string;
+  visibility?: string;
+  origin?: string;
+  day?: number;
   module_1?: string;
   module_2?: string;
   module_3?: string;
-  origin: 'migrated_from_airtable' | 'alfred' | 'microlearn_manual' | 'microlearn_cop';
-  visibility: 'public' | 'private';
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  status: 'active' | 'archived' | 'draft';
-  request_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
 }
 
 export interface Learner {

@@ -30,7 +30,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
     { icon: Users, label: 'Learners', path: '/learners' },
     { icon: BookOpen, label: 'Courses', path: '/courses' },
     { icon: BarChart, label: 'Analytics', path: '/analytics' },
-    { icon: MessageCircle, label: 'WhatsApp', path: '/whatsapp' },
     { icon: Settings, label: 'Settings', path: '/settings' },
   ];
 

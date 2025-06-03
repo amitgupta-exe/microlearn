@@ -28,10 +28,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
-          <AuthProvider>
-            <SuperAdminProvider>
-              <Toaster />
-              <BrowserRouter>
+          <BrowserRouter>
+            <AuthProvider>
+              <SuperAdminProvider>
+                <Toaster />
                 <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
                   <Routes>
                     {/* Public routes */}
@@ -42,11 +42,11 @@ function App() {
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/admin/login" element={<SuperAdminLogin />} />
                     <Route path="/admin" element={<SuperAdminDashboard />} />
-                    
+
                     {/* Protected routes with sidebar */}
                     <Route path="/*" element={
                       <div className="flex h-screen">
-                        <Sidebar />
+                        <Sidebar user={null} />
                         <main className="flex-1 overflow-auto">
                           <Routes>
                             <Route path="/" element={<Index />} />
@@ -63,9 +63,9 @@ function App() {
                     } />
                   </Routes>
                 </div>
-              </BrowserRouter>
-            </SuperAdminProvider>
-          </AuthProvider>
+              </SuperAdminProvider>
+            </AuthProvider>
+          </BrowserRouter>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
