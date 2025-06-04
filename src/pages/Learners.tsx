@@ -39,6 +39,8 @@ import { Learner } from '@/lib/types';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { supabase } from '@/integrations/supabase/client';
 
+import { normalizePhoneNumber } from '@/lib/utils';
+
 const Learners = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [learners, setLearners] = useState<Learner[]>([]);
@@ -135,11 +137,13 @@ const Learners = () => {
         toast.error('You must be logged in to create a learner');
         return;
       }
+
+
       
       const newLearner = {
         name: data.name,
         email: data.email,
-        phone: data.phone,
+        phone: normalizePhoneNumber(data.phone),
         status: 'active' as 'active',
         created_by: user.id,
       };

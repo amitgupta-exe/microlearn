@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Learner, Course } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { sendInteractiveButtonsMessage } from '@/integrations/wati/functions';
-
+import { sendWhatsAppMessage, sendInteractiveButtonsMessage } from '@/integrations/wati/functions';
+import { normalizePhoneNumber } from '@/lib/utils'
 interface Props {
     course: Course | null;
     open: boolean;
@@ -13,17 +13,9 @@ interface Props {
     onAssigned?: () => void;
 }
 
-function normalizePhone(phone: string): string {
-    let p = phone.replace(/\s+/g, '').replace(/^\+/, '');
-    if (p.length === 10) return '91' + p;
-    if (p.length === 12 && p.startsWith('91')) return p;
-    if (p.length === 13 && p.startsWith('91')) return p.slice(1); // e.g. '091xxxxxxxxxx'
-    if (p.length === 14 && p.startsWith('91')) return p.slice(2); // e.g. '0091xxxxxxxxxx'
-    throw new Error('Invalid phone number format');
-}
 
 const safeSendWhatsApp = async (phone: string, courseName: string, learnerName: string) => {
-    const normalizedPhone = normalizePhone(phone);
+    const normalizedPhone = normalizePhoneNumber(phone);
     const title = `Start Learning`.slice(0, 20);
     const header = `Welcome to ${courseName}`.slice(0, 50);
     const body = `Hi ${learnerName}, you have been assigned a new course: ${courseName}. Click below to start learning!`;
@@ -44,16 +36,14 @@ const safeSendWhatsApp = async (phone: string, courseName: string, learnerName: 
 };
 
 const sendSuspendedMessage = async (phone: string, prevCourseName: string, learnerName: string) => {
-    const normalizedPhone = normalizePhone(phone);
+    const normalizedPhone = normalizePhoneNumber(phone);
     const title = `Course Suspended`.slice(0, 20);
     const header = `Course Suspended`.slice(0, 50);
     const body = `Hi ${learnerName}, your previous course (${prevCourseName}) has been suspended as you have been assigned a new course.`;
     try {
-        await sendInteractiveButtonsMessage(
+        await sendWhatsAppMessage(
             normalizedPhone,
-            header,
-            body,
-            [{ title }],
+            `${header}\n\n${body}`,
             import.meta.env.VITE_WATI_API_KEY || ''
         );
     } catch (err: any) {
@@ -156,6 +146,7 @@ const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, on
                 if (updateError) throw updateError;
 
                 // 5. Insert new assigned progress row
+                const number = normalizePhoneNumber(learner.phone)
                 const { error: insertError } = await supabase
                     .from('course_progress')
                     .insert({
@@ -164,7 +155,7 @@ const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, on
                         course_id: course.id,
                         course_name: course.course_name,
                         status: 'assigned',
-                        phone_number: learner.phone || null,
+                        phone_number: number || null,
                         current_day: 1,
                         last_module_completed_at: new Date().toISOString()
                     });
@@ -217,6 +208,8 @@ const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, on
                 if (updateError) throw updateError;
 
                 // 4. Insert new assigned progress row
+                const number = normalizePhoneNumber(learner.phone)
+
                 const { error: insertError } = await supabase
                     .from('course_progress')
                     .insert({
@@ -225,7 +218,7 @@ const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, on
                         course_id: course!.id,
                         course_name: course!.course_name,
                         status: 'assigned',
-                        phone_number: learner.phone || null,
+                        phone_number: number || null,
                         current_day: 1,
                         last_module_completed_at: new Date().toISOString()
                     });

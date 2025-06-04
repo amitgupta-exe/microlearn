@@ -217,15 +217,60 @@ const Courses = () => {
     setShowAssignDialog(true);
   };
 
+  // New: Find the group for the current id (for detail/edit)
+  const currentGroup = id && courseGroups[id] ? courseGroups[id] : null;
+
+  // New: Card click navigates to detail page
   const handleCourseCardClick = (courses: Course[]) => {
-    setDetailCourses(courses);
-    setShowDetailDialog(true);
+    if (courses[0].request_id) {
+      navigate(`/courses/${courses[0].request_id}`);
+    } else {
+      setDetailCourses(courses);
+      setShowDetailDialog(true);
+    }
   };
 
-  const handlePromptSuccess = () => {
-    navigate(`/courses`);
-    window.location.reload();
+  // New: Edit handler
+  const handleEditCourse = (courses: Course[]) => {
+    if (courses[0].request_id) {
+      navigate(`/courses/${courses[0].request_id}?edit=1`);
+    }
   };
+
+  // Show edit form if on /courses/:id?edit=1
+  const isEditMode = !!(id && new URLSearchParams(window.location.search).get('edit'));
+
+  if (isEditMode && currentGroup) {
+    return (
+      <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
+        <div className="max-w-5xl mx-auto">
+          <Button
+            variant="ghost"
+            className="mb-6"
+            onClick={() => navigate('/courses')}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Courses
+          </Button>
+          <CourseForm
+            onSubmit={handleCreateCourse}
+            onCancel={() => navigate('/courses')}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Show detail dialog if on /courses/:id and not editing
+  if (id && currentGroup && !isEditMode) {
+    return (
+      <CourseDetailDialog
+        courses={currentGroup}
+        open={true}
+        onOpenChange={() => navigate('/courses')}
+      />
+    );
+  }
 
   // Apply filters
   let displayedGroups = Object.entries(courseGroups);
@@ -405,6 +450,15 @@ const Courses = () => {
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCourse(courses);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
