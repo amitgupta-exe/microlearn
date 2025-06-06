@@ -38,7 +38,7 @@ const LearnerDashboard: React.FC = () => {
         .from('course_progress')
         .select(`
           *,
-          course:course_id (
+          course:courses!course_progress_course_id_fkey (
             id,
             course_name,
             visibility,
@@ -126,11 +126,11 @@ const LearnerDashboard: React.FC = () => {
                     <CardTitle className="text-lg">
                       {progress.course?.course_name || 'Unknown Course'}
                     </CardTitle>
-                    {getStatusIcon(progress.status)}
+                    {getStatusIcon(progress.status || 'not_started')}
                   </div>
                   <CardDescription>
-                    <Badge variant={getStatusColor(progress.status)}>
-                      {progress.status.replace('_', ' ')}
+                    <Badge variant={getStatusColor(progress.status || 'not_started')}>
+                      {(progress.status || 'not_started').replace('_', ' ')}
                     </Badge>
                   </CardDescription>
                 </CardHeader>

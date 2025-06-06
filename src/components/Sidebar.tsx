@@ -6,14 +6,13 @@ import {
   Users, 
   BookOpen, 
   BarChart, 
-  MessageCircle, 
   Settings,
   ChevronLeft,
   ChevronRight,
   LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
+import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { User } from '@supabase/supabase-js';
 
 interface SidebarProps {
@@ -23,7 +22,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ user }) => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut } = useMultiAuth();
   
   const navItems = [
     { icon: LayoutDashboard, label: 'Overview', path: '/' },

@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, User, Mail, Phone, BookOpen } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useMultiAuth } from '@/contexts/MultiAuthContext';
+import { toast } from 'sonner';
+import { Course, Learner } from '@/lib/types';
 import {
   Dialog,
   DialogContent,
@@ -10,166 +17,153 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { Course, Learner } from '@/lib/types';
-import { useMultiAuth } from '@/contexts/MultiAuthContext';
-import { sendWhatsAppMessage } from '@/integrations/wati/functions';
-import CourseOverwriteDialog from './CourseOverwriteDialog';
-
-const formSchema = z.object({
-  course: z.string().min(1, {
-    message: 'Please select a course.',
-  }),
-  learner: z.string().min(1, {
-    message: 'Please select a learner.',
-  }),
-});
 
 interface CourseAssignmentProps {
+  course: Course;
+  onAssignmentComplete?: () => void;
+}
+
+interface CourseOverwriteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  courses: Course[];
-  learners: Learner[];
-  onSuccess?: () => void;
-  selectedCourse?: string;
-  selectedLearner?: string;
+  learner: Learner;
+  currentCourse: Course;
+  newCourse: Course;
+  onConfirm: () => Promise<void>;
 }
 
-interface CourseAssignmentFormValues {
-  course: string;
-  learner: string;
-}
-
-const CourseAssignment: React.FC<CourseAssignmentProps> = ({
+const CourseOverwriteDialog: React.FC<CourseOverwriteDialogProps> = ({
   open,
   onOpenChange,
-  courses,
-  learners,
-  onSuccess,
-  selectedCourse,
-  selectedLearner,
+  learner,
+  currentCourse,
+  newCourse,
+  onConfirm,
 }) => {
-  const { user } = useMultiAuth();
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleConfirm = async () => {
+    setIsLoading(true);
+    try {
+      await onConfirm();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error confirming overwrite:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Course Assignment Conflict</DialogTitle>
+          <DialogDescription>
+            {learner.name} is already assigned to "{currentCourse.course_name}". 
+            Do you want to reassign them to "{newCourse.course_name}"?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirm} disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Reassign Course
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmentComplete }) => {
+  const { user, userRole } = useMultiAuth();
+  const [learners, setLearners] = useState<Learner[]>([]);
+  const [selectedLearnerId, setSelectedLearnerId] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingLearners, setIsLoadingLearners] = useState(true);
   const [overwriteDialog, setOverwriteDialog] = useState<{
     open: boolean;
-    existingCourse?: Course;
     learner?: Learner;
-    newCourse?: Course;
-  }>({
-    open: false,
-  });
+    currentCourse?: Course;
+  }>({ open: false });
 
-  const form = useForm<CourseAssignmentFormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      course: selectedCourse || '',
-      learner: selectedLearner || '',
-    },
-  });
+  useEffect(() => {
+    fetchLearners();
+  }, [user, userRole]);
 
-  const onSubmit = async (values: CourseAssignmentFormValues) => {
-    setIsLoading(true);
+  const fetchLearners = async () => {
+    try {
+      let query = supabase
+        .from('learners')
+        .select(`
+          *,
+          assigned_course:courses!learners_assigned_course_id_fkey (*)
+        `);
 
-    const learner = learners.find(l => l.id === values.learner);
-    const courseRequestId = values.course;
+      // Filter based on user role
+      if (userRole === 'admin') {
+        query = query.eq('created_by', user?.id);
+      }
 
-    if (!learner) {
-      toast({
-        title: 'Error',
-        description: 'Learner not found. Please try again.',
-        variant: 'destructive',
-      });
-      setIsLoading(false);
-      return;
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      setLearners(data || []);
+    } catch (error) {
+      console.error('Error fetching learners:', error);
+      toast.error('Failed to load learners');
+    } finally {
+      setIsLoadingLearners(false);
     }
+  };
 
-    if (learner.assigned_course_id) {
-      // Check if the learner is already assigned to a course
-      const existingCourse = courses.find(c => c.id === learner.assigned_course_id);
-      const newCourse = courses.find(c => c.request_id === courseRequestId);
+  const handleAssignment = async () => {
+    if (!selectedLearnerId || !course.id) return;
 
-      if (existingCourse && newCourse) {
+    setIsLoading(true);
+    try {
+      const selectedLearner = learners.find(l => l.id === selectedLearnerId);
+      if (!selectedLearner) throw new Error('Learner not found');
+
+      // Check if learner already has an assigned course
+      if (selectedLearner.assigned_course_id && selectedLearner.assigned_course) {
         setOverwriteDialog({
           open: true,
-          existingCourse: existingCourse,
-          learner: learner,
-          newCourse: newCourse,
+          learner: selectedLearner,
+          currentCourse: selectedLearner.assigned_course,
         });
-        setIsLoading(false);
         return;
       }
-    }
 
-    const success = await assignCourse(values.learner, courseRequestId);
-    if (success) {
-      onSuccess && onSuccess();
-      onOpenChange(false);
-    }
-
-    setIsLoading(false);
-  };
-
-  const trackMessage = async (learnerId: string) => {
-    try {
-      await supabase.from('messages_sent').insert({
-        user_id: user?.id!,
-        learner_id: learnerId,
-        message_type: 'course_assignment',
-      });
+      await performAssignment(selectedLearner);
     } catch (error) {
-      console.error('Error tracking message:', error);
+      console.error('Error assigning course:', error);
+      toast.error('Failed to assign course');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const assignCourse = async (learnerId: string, courseRequestId: string, shouldOverwrite = false) => {
+  const performAssignment = async (learner: Learner, isOverwrite = false) => {
     try {
-      // Get the first course from the selected course group
-      const selectedCourseGroup = courses.filter(c => c.request_id === courseRequestId);
-      const firstCourse = selectedCourseGroup[0];
-      
-      if (!firstCourse) {
-        throw new Error('Course not found');
-      }
-
-      const learner = learners.find(l => l.id === learnerId);
-      if (!learner) {
-        throw new Error('Learner not found');
-      }
-
       // If overwriting, suspend the previous course progress
-      if (shouldOverwrite && learner.assigned_course_id) {
+      if (isOverwrite && learner.assigned_course_id) {
         await supabase
           .from('course_progress')
           .update({ status: 'suspended' })
-          .eq('learner_id', learnerId)
+          .eq('learner_id', learner.id)
           .eq('course_id', learner.assigned_course_id);
       }
 
-      // Update learner with new course assignment
+      // Update learner's assigned course
       const { error: updateError } = await supabase
         .from('learners')
-        .update({ assigned_course_id: firstCourse.id })
-        .eq('id', learnerId);
+        .update({ assigned_course_id: course.id })
+        .eq('id', learner.id);
 
       if (updateError) throw updateError;
 
@@ -177,144 +171,161 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({
       const { error: progressError } = await supabase
         .from('course_progress')
         .insert({
-          learner_id: learnerId,
-          course_id: firstCourse.id,
-          course_name: firstCourse.course_name,
-          learner_name: learner.name,
-          phone_number: learner.phone,
+          learner_id: learner.id,
+          course_id: course.id!,
           status: 'not_started',
           progress_percent: 0,
+          current_day: 1,
+          course_name: course.course_name,
+          learner_name: learner.name,
+          phone_number: learner.phone,
         });
 
       if (progressError) throw progressError;
 
-      // Send WhatsApp message
+      // Record message sent
+      const { error: messageError } = await supabase
+        .from('messages_sent')
+        .insert({
+          user_id: user?.id!,
+          learner_id: learner.id,
+          message_type: 'course_assignment',
+        });
+
+      if (messageError) throw messageError;
+
+      // Send WhatsApp message (placeholder - implement your WhatsApp API call here)
       try {
-        await sendWhatsAppMessage(
-          learner.phone,
-          `Hello ${learner.name}! You have been assigned to the course "${firstCourse.course_name}". Your learning journey starts now!`,
-          process.env.REACT_APP_WATI_API_KEY || ''
-        );
-        
-        // Track the message
-        await trackMessage(learnerId);
+        const response = await fetch('/api/send-whatsapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: learner.phone,
+            message: `You have been assigned to course: ${course.course_name}`,
+            learner_name: learner.name,
+            course_name: course.course_name,
+          }),
+        });
+        console.log('WhatsApp message sent:', response.status);
       } catch (whatsappError) {
-        console.error('Error sending WhatsApp message:', whatsappError);
-        // Don't fail the assignment if WhatsApp fails
+        console.warn('WhatsApp message failed:', whatsappError);
       }
 
-      toast({
-        title: 'Course assigned successfully',
-        description: `${learner.name} has been assigned to ${firstCourse.course_name}`,
-      });
-
-      return true;
+      toast.success(`Course assigned to ${learner.name} successfully`);
+      setSelectedLearnerId('');
+      await fetchLearners();
+      onAssignmentComplete?.();
     } catch (error) {
-      console.error('Error assigning course:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to assign course. Please try again.',
-        variant: 'destructive',
-      });
-      return false;
+      console.error('Error in assignment:', error);
+      toast.error('Failed to assign course');
+      throw error;
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Assign Course</DialogTitle>
-          <DialogDescription>
-            Select a course and learner to create a new assignment.
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="course"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Course</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a course" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {courses.reduce((uniqueCourses, course) => {
-                        if (!uniqueCourses.find(c => c.request_id === course.request_id)) {
-                          uniqueCourses.push(course);
-                        }
-                        return uniqueCourses;
-                      }, [] as Course[]).map((course) => (
-                        <SelectItem key={course.request_id} value={course.request_id}>
-                          {course.course_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="learner"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Learner</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a learner" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {learners.map((learner) => (
-                        <SelectItem key={learner.id} value={learner.id}>
-                          {learner.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Assigning...' : 'Assign Course'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
+  const handleOverwriteConfirm = async () => {
+    if (!overwriteDialog.learner) return;
+    await performAssignment(overwriteDialog.learner, true);
+    setOverwriteDialog({ open: false });
+  };
 
-      <CourseOverwriteDialog
-        open={overwriteDialog.open}
-        onOpenChange={(open) => setOverwriteDialog({ ...overwriteDialog, open })}
-        existingCourse={overwriteDialog.existingCourse}
-        learner={overwriteDialog.learner}
-        newCourse={overwriteDialog.newCourse}
-        onConfirm={async () => {
-          setIsLoading(true);
-          const success = await assignCourse(
-            overwriteDialog.learner!.id,
-            overwriteDialog.newCourse!.request_id!,
-            true
-          );
-          if (success) {
-            onSuccess && onSuccess();
-            onOpenChange(false);
-          }
-          setIsLoading(false);
-          setOverwriteDialog({ open: false });
-        }}
-      />
-    </Dialog>
+  if (isLoadingLearners) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin mr-2" />
+          <span>Loading learners...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5" />
+            Assign Course: {course.course_name}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">Select Learner</label>
+            <Select value={selectedLearnerId} onValueChange={setSelectedLearnerId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a learner..." />
+              </SelectTrigger>
+              <SelectContent>
+                {learners.map((learner) => (
+                  <SelectItem key={learner.id} value={learner.id}>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      <span>{learner.name}</span>
+                      {learner.assigned_course_id && (
+                        <Badge variant="secondary" className="ml-2">
+                          Has Course
+                        </Badge>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedLearnerId && (
+            <div className="border rounded-lg p-4 bg-muted/50">
+              {(() => {
+                const selectedLearner = learners.find(l => l.id === selectedLearnerId);
+                return selectedLearner ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      <span className="font-medium">{selectedLearner.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Mail className="h-3 w-3" />
+                      <span>{selectedLearner.email}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Phone className="h-3 w-3" />
+                      <span>{selectedLearner.phone}</span>
+                    </div>
+                    {selectedLearner.assigned_course && (
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-sm text-yellow-800">
+                          Currently assigned to: <strong>{selectedLearner.assigned_course.course_name}</strong>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : null;
+              })()}
+            </div>
+          )}
+
+          <Button 
+            onClick={handleAssignment} 
+            disabled={!selectedLearnerId || isLoading}
+            className="w-full"
+          >
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Assign Course
+          </Button>
+        </CardContent>
+      </Card>
+
+      {overwriteDialog.learner && overwriteDialog.currentCourse && (
+        <CourseOverwriteDialog
+          open={overwriteDialog.open}
+          onOpenChange={(open) => setOverwriteDialog({ ...overwriteDialog, open })}
+          learner={overwriteDialog.learner}
+          currentCourse={overwriteDialog.currentCourse}
+          newCourse={course}
+          onConfirm={handleOverwriteConfirm}
+        />
+      )}
+    </>
   );
 };
 
