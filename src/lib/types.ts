@@ -1,3 +1,4 @@
+
 export interface Course {
   id?: string;
   request_id?: string;
@@ -11,6 +12,7 @@ export interface Course {
   created_at?: string;
   updated_at?: string;
   created_by?: string;
+  status?: 'pending' | 'approved' | 'rejected';
 }
 
 export interface Learner {
@@ -47,3 +49,5 @@ export interface CourseProgress {
   created_at: string;
   updated_at: string;
 }
+
+export type UserRole = 'superadmin' | 'admin' | 'learner';

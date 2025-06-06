@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { MultiAuthProvider } from "@/contexts/MultiAuthContext";
 import { SuperAdminProvider } from "@/contexts/SuperAdminContext";
 import { ThemeProvider } from "next-themes";
 import Sidebar from "@/components/Sidebar";
@@ -19,6 +19,7 @@ import ResetPassword from "./pages/ResetPassword";
 import AuthCallback from "./pages/AuthCallback";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import LearnerDashboard from "./pages/LearnerDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,7 +30,7 @@ function App() {
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
           <BrowserRouter>
-            <AuthProvider>
+            <MultiAuthProvider>
               <SuperAdminProvider>
                 <Toaster />
                 <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -42,6 +43,9 @@ function App() {
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/admin/login" element={<SuperAdminLogin />} />
                     <Route path="/admin" element={<SuperAdminDashboard />} />
+                    
+                    {/* Learner-specific route */}
+                    <Route path="/learner-dashboard" element={<LearnerDashboard />} />
 
                     {/* Protected routes with sidebar */}
                     <Route path="/*" element={
@@ -64,7 +68,7 @@ function App() {
                   </Routes>
                 </div>
               </SuperAdminProvider>
-            </AuthProvider>
+            </MultiAuthProvider>
           </BrowserRouter>
         </TooltipProvider>
       </ThemeProvider>

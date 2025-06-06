@@ -139,15 +139,7 @@ export type Database = {
           started_at?: string | null
           status?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "course_progress_learner_id_fkey"
-            columns: ["learner_id"]
-            isOneToOne: false
-            referencedRelation: "registration_requests"
-            referencedColumns: ["request_id"]
-          },
-        ]
+        Relationships: []
       }
       courses: {
         Row: {
@@ -161,6 +153,7 @@ export type Database = {
           module_3: string | null
           origin: string
           request_id: string | null
+          status: string
           updated_at: string
           visibility: string
         }
@@ -175,6 +168,7 @@ export type Database = {
           module_3?: string | null
           origin?: string
           request_id?: string | null
+          status?: string
           updated_at?: string
           visibility?: string
         }
@@ -189,6 +183,7 @@ export type Database = {
           module_3?: string | null
           origin?: string
           request_id?: string | null
+          status?: string
           updated_at?: string
           visibility?: string
         }
@@ -249,6 +244,38 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages_sent: {
+        Row: {
+          created_at: string | null
+          id: string
+          learner_id: string | null
+          message_type: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          learner_id?: string | null
+          message_type?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          learner_id?: string | null
+          message_type?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_sent_learner_id_fkey"
+            columns: ["learner_id"]
+            isOneToOne: false
+            referencedRelation: "learners"
             referencedColumns: ["id"]
           },
         ]

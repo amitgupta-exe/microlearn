@@ -17,11 +17,11 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { useMultiAuth } from '@/contexts/MultiAuthContext';
 
-// Define type for analytics data
 interface AnalyticsData {
   totalLearners: number;
-  activeCourses: number;
+  totalCourses: number;
   messagesSent: number;
   messagesByPeriod: {
     daily: { date: string; count: number }[];
@@ -35,10 +35,11 @@ interface AnalyticsData {
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#84cc16'];
 
 const Analytics = () => {
+  const { user, userRole } = useMultiAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     totalLearners: 0,
-    activeCourses: 0,
+    totalCourses: 0,
     messagesSent: 0,
     messagesByPeriod: {
       daily: [],
@@ -50,145 +51,191 @@ const Analytics = () => {
   });
 
   useEffect(() => {
-    const fetchAnalyticsData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Fetch total learners count
-        const { count: learnersCount, error: learnersError } = await supabase
-          .from('learners')
-          .select('*', { count: 'exact', head: true });
-          
-        if (learnersError) {
-          console.error('Error fetching learners count:', learnersError);
-        }
-        
-        // Fetch active courses count
-        const { count: coursesCount, error: coursesError } = await supabase
-          .from('courses')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'active');
-          
-        if (coursesError) {
-          console.error('Error fetching courses count:', coursesError);
-        }
-        
-        // Fetch messages count
-        const { count: messagesCount, error: messagesError } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true });
-          
-        if (messagesError) {
-          console.error('Error fetching messages count:', messagesError);
-        }
-        
-        // Fetch messages data for different periods
-        // Note: In a real-world scenario, you might want to use SQL aggregation queries
-        // For now, we'll just create some simulated data based on the actual count
-        const dailyData = generateTimeSeriesData(7, messagesCount || 0, 'day');
-        const weeklyData = generateTimeSeriesData(4, messagesCount || 0, 'week');
-        const monthlyData = generateTimeSeriesData(6, messagesCount || 0, 'month');
-        
-        // Fetch courses with learner counts
-        const { data: coursesWithLearners, error: coursesWithLearnersError } = await supabase
-          .from('courses')
-          .select(`
-            id,
-            name,
-            learner_courses:learner_courses(learner_id)
-          `)
-          .eq('status', 'active');
-          
-        if (coursesWithLearnersError) {
-          console.error('Error fetching courses with learners:', coursesWithLearnersError);
-        }
-        
-        // Process learners per course data
-        const learnersPerCourse = coursesWithLearners
-          ? coursesWithLearners.map(course => ({
-              name: course.name,
-              value: Array.isArray(course.learner_courses) ? course.learner_courses.length : 0
-            }))
-              .filter(course => course.value > 0) // Only include courses with learners
-              .sort((a, b) => b.value - a.value) // Sort by learner count
-              .slice(0, 5) // Take top 5
-          : [];
-          
-        // If there are no courses with learners, add a placeholder
-        if (learnersPerCourse.length === 0 && (coursesCount || 0) > 0) {
-          learnersPerCourse.push({ name: 'No enrollments yet', value: 1 });
-        }
-        
-        // Fetch course completion rates
-        const { data: learnerCourses, error: learnerCoursesError } = await supabase
-          .from('learner_courses')
-          .select(`
-            course_id,
-            completion_percentage,
-            course:course_id(name)
-          `);
-          
-        if (learnerCoursesError) {
-          console.error('Error fetching learner courses:', learnerCoursesError);
-        }
-        
-        // Calculate completion rates per course
-        const courseCompletionMap = new Map();
-        
-        if (learnerCourses) {
-          learnerCourses.forEach(lc => {
-            const courseName = lc.course?.name || 'Unknown Course';
-            if (!courseCompletionMap.has(courseName)) {
-              courseCompletionMap.set(courseName, { 
-                total: 0, 
-                sum: 0 
-              });
-            }
-            
-            const courseData = courseCompletionMap.get(courseName);
-            courseData.total += 1;
-            courseData.sum += lc.completion_percentage || 0;
-            courseCompletionMap.set(courseName, courseData);
-          });
-        }
-        
-        // Convert to array and calculate average
-        const courseCompletionRates = Array.from(courseCompletionMap.entries())
-          .map(([name, data]) => ({
-            name,
-            rate: Math.round(data.sum / data.total)
-          }))
-          .filter(course => !isNaN(course.rate)) // Filter out any NaN values
-          .sort((a, b) => b.rate - a.rate); // Sort by completion rate
-          
-        // If there are no course completion rates, add placeholders
-        if (courseCompletionRates.length === 0 && (coursesCount || 0) > 0) {
-          courseCompletionRates.push(
-            { name: 'No completion data yet', rate: 0 }
-          );
-        }
-        
-        setAnalyticsData({
-          totalLearners: learnersCount || 0,
-          activeCourses: coursesCount || 0,
-          messagesSent: messagesCount || 0,
-          messagesByPeriod: {
-            daily: dailyData,
-            weekly: weeklyData,
-            monthly: monthlyData
-          },
-          learnersPerCourse,
-          courseCompletionRates
-        });
-      } catch (error) {
-        console.error('Error fetching analytics data:', error);
-      } finally {
-        setIsLoading(false);
+    if (user && (userRole === 'admin' || userRole === 'superadmin')) {
+      fetchAnalyticsData();
+    }
+  }, [user, userRole]);
+
+  const fetchAnalyticsData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch learners count (admin sees only their learners, superadmin sees all)
+      let learnersQuery = supabase.from('learners').select('*', { count: 'exact', head: true });
+      if (userRole === 'admin') {
+        learnersQuery = learnersQuery.eq('created_by', user?.id);
       }
-    };
-    
-    fetchAnalyticsData();
-  }, []);
+      const { count: learnersCount, error: learnersError } = await learnersQuery;
+      
+      if (learnersError) {
+        console.error('Error fetching learners count:', learnersError);
+      }
+      
+      // Fetch courses count (admin sees only their courses, superadmin sees all approved)
+      let coursesQuery = supabase.from('courses').select('*', { count: 'exact', head: true });
+      if (userRole === 'admin') {
+        coursesQuery = coursesQuery.eq('created_by', user?.id);
+      } else {
+        coursesQuery = coursesQuery.eq('status', 'approved');
+      }
+      const { count: coursesCount, error: coursesError } = await coursesQuery;
+      
+      if (coursesError) {
+        console.error('Error fetching courses count:', coursesError);
+      }
+      
+      // Fetch messages sent count
+      let messagesQuery = supabase.from('messages_sent').select('*', { count: 'exact', head: true });
+      if (userRole === 'admin') {
+        messagesQuery = messagesQuery.eq('user_id', user?.id);
+      }
+      const { count: messagesCount, error: messagesError } = await messagesQuery;
+      
+      if (messagesError) {
+        console.error('Error fetching messages count:', messagesError);
+      }
+      
+      // Generate time series data for messages
+      const dailyData = generateTimeSeriesData(7, messagesCount || 0, 'day');
+      const weeklyData = generateTimeSeriesData(4, messagesCount || 0, 'week');
+      const monthlyData = generateTimeSeriesData(6, messagesCount || 0, 'month');
+      
+      // Fetch courses with learner assignment counts
+      let coursesWithLearnersQuery = supabase
+        .from('courses')
+        .select(`
+          id,
+          course_name,
+          request_id
+        `);
+      
+      if (userRole === 'admin') {
+        coursesWithLearnersQuery = coursesWithLearnersQuery.eq('created_by', user?.id);
+      } else {
+        coursesWithLearnersQuery = coursesWithLearnersQuery.eq('status', 'approved');
+      }
+      
+      const { data: coursesWithLearners, error: coursesWithLearnersError } = await coursesWithLearnersQuery;
+      
+      if (coursesWithLearnersError) {
+        console.error('Error fetching courses with learners:', coursesWithLearnersError);
+      }
+      
+      // Count learners per course by checking assigned_course_id
+      const learnersPerCourse: { name: string; value: number }[] = [];
+      
+      if (coursesWithLearners) {
+        // Group courses by request_id to get unique course assignments
+        const courseGroups = coursesWithLearners.reduce((acc, course) => {
+          if (!acc[course.request_id]) {
+            acc[course.request_id] = course.course_name;
+          }
+          return acc;
+        }, {} as Record<string, string>);
+        
+        for (const [requestId, courseName] of Object.entries(courseGroups)) {
+          // Count learners assigned to any course with this request_id
+          const courseIds = coursesWithLearners
+            .filter(c => c.request_id === requestId)
+            .map(c => c.id);
+          
+          let learnersCountQuery = supabase
+            .from('learners')
+            .select('*', { count: 'exact', head: true })
+            .in('assigned_course_id', courseIds);
+            
+          if (userRole === 'admin') {
+            learnersCountQuery = learnersCountQuery.eq('created_by', user?.id);
+          }
+          
+          const { count: learnerCount } = await learnersCountQuery;
+          
+          if (learnerCount && learnerCount > 0) {
+            learnersPerCourse.push({
+              name: courseName,
+              value: learnerCount
+            });
+          }
+        }
+      }
+      
+      // Sort and limit to top 5
+      learnersPerCourse.sort((a, b) => b.value - a.value);
+      const topLearnersPerCourse = learnersPerCourse.slice(0, 5);
+      
+      // If no assignments, add placeholder
+      if (topLearnersPerCourse.length === 0 && (coursesCount || 0) > 0) {
+        topLearnersPerCourse.push({ name: 'No assignments yet', value: 1 });
+      }
+      
+      // Fetch course completion rates from course_progress
+      let progressQuery = supabase
+        .from('course_progress')
+        .select(`
+          course_id,
+          progress_percent,
+          status
+        `);
+      
+      const { data: progressData, error: progressError } = await progressQuery;
+      
+      if (progressError) {
+        console.error('Error fetching course progress:', progressError);
+      }
+      
+      // Calculate completion rates
+      const courseCompletionMap = new Map();
+      
+      if (progressData && coursesWithLearners) {
+        progressData.forEach(progress => {
+          const course = coursesWithLearners.find(c => c.id === progress.course_id);
+          if (!course) return;
+          
+          const courseName = course.course_name;
+          if (!courseCompletionMap.has(courseName)) {
+            courseCompletionMap.set(courseName, { 
+              total: 0, 
+              sum: 0 
+            });
+          }
+          
+          const courseData = courseCompletionMap.get(courseName);
+          courseData.total += 1;
+          courseData.sum += progress.progress_percent || 0;
+          courseCompletionMap.set(courseName, courseData);
+        });
+      }
+      
+      const courseCompletionRates = Array.from(courseCompletionMap.entries())
+        .map(([name, data]) => ({
+          name,
+          rate: Math.round(data.sum / data.total)
+        }))
+        .filter(course => !isNaN(course.rate))
+        .sort((a, b) => b.rate - a.rate);
+      
+      if (courseCompletionRates.length === 0 && (coursesCount || 0) > 0) {
+        courseCompletionRates.push({ name: 'No progress data yet', rate: 0 });
+      }
+      
+      setAnalyticsData({
+        totalLearners: learnersCount || 0,
+        totalCourses: coursesCount || 0,
+        messagesSent: messagesCount || 0,
+        messagesByPeriod: {
+          daily: dailyData,
+          weekly: weeklyData,
+          monthly: monthlyData
+        },
+        learnersPerCourse: topLearnersPerCourse,
+        courseCompletionRates
+      });
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Helper to generate time series data
   const generateTimeSeriesData = (numPoints: number, total: number, period: 'day' | 'week' | 'month') => {
@@ -209,7 +256,6 @@ const Analytics = () => {
         label = months[monthIndex >= 0 ? monthIndex : monthIndex + 12];
       }
       
-      // Create a slightly random value based on the baseValue
       const randomFactor = 0.5 + Math.random();
       const count = Math.floor(baseValue * randomFactor);
       
@@ -219,12 +265,22 @@ const Analytics = () => {
     return result;
   };
 
+  if (userRole === 'learner') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Access denied. Analytics are only available for admins and super admins.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
       <div className="max-w-[1400px] mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground mt-1">Track your teaching platform performance</p>
+          <p className="text-muted-foreground mt-1">
+            {userRole === 'superadmin' ? 'System-wide analytics' : 'Your teaching platform performance'}
+          </p>
         </div>
 
         {isLoading ? (
@@ -242,8 +298,8 @@ const Analytics = () => {
                 trend={{ value: 0, direction: 'up', label: 'current count' }}
               />
               <DashboardCard
-                title="Active Courses"
-                value={analyticsData.activeCourses.toString()}
+                title="Total Courses"
+                value={analyticsData.totalCourses.toString()}
                 icon={<BookOpen size={24} />}
                 trend={{ value: 0, direction: 'up', label: 'current count' }}
               />
