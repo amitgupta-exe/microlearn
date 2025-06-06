@@ -112,7 +112,13 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
 
       if (error) throw error;
 
-      setLearners(data || []);
+      // Transform the data to match our types
+      const transformedData = (data || []).map(learner => ({
+        ...learner,
+        assigned_course: learner.assigned_course || undefined
+      })) as Learner[];
+
+      setLearners(transformedData);
     } catch (error) {
       console.error('Error fetching learners:', error);
       toast.error('Failed to load learners');

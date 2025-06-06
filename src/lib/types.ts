@@ -12,7 +12,7 @@ export interface Course {
   created_at?: string;
   updated_at?: string;
   created_by?: string;
-  status?: 'pending' | 'approved' | 'rejected';
+  status?: string;
 }
 
 export interface Learner {
@@ -20,7 +20,7 @@ export interface Learner {
   name: string;
   phone: string;
   email: string;
-  status: 'active' | 'inactive';
+  status: string;
   assigned_course_id?: string;
   created_at: string;
   updated_at: string;
@@ -72,6 +72,17 @@ export interface CourseProgress {
   phone_number?: string;
   notes?: string;
   created_at: string;
+  course?: Course;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: UserRole;
+  created_at: string;
+  updated_at: string;
 }
 
 export type UserRole = 'superadmin' | 'admin' | 'learner';

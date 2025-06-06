@@ -1,167 +1,211 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, BookOpen, Clock, CheckCircle } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { BookOpen, Clock, CheckCircle, Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
+import { toast } from 'sonner';
 import { CourseProgress, Course } from '@/lib/types';
 
-const LearnerDashboard: React.FC = () => {
-  const { user, userRole } = useMultiAuth();
-  const [courseProgress, setCourseProgress] = useState<(CourseProgress & { course?: Course })[]>([]);
+interface CourseProgressWithCourse extends CourseProgress {
+  course?: Course | null;
+}
+
+const LearnerDashboard = () => {
+  const { user, userProfile } = useMultiAuth();
+  const [courseProgress, setCourseProgress] = useState<CourseProgressWithCourse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (user && userRole === 'learner') {
-      fetchLearnerProgress();
+    if (user && userProfile) {
+      fetchCourseProgress();
     }
-  }, [user, userRole]);
+  }, [user, userProfile]);
 
-  const fetchLearnerProgress = async () => {
+  const fetchCourseProgress = async () => {
     try {
-      const phone = user?.user_metadata?.phone;
-      if (!phone) return;
-
-      // Get learner info
+      // First get the learner record
       const { data: learner, error: learnerError } = await supabase
         .from('learners')
-        .select('id')
-        .eq('phone', phone)
+        .select('*')
+        .eq('phone', userProfile?.phone)
         .single();
 
-      if (learnerError) throw learnerError;
+      if (learnerError || !learner) {
+        console.error('Error fetching learner:', learnerError);
+        return;
+      }
 
-      // Get course progress with course details
+      // Then get course progress
       const { data: progress, error: progressError } = await supabase
         .from('course_progress')
-        .select(`
-          *,
-          course:courses!course_progress_course_id_fkey (
-            id,
-            course_name,
-            visibility,
-            day,
-            module_1,
-            module_2,
-            module_3
-          )
-        `)
+        .select('*')
         .eq('learner_id', learner.id);
 
-      if (progressError) throw progressError;
+      if (progressError) {
+        console.error('Error fetching course progress:', progressError);
+        return;
+      }
 
-      setCourseProgress(progress || []);
+      // Get course details for each progress record
+      const progressWithCourses = await Promise.all(
+        (progress || []).map(async (prog) => {
+          if (prog.course_id) {
+            const { data: course } = await supabase
+              .from('courses')
+              .select('*')
+              .eq('id', prog.course_id)
+              .single();
+            
+            return { ...prog, course };
+          }
+          return prog;
+        })
+      );
+
+      setCourseProgress(progressWithCourses);
     } catch (error) {
-      console.error('Error fetching learner progress:', error);
+      console.error('Error fetching course progress:', error);
+      toast.error('Failed to load course progress');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'in_progress':
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-      case 'suspended':
-        return <Clock className="h-4 w-4 text-red-500" />;
-      default:
-        return <BookOpen className="h-4 w-4 text-blue-500" />;
+      case 'completed': return 'bg-green-500';
+      case 'in_progress': return 'bg-blue-500';
+      case 'not_started': return 'bg-gray-500';
+      default: return 'bg-gray-500';
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusText = (status?: string) => {
     switch (status) {
-      case 'completed':
-        return 'default';
-      case 'in_progress':
-        return 'secondary';
-      case 'suspended':
-        return 'destructive';
-      default:
-        return 'outline';
+      case 'completed': return 'Completed';
+      case 'in_progress': return 'In Progress';
+      case 'not_started': return 'Not Started';
+      default: return 'Unknown';
     }
   };
 
-  if (userRole !== 'learner') {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p>Access denied. This page is only for learners.</p>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading your courses...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
-      <div className="max-w-[1400px] mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">My Learning Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Track your course progress and access your assignments</p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="w-full py-6 px-6 md:px-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">
+              Welcome back, {userProfile?.name || 'Learner'}!
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Track your learning progress and continue your courses.
+            </p>
+          </div>
+
+          {courseProgress.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Courses Yet</h3>
+                <p className="text-muted-foreground">
+                  You haven't been assigned any courses yet. Please contact your administrator.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courseProgress.map((progress) => (
+                <Card key={progress.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg mb-2">
+                          {progress.course?.course_name || progress.course_name || 'Untitled Course'}
+                        </CardTitle>
+                        <CardDescription className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Day {progress.current_day || 1}
+                        </CardDescription>
+                      </div>
+                      <Badge 
+                        variant="secondary" 
+                        className={`${getStatusColor(progress.status)} text-white`}
+                      >
+                        {getStatusText(progress.status)}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span>Progress</span>
+                        <span>{progress.progress_percent || 0}%</span>
+                      </div>
+                      <Progress value={progress.progress_percent || 0} className="h-2" />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="text-center">
+                        <div className={`inline-flex items-center justify-center w-6 h-6 rounded-full mb-1 ${
+                          progress.day1_module1 ? 'bg-green-500 text-white' : 'bg-gray-200'
+                        }`}>
+                          {progress.day1_module1 ? <CheckCircle className="h-3 w-3" /> : '1'}
+                        </div>
+                        <div>Day 1</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`inline-flex items-center justify-center w-6 h-6 rounded-full mb-1 ${
+                          progress.day2_module1 ? 'bg-green-500 text-white' : 'bg-gray-200'
+                        }`}>
+                          {progress.day2_module1 ? <CheckCircle className="h-3 w-3" /> : '2'}
+                        </div>
+                        <div>Day 2</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`inline-flex items-center justify-center w-6 h-6 rounded-full mb-1 ${
+                          progress.day3_module1 ? 'bg-green-500 text-white' : 'bg-gray-200'
+                        }`}>
+                          {progress.day3_module1 ? <CheckCircle className="h-3 w-3" /> : '3'}
+                        </div>
+                        <div>Day 3</div>
+                      </div>
+                    </div>
+
+                    {progress.status !== 'completed' && (
+                      <Button className="w-full" variant="default">
+                        <Play className="h-4 w-4 mr-2" />
+                        Continue Learning
+                      </Button>
+                    )}
+
+                    {progress.feedback && (
+                      <div className="text-sm">
+                        <p className="font-medium mb-1">Your Feedback:</p>
+                        <p className="text-muted-foreground italic">{progress.feedback}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2">Loading your courses...</span>
-          </div>
-        ) : courseProgress.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No courses assigned yet</h3>
-              <p className="text-muted-foreground text-center">
-                You haven't been assigned any courses yet. Please contact your instructor for course assignments.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courseProgress.map((progress) => (
-              <Card key={progress.id} className="glass-card">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">
-                      {progress.course?.course_name || 'Unknown Course'}
-                    </CardTitle>
-                    {getStatusIcon(progress.status || 'not_started')}
-                  </div>
-                  <CardDescription>
-                    <Badge variant={getStatusColor(progress.status || 'not_started')}>
-                      {(progress.status || 'not_started').replace('_', ' ')}
-                    </Badge>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span>Progress</span>
-                      <span>{progress.progress_percent || 0}%</span>
-                    </div>
-                    <Progress value={progress.progress_percent || 0} className="h-2" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm">Course Content:</h4>
-                    <div className="space-y-1 text-sm text-muted-foreground">
-                      <div>• Day {progress.course?.day}: Module 1</div>
-                      <div>• Day {progress.course?.day}: Module 2</div>
-                      <div>• Day {progress.course?.day}: Module 3</div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t">
-                    <p className="text-xs text-muted-foreground">
-                      Started: {new Date(progress.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

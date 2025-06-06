@@ -32,9 +32,19 @@ const Index = () => {
         learnersQuery = learnersQuery.eq('created_by', user?.id);
         coursesQuery = coursesQuery.eq('created_by', user?.id);
         messagesQuery = messagesQuery.eq('user_id', user?.id);
-        progressQuery = progressQuery.in('learner_id', 
-          supabase.from('learners').select('id').eq('created_by', user?.id)
-        );
+        
+        // Get learner IDs for this admin first
+        const { data: adminLearners } = await supabase
+          .from('learners')
+          .select('id')
+          .eq('created_by', user?.id);
+        
+        const learnerIds = adminLearners?.map(l => l.id) || [];
+        if (learnerIds.length > 0) {
+          progressQuery = progressQuery.in('learner_id', learnerIds);
+        } else {
+          progressQuery = progressQuery.eq('learner_id', 'none'); // No results
+        }
       }
 
       const [learners, courses, messages, progress] = await Promise.all([

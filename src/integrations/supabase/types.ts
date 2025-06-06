@@ -321,57 +321,30 @@ export type Database = {
       }
       users: {
         Row: {
-          avatar_url: string | null
-          course_id: string | null
           created_at: string
-          day_completed: number | null
           email: string
           id: string
-          interactive_responses: string | null
-          last_msg: string | null
-          module_completed: number | null
           name: string
-          next_day: number | null
-          next_module: number | null
           phone: string | null
-          question_responses: string | null
-          responses: string | null
+          role: string
           updated_at: string
         }
         Insert: {
-          avatar_url?: string | null
-          course_id?: string | null
           created_at?: string
-          day_completed?: number | null
           email: string
           id?: string
-          interactive_responses?: string | null
-          last_msg?: string | null
-          module_completed?: number | null
           name: string
-          next_day?: number | null
-          next_module?: number | null
           phone?: string | null
-          question_responses?: string | null
-          responses?: string | null
+          role?: string
           updated_at?: string
         }
         Update: {
-          avatar_url?: string | null
-          course_id?: string | null
           created_at?: string
-          day_completed?: number | null
           email?: string
           id?: string
-          interactive_responses?: string | null
-          last_msg?: string | null
-          module_completed?: number | null
           name?: string
-          next_day?: number | null
-          next_module?: number | null
           phone?: string | null
-          question_responses?: string | null
-          responses?: string | null
+          role?: string
           updated_at?: string
         }
         Relationships: []

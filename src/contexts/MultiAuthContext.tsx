@@ -2,15 +2,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Session, User } from '@supabase/supabase-js';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { toast } from '@/hooks/use-toast';
 import { normalizePhoneNumber } from '@/lib/utils';
-import { UserRole } from '@/lib/types';
+import { UserRole, User } from '@/lib/types';
 
 interface MultiAuthContextProps {
   session: Session | null;
-  user: User | null;
+  user: SupabaseUser | null;
   userRole: UserRole | null;
+  userProfile: User | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any | null }>;
   signIn: (email: string, password: string, role: UserRole) => Promise<{ error: any | null }>;
@@ -23,23 +24,23 @@ const MultiAuthContext = createContext<MultiAuthContextProps | undefined>(undefi
 
 export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [userProfile, setUserProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, currentSession) => {
+      async (_event, currentSession) => {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        // Determine user role from metadata or default to admin
         if (currentSession?.user) {
-          const role = currentSession.user.user_metadata?.role || 'admin';
-          setUserRole(role);
+          await fetchUserProfile(currentSession.user.id);
         } else {
           setUserRole(null);
+          setUserProfile(null);
         }
       }
     );
@@ -51,8 +52,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setUser(sessionData.session?.user ?? null);
         
         if (sessionData.session?.user) {
-          const role = sessionData.session.user.user_metadata?.role || 'admin';
-          setUserRole(role);
+          await fetchUserProfile(sessionData.session.user.id);
         }
       } catch (err) {
         console.error('Error getting session:', err);
@@ -65,6 +65,25 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return () => subscription.unsubscribe();
   }, []);
 
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+      
+      if (profile) {
+        setUserProfile(profile);
+        setUserRole(profile.role as UserRole);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -73,13 +92,26 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         options: {
           data: {
             full_name: fullName,
-            role: 'admin',
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       
       if (error) throw error;
+      
+      // Create user profile
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            name: fullName,
+            email: email,
+            role: 'admin',
+          });
+        
+        if (profileError) throw profileError;
+      }
+      
       return { error: null };
     } catch (error) {
       console.error('Error signing up:', error);
@@ -96,11 +128,18 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       if (error) throw error;
       
-      // Update user metadata with role
+      // Verify user has the correct role
       if (data.user) {
-        await supabase.auth.updateUser({
-          data: { role }
-        });
+        const { data: profile } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (profile && profile.role !== role) {
+          await supabase.auth.signOut();
+          throw new Error('Invalid role for this user');
+        }
       }
       
       return { error: null };
@@ -114,25 +153,25 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       const normalizedPhone = normalizePhoneNumber(phone);
       
-      // For learners, we'll use phone as email with a domain
-      const learnerEmail = `${normalizedPhone}@learner.local`;
+      // Find user by phone number
+      const { data: userProfile, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('phone', normalizedPhone)
+        .eq('role', 'learner')
+        .single();
       
+      if (userError || !userProfile) {
+        throw new Error('Invalid phone number or user not found');
+      }
+      
+      // Sign in with email and password
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: learnerEmail,
+        email: userProfile.email,
         password,
       });
       
       if (error) throw error;
-      
-      // Update user metadata with role and phone
-      if (data.user) {
-        await supabase.auth.updateUser({
-          data: { 
-            role: 'learner',
-            phone: normalizedPhone
-          }
-        });
-      }
       
       return { error: null };
     } catch (error) {
@@ -147,6 +186,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setUser(null);
       setSession(null);
       setUserRole(null);
+      setUserProfile(null);
       navigate('/login');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -173,6 +213,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         session,
         user,
         userRole,
+        userProfile,
         loading,
         signUp,
         signIn,
