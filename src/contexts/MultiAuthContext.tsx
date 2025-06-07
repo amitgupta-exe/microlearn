@@ -42,6 +42,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setUserRole(null);
           setUserProfile(null);
         }
+        setLoading(false);
       }
     );
 
@@ -76,7 +77,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (error) throw error;
       
       if (profile) {
-        setUserProfile(profile);
+        setUserProfile(profile as User);
         setUserRole(profile.role as UserRole);
       }
     } catch (error) {
@@ -121,6 +122,45 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const signIn = async (email: string, password: string, role: UserRole) => {
     try {
+      // Handle superadmin login
+      if (role === 'superadmin' && email === 'superadmin' && password === 'superadmin') {
+        // Check if superadmin exists in users table
+        const { data: existingUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', 'superadmin@system.com')
+          .eq('role', 'superadmin')
+          .single();
+
+        if (!existingUser) {
+          // Create superadmin user
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: 'superadmin@system.com',
+            password: 'superadmin',
+          });
+
+          if (authError) throw authError;
+
+          if (authData.user) {
+            await supabase.from('users').insert({
+              id: authData.user.id,
+              name: 'Super Admin',
+              email: 'superadmin@system.com',
+              role: 'superadmin',
+            });
+          }
+        }
+
+        // Sign in as superadmin
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: 'superadmin@system.com',
+          password: 'superadmin',
+        });
+
+        if (error) throw error;
+        return { error: null };
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -165,10 +205,15 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         throw new Error('Invalid phone number or user not found');
       }
       
-      // Sign in with email and password
+      // For learners, password should be their phone number
+      if (password !== normalizedPhone) {
+        throw new Error('Invalid password');
+      }
+      
+      // Sign in with email and phone as password
       const { data, error } = await supabase.auth.signInWithPassword({
         email: userProfile.email,
-        password,
+        password: normalizedPhone,
       });
       
       if (error) throw error;

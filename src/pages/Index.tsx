@@ -4,9 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, BookOpen, MessageCircle, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
-  const { user, userRole } = useMultiAuth();
+  const { user, userRole, loading } = useMultiAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalLearners: 0,
     totalCourses: 0,
@@ -15,10 +17,15 @@ const Index = () => {
   });
 
   useEffect(() => {
+    if (!loading && !user) {
+      navigate('/login');
+      return;
+    }
+
     if (user && userRole) {
       fetchStats();
     }
-  }, [user, userRole]);
+  }, [user, userRole, loading, navigate]);
 
   const fetchStats = async () => {
     try {
@@ -64,6 +71,21 @@ const Index = () => {
       console.error('Error fetching stats:', error);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect to login
+  }
 
   return (
     <div className="w-full py-6 px-6 md:px-8 page-transition">

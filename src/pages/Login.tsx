@@ -12,7 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { AlertCircle, Shield, Users, GraduationCap } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UserRole } from '@/lib/types';
-import * as z from 'zod';
+import * as z from 'z';
 import { cn } from '@/lib/utils';
 
 const adminLoginSchema = z.object({
@@ -25,8 +25,14 @@ const learnerLoginSchema = z.object({
   password: z.string().min(1, { message: 'Password is required' }),
 });
 
+const superAdminLoginSchema = z.object({
+  username: z.string().min(1, { message: 'Username is required' }),
+  password: z.string().min(1, { message: 'Password is required' }),
+});
+
 type AdminLoginFormValues = z.infer<typeof adminLoginSchema>;
 type LearnerLoginFormValues = z.infer<typeof learnerLoginSchema>;
+type SuperAdminLoginFormValues = z.infer<typeof superAdminLoginSchema>;
 
 const roleConfig = {
   superadmin: {
@@ -81,18 +87,51 @@ const Login: React.FC = () => {
     },
   });
 
+  const superAdminForm = useForm<SuperAdminLoginFormValues>({
+    resolver: zodResolver(superAdminLoginSchema),
+    defaultValues: {
+      username: '',
+      password: '',
+    },
+  });
+
+  const onSuperAdminSubmit = async (values: SuperAdminLoginFormValues) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await signIn(values.username, values.password, 'superadmin');
+      if (error) {
+        setError('Invalid username or password');
+        return;
+      }
+
+      toast({
+        title: 'Welcome back!',
+        description: 'You have successfully logged in.',
+      });
+      
+      navigate('/');
+    } catch (err) {
+      console.error('Super admin login error:', err);
+      setError('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const onAdminSubmit = async (values: AdminLoginFormValues) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const { error } = await signIn(values.email, values.password, selectedRole as 'admin' | 'superadmin');
+      const { error } = await signIn(values.email, values.password, 'admin');
       if (error) {
         setError(
           error.message === 'Email not confirmed'
             ? 'Please verify your email before logging in'
             : error.message === 'Invalid role for this user'
-            ? `You don't have ${selectedRole} access`
+            ? 'You don\'t have admin access'
             : 'Invalid email or password'
         );
         return;
@@ -203,7 +242,56 @@ const Login: React.FC = () => {
               </Alert>
             )}
 
-            {selectedRole === 'learner' ? (
+            {selectedRole === 'superadmin' ? (
+              <Form {...superAdminForm}>
+                <form onSubmit={superAdminForm.handleSubmit(onSuperAdminSubmit)} className="space-y-4">
+                  <FormField
+                    control={superAdminForm.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Username</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="Enter username (superadmin)" 
+                            {...field}
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={superAdminForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="password" 
+                            placeholder="Enter password (superadmin)"
+                            {...field}
+                            disabled={isLoading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button 
+                    type="submit" 
+                    className={cn("w-full", config.color)}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Signing in...' : `Sign in as ${config.title}`}
+                  </Button>
+                </form>
+              </Form>
+            ) : selectedRole === 'learner' ? (
               <Form {...learnerForm}>
                 <form onSubmit={learnerForm.handleSubmit(onLearnerSubmit)} className="space-y-4">
                   <FormField
@@ -234,6 +322,7 @@ const Login: React.FC = () => {
                         <FormControl>
                           <Input 
                             type="password" 
+                            placeholder="Enter your phone number"
                             {...field}
                             disabled={isLoading}
                           />
@@ -313,7 +402,7 @@ const Login: React.FC = () => {
           </CardContent>
         </Card>
 
-        {selectedRole !== 'learner' && (
+        {selectedRole === 'admin' && (
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
               Don't have an account?{' '}
