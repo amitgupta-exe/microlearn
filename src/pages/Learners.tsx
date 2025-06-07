@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,8 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, Phone, Mail, Calendar, BookOpen, Plus } from 'lucide-react';
-import LearnerForm from '@/components/LearnerForm';
-import LearnerImport from '@/components/LearnerImport';
 import { toast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
 
@@ -162,7 +161,7 @@ const Learners = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <BookOpen className="h-4 w-4 text-muted-foreground" />
-                  <Badge variant="outline">Active</Badge>
+                  <Badge variant="outline">{selectedLearner.status}</Badge>
                 </div>
               </div>
               <div className="flex gap-2 pt-4">
@@ -185,7 +184,7 @@ const Learners = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span className="truncate">{learner.name}</span>
-                    <Badge variant="outline">Active</Badge>
+                    <Badge variant="outline">{learner.status}</Badge>
                   </CardTitle>
                   <CardDescription className="space-y-1">
                     <div className="flex items-center gap-1">
@@ -228,19 +227,6 @@ const Learners = () => {
             </CardContent>
           </Card>
         )}
-
-        <LearnerForm
-          learner={selectedLearner}
-          open={isFormOpen}
-          onOpenChange={setIsFormOpen}
-          onSuccess={handleFormSuccess}
-        />
-
-        <LearnerImport
-          open={isImportOpen}
-          onOpenChange={setIsImportOpen}
-          onSuccess={handleImportSuccess}
-        />
       </div>
     </div>
   );

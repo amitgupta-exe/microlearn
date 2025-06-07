@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
@@ -94,6 +95,14 @@ const Login: React.FC = () => {
     },
   });
 
+  // Reset forms when role changes
+  React.useEffect(() => {
+    adminForm.reset();
+    learnerForm.reset();
+    superAdminForm.reset();
+    setError(null);
+  }, [selectedRole, adminForm, learnerForm, superAdminForm]);
+
   const onSuperAdminSubmit = async (values: SuperAdminLoginFormValues) => {
     setIsLoading(true);
     setError(null);
@@ -107,7 +116,7 @@ const Login: React.FC = () => {
 
       toast({
         title: 'Welcome back!',
-        description: 'You have successfully logged in.',
+        description: 'You have successfully logged in as Super Admin.',
       });
       
       navigate('/');
@@ -241,7 +250,7 @@ const Login: React.FC = () => {
               </Alert>
             )}
 
-            {selectedRole === 'superadmin' ? (
+            {selectedRole === 'superadmin' && (
               <Form {...superAdminForm}>
                 <form onSubmit={superAdminForm.handleSubmit(onSuperAdminSubmit)} className="space-y-4">
                   <FormField
@@ -252,7 +261,7 @@ const Login: React.FC = () => {
                         <FormLabel>Username</FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder="Enter username (superadmin)" 
+                            placeholder="Enter username" 
                             {...field}
                             disabled={isLoading}
                           />
@@ -271,7 +280,7 @@ const Login: React.FC = () => {
                         <FormControl>
                           <Input 
                             type="password" 
-                            placeholder="Enter password (superadmin)"
+                            placeholder="Enter password"
                             {...field}
                             disabled={isLoading}
                           />
@@ -290,7 +299,9 @@ const Login: React.FC = () => {
                   </Button>
                 </form>
               </Form>
-            ) : selectedRole === 'learner' ? (
+            )}
+
+            {selectedRole === 'learner' && (
               <Form {...learnerForm}>
                 <form onSubmit={learnerForm.handleSubmit(onLearnerSubmit)} className="space-y-4">
                   <FormField
@@ -321,7 +332,7 @@ const Login: React.FC = () => {
                         <FormControl>
                           <Input 
                             type="password" 
-                            placeholder="Enter your phone number"
+                            placeholder="Enter your password"
                             {...field}
                             disabled={isLoading}
                           />
@@ -340,7 +351,9 @@ const Login: React.FC = () => {
                   </Button>
                 </form>
               </Form>
-            ) : (
+            )}
+
+            {selectedRole === 'admin' && (
               <Form {...adminForm}>
                 <form onSubmit={adminForm.handleSubmit(onAdminSubmit)} className="space-y-4">
                   <FormField
@@ -379,6 +392,7 @@ const Login: React.FC = () => {
                         <FormControl>
                           <Input 
                             type="password" 
+                            placeholder="Enter your password"
                             {...field}
                             disabled={isLoading}
                           />

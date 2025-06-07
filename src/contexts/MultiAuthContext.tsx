@@ -14,7 +14,7 @@ interface MultiAuthContextProps {
   userProfile: User | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any | null }>;
-  signIn: (email: string, password: string, role: UserRole) => Promise<{ error: any | null }>;
+  signIn: (identifier: string, password: string, role: UserRole) => Promise<{ error: any | null }>;
   signInLearner: (phone: string, password: string) => Promise<{ error: any | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: any | null }>;
@@ -120,45 +120,17 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const signIn = async (email: string, password: string, role: UserRole) => {
+  const signIn = async (identifier: string, password: string, role: UserRole) => {
     try {
+      let email = identifier;
+      
       // Handle superadmin login
-      if (role === 'superadmin' && email === 'superadmin' && password === 'superadmin') {
-        // Check if superadmin exists in users table
-        const { data: existingUser } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', 'superadmin@system.com')
-          .eq('role', 'superadmin')
-          .single();
-
-        if (!existingUser) {
-          // Create superadmin user
-          const { data: authData, error: authError } = await supabase.auth.signUp({
-            email: 'superadmin@system.com',
-            password: 'superadmin',
-          });
-
-          if (authError) throw authError;
-
-          if (authData.user) {
-            await supabase.from('users').insert({
-              id: authData.user.id,
-              name: 'Super Admin',
-              email: 'superadmin@system.com',
-              role: 'superadmin',
-            });
-          }
+      if (role === 'superadmin') {
+        if (identifier === 'superadmin' && password === 'superadmin') {
+          email = 'superadmin@system.com';
+        } else {
+          throw new Error('Invalid credentials');
         }
-
-        // Sign in as superadmin
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: 'superadmin@system.com',
-          password: 'superadmin',
-        });
-
-        if (error) throw error;
-        return { error: null };
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({
