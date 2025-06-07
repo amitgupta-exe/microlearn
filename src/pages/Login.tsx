@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
@@ -11,9 +10,9 @@ import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { toast } from '@/hooks/use-toast';
 import { AlertCircle, Shield, Users, GraduationCap } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { UserRole } from '@/lib/types';
-import * as z from 'z';
+import * as z from 'zod';
 import { cn } from '@/lib/utils';
+import { UserRole } from '@/lib/types';
 
 const adminLoginSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address' }),

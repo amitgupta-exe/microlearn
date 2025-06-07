@@ -1,468 +1,247 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Search, User, MoreHorizontal, ArrowLeft, Loader2, FileUp, Users } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { Users, Phone, Mail, Calendar, BookOpen, Plus } from 'lucide-react';
 import LearnerForm from '@/components/LearnerForm';
 import LearnerImport from '@/components/LearnerImport';
-import AssignLearnerToCourse from '@/components/AssignLearnerToCourse';
-import { Learner } from '@/lib/types';
-import { useRequireAuth } from '@/hooks/useRequireAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { Tables } from '@/integrations/supabase/types';
 
-import { normalizePhoneNumber } from '@/lib/utils';
+type Learner = Tables<'learners'>;
 
 const Learners = () => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const { id } = useParams();
+  const { user, userRole, loading } = useRequireAuth();
   const [learners, setLearners] = useState<Learner[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { user, profile, loading: authLoading } = useRequireAuth();
-  
-  const isNew = id === 'new';
-  const isImport = id === 'import';
-  const isEdit = id && id !== 'new' && id !== 'import';
-  const showForm = isNew || isEdit;
-  
-  const currentLearner = isEdit 
-    ? learners.find(learner => learner.id === id) 
-    : undefined;
-  
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedLearner, setSelectedLearner] = useState<Learner | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    const fetchLearners = async () => {
-      if (!user) return;
-      
-      try {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-          
-        if (userError && userError.code !== 'PGRST116') {
-          console.error('Error fetching user:', userError);
-          toast.error('Failed to fetch user data');
-          return;
-        }
-        
-        if (!userData) {
-          const { data: newUser, error: createError } = await supabase
-            .from('users')
-            .insert([{
-              id: user.id,
-              email: user.email,
-              name: profile?.full_name || user.email?.split('@')[0] || 'User',
-            }])
-            .select('*')
-            .single();
-            
-          if (createError) {
-            console.error('Error creating user:', createError);
-            toast.error('Failed to create user data');
-            return;
-          }
-        }
-        
-        // Fetch learners with their assigned courses
-        const { data, error } = await supabase
-          .from('learners')
-          .select(`
-            *,
-            assigned_course:courses(*)
-          `)
-          .eq('created_by', user.id)
-          .order('created_at', { ascending: false });
-          
-        if (error) {
-          console.error('Error fetching learners:', error);
-          toast.error('Failed to load learners');
-          return;
-        }
-        
-        const learnersWithCourses = data.map(learner => ({
-          ...learner,
-          status: learner.status as 'active' | 'inactive'
-        }));
-        
-        setLearners(learnersWithCourses);
-      } catch (error) {
-        console.error('Error in learners fetch:', error);
-        toast.error('An error occurred while loading learners');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (!authLoading && user) {
+    if (!loading && user && userRole) {
       fetchLearners();
     }
-  }, [user, authLoading, profile]);
-  
-  const handleCreateLearner = async (data: any) => {
-    try {
-      if (!user) {
-        toast.error('You must be logged in to create a learner');
-        return;
-      }
+  }, [user, userRole, loading]);
 
+  useEffect(() => {
+    if (id && learners.length > 0) {
+      const learner = learners.find(l => l.id === id);
+      if (learner) {
+        setSelectedLearner(learner);
+      }
+    }
+  }, [id, learners]);
 
-      
-      const newLearner = {
-        name: data.name,
-        email: data.email,
-        phone: normalizePhoneNumber(data.phone),
-        status: 'active' as 'active',
-        created_by: user.id,
-      };
-      
-      const { data: createdLearner, error } = await supabase
-        .from('learners')
-        .insert([newLearner])
-        .select('*')
-        .single();
-        
-      if (error) {
-        console.error('Error creating learner:', error);
-        toast.error('Failed to create learner');
-        throw error;
-      }
-      
-      try {
-        await supabase.functions.invoke('send-course-notification', {
-          body: {
-            learner_id: createdLearner.id,
-            learner_name: createdLearner.name,
-            learner_phone: createdLearner.phone,
-            type: 'welcome'
-          }
-        });
-        console.log('Welcome message sent successfully');
-      } catch (welcomeError) {
-        console.error('Error sending welcome message:', welcomeError);
-      }
-      
-      const learnerWithCourses: Learner = {
-        ...createdLearner,
-        status: createdLearner.status as 'active' | 'inactive'
-      };
-      
-      setLearners([learnerWithCourses, ...learners]);
-      toast.success('Learner created successfully');
-      navigate('/learners');
-    } catch (error) {
-      console.error('Create learner error:', error);
-      toast.error('Failed to create learner');
-    }
-  };
-  
-  const handleUpdateLearner = async (data: any) => {
+  const fetchLearners = async () => {
     try {
-      if (!currentLearner) return;
+      let query = supabase.from('learners').select('*');
       
-      const { error } = await supabase
-        .from('learners')
-        .update({
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', currentLearner.id);
-        
-      if (error) {
-        console.error('Error updating learner:', error);
-        toast.error('Failed to update learner');
-        throw error;
+      // Filter by admin if not superadmin
+      if (userRole === 'admin') {
+        query = query.eq('created_by', user?.id);
       }
       
-      const updatedLearners = learners.map(learner => 
-        learner.id === currentLearner.id 
-          ? { 
-              ...learner, 
-              name: data.name, 
-              email: data.email, 
-              phone: data.phone,
-              updated_at: new Date().toISOString(),
-            } 
-          : learner
-      );
+      const { data, error } = await query.order('created_at', { ascending: false });
       
-      setLearners(updatedLearners);
-      toast.success('Learner updated successfully');
-      navigate('/learners');
+      if (error) throw error;
+      setLearners(data || []);
     } catch (error) {
-      console.error('Update learner error:', error);
-      toast.error('Failed to update learner');
+      console.error('Error fetching learners:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch learners',
+        variant: 'destructive',
+      });
+    } finally {
+      setDataLoading(false);
     }
   };
-  
-  const handleDeleteLearner = async (id: string) => {
+
+  const handleCreateLearner = () => {
+    setSelectedLearner(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEditLearner = (learner: Learner) => {
+    setSelectedLearner(learner);
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteLearner = async (learnerId: string) => {
     try {
-      const { error } = await supabase
-        .from('learners')
-        .delete()
-        .eq('id', id);
-        
-      if (error) {
-        console.error('Error deleting learner:', error);
-        toast.error('Failed to delete learner');
-        throw error;
-      }
+      const { error } = await supabase.from('learners').delete().eq('id', learnerId);
       
-      setLearners(learners.filter(learner => learner.id !== id));
-      toast.success('Learner deleted successfully');
+      if (error) throw error;
+      
+      toast({
+        title: 'Success',
+        description: 'Learner deleted successfully',
+      });
+      
+      fetchLearners();
     } catch (error) {
-      console.error('Delete learner error:', error);
-      toast.error('Failed to delete learner');
+      console.error('Error deleting learner:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete learner',
+        variant: 'destructive',
+      });
     }
   };
-  
-  const filteredLearners = learners.filter(learner => 
-    learner.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    learner.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    learner.phone.includes(searchQuery)
-  );
-  
-  if (authLoading) {
+
+  const handleFormSuccess = () => {
+    setIsFormOpen(false);
+    setSelectedLearner(null);
+    fetchLearners();
+  };
+
+  const handleImportSuccess = () => {
+    setIsImportOpen(false);
+    fetchLearners();
+  };
+
+  if (loading || dataLoading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2">Loading...</span>
-      </div>
-    );
-  }
-  
-  if (isEdit && currentLearner) {
-    return (
-      <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
-        <div className="max-w-6xl mx-auto">
-          <Button 
-            variant="ghost" 
-            className="mb-6" 
-            onClick={() => navigate('/learners')}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Learners
-          </Button>
-          
-          <div className="grid grid-cols-1 gap-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Edit Learner</CardTitle>
-                <CardDescription>
-                  Update learner information
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <LearnerForm
-                  learner={currentLearner}
-                  onSubmit={handleUpdateLearner}
-                  onCancel={() => navigate('/learners')}
-                />
-              </CardContent>
-            </Card>
-            
-          </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
-  
-  if (isImport) {
-    return (
-      <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
-        <div className="max-w-4xl mx-auto">
-          <Button 
-            variant="ghost" 
-            className="mb-6" 
-            onClick={() => navigate('/learners')}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Learners
-          </Button>
-          
-          <LearnerImport />
-        </div>
-      </div>
-    );
-  }
-  
-  if (showForm) {
-    return (
-      <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
-        <div className="max-w-3xl mx-auto">
-          <Button 
-            variant="ghost" 
-            className="mb-6" 
-            onClick={() => navigate('/learners')}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Learners
-          </Button>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>{isNew ? 'Add New Learner' : 'Edit Learner'}</CardTitle>
-              <CardDescription>
-                {isNew 
-                  ? 'Create a new learner profile'
-                  : 'Update learner information'
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <LearnerForm
-                learner={currentLearner}
-                onSubmit={isNew ? handleCreateLearner : handleUpdateLearner}
-                onCancel={() => navigate('/learners')}
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-  
+
   return (
-    <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
-      <div className="max-w-[900px] mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
+    <div className="w-full py-6 px-6 md:px-8 page-transition">
+      <div className="max-w-[1400px] mx-auto">
+        <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Learners</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your learners and their course assignments
+              Manage your learners and track their progress
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 mt-4 sm:mt-0">
-            <Button variant="outline" onClick={() => navigate('/learners/import')}>
-              <FileUp className="mr-2 h-4 w-4" />
+          <div className="flex gap-2">
+            <Button onClick={() => setIsImportOpen(true)} variant="outline">
               Import Learners
             </Button>
-            <Button onClick={() => navigate('/learners/new')}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add New Learner
+            <Button onClick={handleCreateLearner}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Learner
             </Button>
           </div>
         </div>
 
-        {/* Heading Row */}
-        <div className="grid grid-cols-4 gap-4 px-4 py-2 font-semibold border-b bg-muted rounded-t">
-          <div>Name</div>
-          <div>Email</div>
-          <div>Phone</div>
-          <div>Assigned Course</div>
-        </div>
-
-        {/* Learner Cards */}
-        <div className="flex flex-col gap-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span className="ml-2">Loading learners...</span>
-            </div>
-          ) : filteredLearners.length === 0 ? (
-            <div className="text-center h-32 text-muted-foreground flex items-center justify-center">
-              {searchQuery ? 'No learners match your search' : 'No learners found. Create your first one!'}
-            </div>
-          ) : (
-            filteredLearners.map(learner => (
-              <div
-                key={learner.id}
-                className="grid grid-cols-4 gap-4 items-center px-4 py-3 border-b bg-card rounded"
-              >
+        {selectedLearner ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                {selectedLearner.name}
+              </CardTitle>
+              <CardDescription>Learner Details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <User size={14} />
-                  </div>
-                  {learner.name}
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span>{selectedLearner.phone}</span>
                 </div>
-                <div>{learner.email}</div>
-                <div>{learner.phone}</div>
                 <div className="flex items-center gap-2">
-                  {learner.assigned_course ? (
-                    <Badge variant="secondary">
-                      {learner.assigned_course.course_name}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground">No course assigned</span>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => navigate(`/learners/${learner.id}`)}>
-                        Manage
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedLearner(learner);
-                          setAssignDialogOpen(true);
-                        }}
-                      >
-                        Assign a Course
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => handleDeleteLearner(learner.id)}
-                      >
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{selectedLearner.email}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>Joined {new Date(selectedLearner.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+                  <Badge variant="outline">Active</Badge>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </div>
+              <div className="flex gap-2 pt-4">
+                <Button onClick={() => handleEditLearner(selectedLearner)}>
+                  Edit Learner
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => handleDeleteLearner(selectedLearner.id)}
+                >
+                  Delete Learner
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {learners.map((learner) => (
+              <Card key={learner.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedLearner(learner)}>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="truncate">{learner.name}</span>
+                    <Badge variant="outline">Active</Badge>
+                  </CardTitle>
+                  <CardDescription className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <Phone className="h-3 w-3" />
+                      <span className="text-xs">{learner.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      <span className="text-xs">{learner.email}</span>
+                    </div>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Joined {new Date(learner.created_at).toLocaleDateString()}</span>
+                    <span>0 courses</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
-      {/* Assign a Course Dialog */}
-      <AssignLearnerToCourse
-        learner={selectedLearner}
-        open={assignDialogOpen}
-        onOpenChange={setAssignDialogOpen}
-        onAssigned={() => {
-          setAssignDialogOpen(false);
-          setSelectedLearner(null);
-          // Optionally refetch learners here
-        }}
-      />
+        {learners.length === 0 && (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Users className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No learners found</h3>
+              <p className="text-muted-foreground text-center mb-4">
+                Get started by adding your first learner or importing a list.
+              </p>
+              <div className="flex gap-2">
+                <Button onClick={() => setIsImportOpen(true)} variant="outline">
+                  Import Learners
+                </Button>
+                <Button onClick={handleCreateLearner}>
+                  Add First Learner
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <LearnerForm
+          learner={selectedLearner}
+          open={isFormOpen}
+          onOpenChange={setIsFormOpen}
+          onSuccess={handleFormSuccess}
+        />
+
+        <LearnerImport
+          open={isImportOpen}
+          onOpenChange={setIsImportOpen}
+          onSuccess={handleImportSuccess}
+        />
+      </div>
     </div>
   );
 };
