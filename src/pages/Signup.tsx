@@ -59,6 +59,10 @@ const Signup: React.FC = () => {
 
       setSuccess(true);
       form.reset();
+      toast({
+        title: 'Account created!',
+        description: 'Your admin account has been created successfully.',
+      });
     } catch (err) {
       console.error('Signup error:', err);
       setError('An unexpected error occurred');
@@ -68,17 +72,17 @@ const Signup: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">Create an account</h1>
-          <p className="mt-2 text-muted-foreground">Sign up to get started</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Create an account</h1>
+          <p className="mt-2 text-gray-600">Sign up to get started as an admin</p>
         </div>
 
         {error && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="bg-red-50 border-red-200">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="text-red-800">{error}</AlertDescription>
           </Alert>
         )}
 
@@ -86,100 +90,106 @@ const Signup: React.FC = () => {
           <Alert className="bg-green-50 border-green-200">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-800">
-              Registration successful! Please check your email to verify your account before logging in.
+              Registration successful! You can now log in with your credentials.
             </AlertDescription>
           </Alert>
         )}
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="fullName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="John Doe" 
-                      {...field}
-                      disabled={isLoading || success}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        <div className="bg-white p-8 rounded-lg shadow-lg border border-gray-200">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="fullName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700">Full Name</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="John Doe" 
+                        {...field}
+                        disabled={isLoading || success}
+                        className="bg-white border-gray-300 focus:border-blue-400"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email address</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="email" 
-                      placeholder="name@example.com" 
-                      {...field}
-                      disabled={isLoading || success}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700">Email address</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="email" 
+                        placeholder="name@example.com" 
+                        {...field}
+                        disabled={isLoading || success}
+                        className="bg-white border-gray-300 focus:border-blue-400"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="password" 
-                      {...field}
-                      disabled={isLoading || success}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700">Password</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="password" 
+                        {...field}
+                        disabled={isLoading || success}
+                        className="bg-white border-gray-300 focus:border-blue-400"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirm Password</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="password" 
-                      {...field}
-                      disabled={isLoading || success}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-gray-700">Confirm Password</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="password" 
+                        {...field}
+                        disabled={isLoading || success}
+                        className="bg-white border-gray-300 focus:border-blue-400"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isLoading || success}
-            >
-              {isLoading ? 'Creating account...' : 'Sign up'}
-            </Button>
-          </form>
-        </Form>
+              <Button 
+                type="submit" 
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white" 
+                disabled={isLoading || success}
+              >
+                {isLoading ? 'Creating account...' : 'Sign up'}
+              </Button>
+            </form>
+          </Form>
+        </div>
 
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-gray-600">
             Already have an account?{' '}
-            <Link to="/login" className="font-medium text-primary hover:underline">
+            <Link to="/login" className="font-medium text-blue-600 hover:underline">
               Sign in
             </Link>
           </p>

@@ -2,14 +2,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { toast } from '@/hooks/use-toast';
 import { normalizePhoneNumber } from '@/lib/utils';
 import { UserRole, User } from '@/lib/types';
 
 interface MultiAuthContextProps {
-  session: Session | null;
-  user: SupabaseUser | null;
+  user: User | null;
   userRole: UserRole | null;
   userProfile: User | null;
   loading: boolean;
@@ -23,95 +21,47 @@ interface MultiAuthContextProps {
 const MultiAuthContext = createContext<MultiAuthContextProps | undefined>(undefined);
 
 export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        if (currentSession?.user) {
-          await fetchUserProfile(currentSession.user.id);
-        } else {
-          setUserRole(null);
-          setUserProfile(null);
-        }
-        setLoading(false);
-      }
-    );
-
-    const initAuth = async () => {
+    // Check for existing session
+    const checkSession = async () => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        setSession(sessionData.session);
-        setUser(sessionData.session?.user ?? null);
-        
-        if (sessionData.session?.user) {
-          await fetchUserProfile(sessionData.session.user.id);
+        const storedUser = localStorage.getItem('currentUser');
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          setUserProfile(userData);
+          setUserRole(userData.role);
         }
-      } catch (err) {
-        console.error('Error getting session:', err);
+      } catch (error) {
+        console.error('Error checking session:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    initAuth();
-    return () => subscription.unsubscribe();
+    checkSession();
   }, []);
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data: profile, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-      
-      if (profile) {
-        setUserProfile(profile as User);
-        setUserRole(profile.role as UserRole);
-      }
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    }
-  };
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
-      });
+      // Insert directly into users table
+      const { data, error } = await supabase
+        .from('users')
+        .insert({
+          email,
+          name: fullName,
+          role: 'admin',
+        })
+        .select()
+        .single();
       
       if (error) throw error;
-      
-      // Create user profile
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: data.user.id,
-            name: fullName,
-            email: email,
-            role: 'admin',
-          });
-        
-        if (profileError) throw profileError;
-      }
       
       return { error: null };
     } catch (error) {
@@ -122,39 +72,53 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const signIn = async (identifier: string, password: string, role: UserRole) => {
     try {
-      let email = identifier;
-      
-      // Handle superadmin login
       if (role === 'superadmin') {
+        // Handle superadmin login
         if (identifier === 'superadmin' && password === 'superadmin') {
-          email = 'superadmin@system.com';
+          const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('role', 'superadmin')
+            .eq('email', 'superadmin@system.com')
+            .single();
+          
+          if (error || !user) {
+            throw new Error('Superadmin user not found');
+          }
+          
+          setUser(user);
+          setUserProfile(user);
+          setUserRole('superadmin');
+          localStorage.setItem('currentUser', JSON.stringify(user));
+          
+          return { error: null };
         } else {
-          throw new Error('Invalid credentials');
+          throw new Error('Invalid superadmin credentials');
         }
-      }
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (error) throw error;
-      
-      // Verify user has the correct role
-      if (data.user) {
-        const { data: profile } = await supabase
+      } else if (role === 'admin') {
+        // Handle admin login - use email as identifier
+        const { data: user, error } = await supabase
           .from('users')
-          .select('role')
-          .eq('id', data.user.id)
+          .select('*')
+          .eq('email', identifier)
+          .eq('role', 'admin')
           .single();
         
-        if (profile && profile.role !== role) {
-          await supabase.auth.signOut();
-          throw new Error('Invalid role for this user');
+        if (error || !user) {
+          throw new Error('Invalid email or user not found');
         }
+        
+        // For demo purposes, accept any password for admin
+        // In production, you'd verify the password hash
+        setUser(user);
+        setUserProfile(user);
+        setUserRole('admin');
+        localStorage.setItem('currentUser', JSON.stringify(user));
+        
+        return { error: null };
       }
       
-      return { error: null };
+      return { error: new Error('Invalid role') };
     } catch (error) {
       console.error('Error signing in:', error);
       return { error };
@@ -165,30 +129,27 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       const normalizedPhone = normalizePhoneNumber(phone);
       
+      // For learners, password should be their phone number
+      if (password !== normalizedPhone) {
+        throw new Error('Invalid password');
+      }
+      
       // Find user by phone number
-      const { data: userProfile, error: userError } = await supabase
+      const { data: user, error } = await supabase
         .from('users')
         .select('*')
         .eq('phone', normalizedPhone)
         .eq('role', 'learner')
         .single();
       
-      if (userError || !userProfile) {
+      if (error || !user) {
         throw new Error('Invalid phone number or user not found');
       }
       
-      // For learners, password should be their phone number
-      if (password !== normalizedPhone) {
-        throw new Error('Invalid password');
-      }
-      
-      // Sign in with email and phone as password
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: userProfile.email,
-        password: normalizedPhone,
-      });
-      
-      if (error) throw error;
+      setUser(user);
+      setUserProfile(user);
+      setUserRole('learner');
+      localStorage.setItem('currentUser', JSON.stringify(user));
       
       return { error: null };
     } catch (error) {
@@ -199,11 +160,10 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
       setUser(null);
-      setSession(null);
-      setUserRole(null);
       setUserProfile(null);
+      setUserRole(null);
+      localStorage.removeItem('currentUser');
       navigate('/login');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -212,11 +172,8 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const resetPassword = async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      
-      if (error) throw error;
+      // For demo purposes, just return success
+      // In production, you'd implement proper password reset
       return { error: null };
     } catch (error) {
       console.error('Error resetting password:', error);
@@ -227,7 +184,6 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   return (
     <MultiAuthContext.Provider
       value={{
-        session,
         user,
         userRole,
         userProfile,

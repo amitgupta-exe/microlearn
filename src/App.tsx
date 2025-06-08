@@ -29,7 +29,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, userRole, loading } = useMultiAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen bg-white">Loading...</div>;
   }
 
   if (!user) {
@@ -42,9 +42,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-white">
       <Sidebar user={user} />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-gray-50">
         {children}
       </main>
     </div>
@@ -54,13 +54,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
         <TooltipProvider>
           <BrowserRouter>
             <MultiAuthProvider>
               <SuperAdminProvider>
                 <Toaster />
-                <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+                <div className="min-h-screen bg-white">
                   <Routes>
                     {/* Public routes */}
                     <Route path="/login" element={<Login />} />

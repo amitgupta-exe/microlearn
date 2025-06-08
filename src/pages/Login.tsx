@@ -17,7 +17,7 @@ import { UserRole } from '@/lib/types';
 
 const adminLoginSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  password: z.string().min(1, { message: 'Password is required' }),
 });
 
 const learnerLoginSchema = z.object({
@@ -39,7 +39,7 @@ const roleConfig = {
     title: 'Super Admin',
     description: 'Full system access',
     icon: Shield,
-    color: 'bg-red-500',
+    color: 'bg-red-500 hover:bg-red-600',
     bgColor: 'bg-red-50',
     borderColor: 'border-red-200',
     textColor: 'text-red-700',
@@ -48,7 +48,7 @@ const roleConfig = {
     title: 'Admin',
     description: 'Manage courses and learners',
     icon: Users,
-    color: 'bg-blue-500',
+    color: 'bg-blue-500 hover:bg-blue-600',
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-200',
     textColor: 'text-blue-700',
@@ -57,7 +57,7 @@ const roleConfig = {
     title: 'Learner',
     description: 'Access your courses',
     icon: GraduationCap,
-    color: 'bg-green-500',
+    color: 'bg-green-500 hover:bg-green-600',
     bgColor: 'bg-green-50',
     borderColor: 'border-green-200',
     textColor: 'text-green-700',
@@ -135,13 +135,7 @@ const Login: React.FC = () => {
     try {
       const { error } = await signIn(values.email, values.password, 'admin');
       if (error) {
-        setError(
-          error.message === 'Email not confirmed'
-            ? 'Please verify your email before logging in'
-            : error.message === 'Invalid role for this user'
-            ? 'You don\'t have admin access'
-            : 'Invalid email or password'
-        );
+        setError('Invalid email or password');
         return;
       }
 
@@ -188,11 +182,11 @@ const Login: React.FC = () => {
   const Icon = config.icon;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Welcome back</h1>
-          <p className="mt-2 text-muted-foreground">Choose your role and sign in to your account</p>
+          <p className="mt-2 text-gray-600">Choose your role and sign in to your account</p>
         </div>
 
         {/* Role Selection */}
@@ -231,7 +225,7 @@ const Login: React.FC = () => {
         </div>
 
         {/* Login Form Card */}
-        <Card className={cn("border-2", config.borderColor)}>
+        <Card className={cn("border-2 bg-white shadow-lg", config.borderColor)}>
           <CardHeader className={cn("text-center", config.bgColor)}>
             <div className="flex items-center justify-center mb-2">
               <div className={cn("p-2 rounded-full", config.color)}>
@@ -239,14 +233,14 @@ const Login: React.FC = () => {
               </div>
             </div>
             <CardTitle className={config.textColor}>{config.title} Login</CardTitle>
-            <CardDescription>{config.description}</CardDescription>
+            <CardDescription className="text-gray-600">{config.description}</CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4 pt-6">
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" className="bg-red-50 border-red-200">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription className="text-red-800">{error}</AlertDescription>
               </Alert>
             )}
 
@@ -258,12 +252,13 @@ const Login: React.FC = () => {
                     name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Username</FormLabel>
+                        <FormLabel className="text-gray-700">Username</FormLabel>
                         <FormControl>
                           <Input 
                             placeholder="Enter username" 
                             {...field}
                             disabled={isLoading}
+                            className="bg-white border-gray-300 focus:border-red-400"
                           />
                         </FormControl>
                         <FormMessage />
@@ -276,13 +271,14 @@ const Login: React.FC = () => {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel className="text-gray-700">Password</FormLabel>
                         <FormControl>
                           <Input 
                             type="password" 
                             placeholder="Enter password"
                             {...field}
                             disabled={isLoading}
+                            className="bg-white border-gray-300 focus:border-red-400"
                           />
                         </FormControl>
                         <FormMessage />
@@ -292,7 +288,7 @@ const Login: React.FC = () => {
 
                   <Button 
                     type="submit" 
-                    className={cn("w-full", config.color)}
+                    className={cn("w-full text-white", config.color)}
                     disabled={isLoading}
                   >
                     {isLoading ? 'Signing in...' : `Sign in as ${config.title}`}
@@ -309,13 +305,14 @@ const Login: React.FC = () => {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
+                        <FormLabel className="text-gray-700">Phone Number</FormLabel>
                         <FormControl>
                           <Input 
                             type="tel" 
                             placeholder="Enter your phone number" 
                             {...field}
                             disabled={isLoading}
+                            className="bg-white border-gray-300 focus:border-green-400"
                           />
                         </FormControl>
                         <FormMessage />
@@ -328,13 +325,14 @@ const Login: React.FC = () => {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel className="text-gray-700">Password</FormLabel>
                         <FormControl>
                           <Input 
                             type="password" 
-                            placeholder="Enter your password"
+                            placeholder="Enter your password (same as phone number)"
                             {...field}
                             disabled={isLoading}
+                            className="bg-white border-gray-300 focus:border-green-400"
                           />
                         </FormControl>
                         <FormMessage />
@@ -344,7 +342,7 @@ const Login: React.FC = () => {
 
                   <Button 
                     type="submit" 
-                    className={cn("w-full", config.color)}
+                    className={cn("w-full text-white", config.color)}
                     disabled={isLoading}
                   >
                     {isLoading ? 'Signing in...' : `Sign in as ${config.title}`}
@@ -361,13 +359,14 @@ const Login: React.FC = () => {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email address</FormLabel>
+                        <FormLabel className="text-gray-700">Email address</FormLabel>
                         <FormControl>
                           <Input 
                             type="email" 
-                            placeholder="name@example.com" 
+                            placeholder="admin@example.com" 
                             {...field}
                             disabled={isLoading}
+                            className="bg-white border-gray-300 focus:border-blue-400"
                           />
                         </FormControl>
                         <FormMessage />
@@ -381,10 +380,10 @@ const Login: React.FC = () => {
                     render={({ field }) => (
                       <FormItem>
                         <div className="flex items-center justify-between">
-                          <FormLabel>Password</FormLabel>
+                          <FormLabel className="text-gray-700">Password</FormLabel>
                           <Link 
                             to="/forgot-password" 
-                            className="text-sm font-medium text-primary hover:underline"
+                            className="text-sm font-medium text-blue-600 hover:underline"
                           >
                             Forgot password?
                           </Link>
@@ -395,6 +394,7 @@ const Login: React.FC = () => {
                             placeholder="Enter your password"
                             {...field}
                             disabled={isLoading}
+                            className="bg-white border-gray-300 focus:border-blue-400"
                           />
                         </FormControl>
                         <FormMessage />
@@ -404,7 +404,7 @@ const Login: React.FC = () => {
 
                   <Button 
                     type="submit" 
-                    className={cn("w-full", config.color)}
+                    className={cn("w-full text-white", config.color)}
                     disabled={isLoading}
                   >
                     {isLoading ? 'Signing in...' : `Sign in as ${config.title}`}
@@ -417,14 +417,26 @@ const Login: React.FC = () => {
 
         {selectedRole === 'admin' && (
           <div className="text-center">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-gray-600">
               Don't have an account?{' '}
-              <Link to="/signup" className="font-medium text-primary hover:underline">
+              <Link to="/signup" className="font-medium text-blue-600 hover:underline">
                 Sign up
               </Link>
             </p>
           </div>
         )}
+
+        {/* Test Credentials Info */}
+        <Card className="bg-gray-50 border border-gray-200">
+          <CardContent className="pt-4">
+            <h3 className="text-sm font-medium text-gray-900 mb-2">Test Credentials:</h3>
+            <div className="text-xs text-gray-600 space-y-1">
+              <div><strong>Super Admin:</strong> superadmin / superadmin</div>
+              <div><strong>Admin:</strong> admin@example.com / any password</div>
+              <div><strong>Learner:</strong> +1234567890 / +1234567890</div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
