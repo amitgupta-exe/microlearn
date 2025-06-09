@@ -32,17 +32,21 @@ const CourseApproval = () => {
 
   const fetchCourses = async () => {
     try {
+      console.log('Fetching courses for approval...');
       const { data, error } = await supabase
         .from('courses')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
+        console.error('Error fetching courses:', error);
         throw error;
       }
 
+      console.log('Fetched courses data:', data);
+
       // Group courses by request_id
-      const grouped = data.reduce((acc: { [key: string]: GroupedCourse }, course: Course) => {
+      const grouped = data?.reduce((acc: { [key: string]: GroupedCourse }, course: Course) => {
         const requestId = course.request_id || 'no-request-id';
         
         if (!acc[requestId]) {
@@ -57,8 +61,9 @@ const CourseApproval = () => {
         
         acc[requestId].modules.push(course);
         return acc;
-      }, {});
+      }, {}) || {};
 
+      console.log('Grouped courses:', Object.values(grouped));
       setGroupedCourses(Object.values(grouped));
     } catch (error) {
       console.error('Error fetching courses:', error);
@@ -70,12 +75,15 @@ const CourseApproval = () => {
 
   const updateCourseStatus = async (requestId: string, status: 'pending' | 'approved' | 'rejected') => {
     try {
+      console.log('Updating course status:', requestId, 'to:', status);
+      
       const { error } = await supabase
         .from('courses')
         .update({ status })
         .eq('request_id', requestId);
 
       if (error) {
+        console.error('Error updating course status:', error);
         throw error;
       }
 
@@ -109,7 +117,7 @@ const CourseApproval = () => {
         <div className="mb-8 flex items-center gap-4">
           <Button 
             variant="outline" 
-            onClick={() => navigate('/admin')}
+            onClick={() => navigate('/superadmin')}
             className="flex items-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
