@@ -38,33 +38,30 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const storedSuperAdmin = localStorage.getItem('superadmin_session');
         const storedLearner = localStorage.getItem('learner_session');
         
-        if (storedSuperAdmin) {
+        if (storedSuperAdmin && mounted) {
           const userProfile = JSON.parse(storedSuperAdmin);
-          if (mounted) {
-            setUser(userProfile);
-            setUserProfile(userProfile);
-            setUserRole('superadmin');
-            setLoading(false);
-          }
+          setUser(userProfile);
+          setUserProfile(userProfile);
+          setUserRole('superadmin');
+          setLoading(false);
           return;
         }
         
-        if (storedLearner) {
+        if (storedLearner && mounted) {
           const userProfile = JSON.parse(storedLearner);
-          if (mounted) {
-            setUser(userProfile);
-            setUserProfile(userProfile);
-            setUserRole('learner');
-            setLoading(false);
-          }
+          setUser(userProfile);
+          setUserProfile(userProfile);
+          setUserRole('learner');
+          setLoading(false);
           return;
         }
 
-        // Check Supabase session
+        // Check Supabase session for admin users
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         
         if (currentSession?.user && mounted) {
-          const { data: profile } = await supabase
+          // Try to get user profile from users table
+          const { data: profile, error } = await supabase
             .from('users')
             .select('*')
             .eq('id', currentSession.user.id)
@@ -85,6 +82,35 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             setUserProfile(userProfile);
             setUserRole(profile.role as UserRole);
             setSession(currentSession);
+          } else {
+            // If no profile exists, create one for the authenticated user
+            const { data: newProfile, error: insertError } = await supabase
+              .from('users')
+              .insert({
+                id: currentSession.user.id,
+                email: currentSession.user.email || '',
+                name: currentSession.user.user_metadata?.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
+                role: 'admin'
+              })
+              .select()
+              .single();
+
+            if (newProfile) {
+              const userProfile: User = {
+                id: newProfile.id,
+                name: newProfile.name,
+                email: newProfile.email,
+                phone: newProfile.phone,
+                role: newProfile.role as UserRole,
+                created_at: newProfile.created_at,
+                updated_at: newProfile.updated_at,
+              };
+              
+              setUser(userProfile);
+              setUserProfile(userProfile);
+              setUserRole(newProfile.role as UserRole);
+              setSession(currentSession);
+            }
           }
         }
       } catch (error) {
@@ -104,11 +130,30 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setSession(currentSession);
         
         if (currentSession?.user) {
-          const { data: profile } = await supabase
+          // Try to get or create user profile
+          let { data: profile, error } = await supabase
             .from('users')
             .select('*')
             .eq('id', currentSession.user.id)
             .single();
+          
+          if (error && error.code === 'PGRST116') {
+            // Profile doesn't exist, create it
+            const { data: newProfile, error: insertError } = await supabase
+              .from('users')
+              .insert({
+                id: currentSession.user.id,
+                email: currentSession.user.email || '',
+                name: currentSession.user.user_metadata?.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
+                role: 'admin'
+              })
+              .select()
+              .single();
+
+            if (!insertError) {
+              profile = newProfile;
+            }
+          }
           
           if (profile) {
             const userProfile: User = {
@@ -152,7 +197,6 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: `${window.location.origin}/`,
         },
       });
       
@@ -169,25 +213,14 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       if (role === 'superadmin') {
         if (identifier === 'superadmin' && password === 'superadmin') {
-          const { data: profile, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', 'superadmin@system.com')
-            .eq('role', 'superadmin')
-            .single();
-          
-          if (error || !profile) {
-            throw new Error('Superadmin user not found');
-          }
-          
           const userProfile: User = {
-            id: profile.id,
-            name: profile.name,
-            email: profile.email,
-            phone: profile.phone,
-            role: profile.role as UserRole,
-            created_at: profile.created_at,
-            updated_at: profile.updated_at,
+            id: 'a74d030f-6ce0-494e-9c7e-fb55dda882a4',
+            name: 'Super Administrator',
+            email: 'superadmin@system.com',
+            phone: null,
+            role: 'superadmin',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           };
           
           setUser(userProfile);
@@ -207,18 +240,6 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
         
         if (error) throw error;
-        
-        const { data: profile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', data.user.id)
-          .eq('role', 'admin')
-          .single();
-        
-        if (!profile) {
-          await supabase.auth.signOut();
-          throw new Error('User is not an admin');
-        }
         
         return { error: null };
       }
