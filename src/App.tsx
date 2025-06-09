@@ -20,7 +20,9 @@ import AuthCallback from "./pages/AuthCallback";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import LearnerDashboard from "./pages/LearnerDashboard";
+import CourseApproval from "./pages/CourseApproval";
 import NotFound from "./pages/NotFound";
+import { User } from "@/lib/types";
 
 const queryClient = new QueryClient();
 
@@ -29,7 +31,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, userRole, loading } = useMultiAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen bg-white">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
@@ -41,14 +50,41 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/learner-dashboard" replace />;
   }
 
+  // Redirect superadmins to their dashboard
+  if (userRole === 'superadmin') {
+    return <Navigate to="/admin" replace />;
+  }
+
   return (
     <div className="flex h-screen bg-white">
-      <Sidebar user={user} />
+      <Sidebar user={user as any} />
       <main className="flex-1 overflow-auto bg-gray-50">
         {children}
       </main>
     </div>
   );
+}
+
+// Super Admin Protected Route
+function SuperAdminProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, userRole, loading } = useMultiAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || userRole !== 'superadmin') {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
 }
 
 function App() {
@@ -69,7 +105,24 @@ function App() {
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/admin/login" element={<SuperAdminLogin />} />
-                    <Route path="/admin" element={<SuperAdminDashboard />} />
+                    
+                    {/* Super Admin routes */}
+                    <Route 
+                      path="/admin" 
+                      element={
+                        <SuperAdminProtectedRoute>
+                          <SuperAdminDashboard />
+                        </SuperAdminProtectedRoute>
+                      } 
+                    />
+                    <Route 
+                      path="/admin/course-approval" 
+                      element={
+                        <SuperAdminProtectedRoute>
+                          <CourseApproval />
+                        </SuperAdminProtectedRoute>
+                      } 
+                    />
                     
                     {/* Learner-specific route */}
                     <Route path="/learner-dashboard" element={<LearnerDashboard />} />
