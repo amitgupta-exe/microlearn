@@ -28,46 +28,46 @@ const CourseDetailDialog: React.FC<CourseDetailDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+      <DialogContent className="max-w-4xl h-[80vh] flex flex-col bg-gray-50">
         <DialogHeader>
-          <DialogTitle>{courseName}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-gray-900">{courseName}</DialogTitle>
+          <DialogDescription className="text-gray-600">
             3 Day Course • {courses[0].visibility === 'public' ? 'Public' : 'Private'} Course
           </DialogDescription>
         </DialogHeader>
 
         <div className="mt-4 overflow-y-auto flex-1 pr-2">
           <Tabs defaultValue="modules" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="modules">Modules</TabsTrigger>
+            <TabsList className="mb-4 bg-white border border-gray-200">
+              <TabsTrigger value="modules" className="text-gray-900">Modules</TabsTrigger>
             </TabsList>
 
             <TabsContent value="modules" className="space-y-6">
               {courses.map((dayContent) => (
-                <div key={dayContent.id} className="border rounded-lg">
-                  <div className="bg-muted/30 p-4 font-medium">
+                <div key={dayContent.id} className="border border-gray-200 rounded-lg bg-white">
+                  <div className="bg-gray-50 p-4 font-medium border-b border-gray-100 text-gray-900">
                     Day {dayContent.day}: {courseName}
                   </div>
                   <div className="p-4 space-y-4">
 
                     {dayContent.module_1 && (
                       <div className="border-l-2 border-primary pl-4 py-2">
-                        <h4 className="font-medium text-sm mb-1">Module 1</h4>
-                        <p className="text-sm">{dayContent.module_1}</p>
+                        <h4 className="font-medium text-sm mb-1 text-gray-900">Module 1</h4>
+                        <p className="text-sm text-gray-700">{dayContent.module_1}</p>
                       </div>
                     )}
 
                     {dayContent.module_2 && (
                       <div className="border-l-2 border-primary/70 pl-4 py-2">
-                        <h4 className="font-medium text-sm mb-1">Module 2</h4>
-                        <p className="text-sm">{dayContent.module_2}</p>
+                        <h4 className="font-medium text-sm mb-1 text-gray-900">Module 2</h4>
+                        <p className="text-sm text-gray-700">{dayContent.module_2}</p>
                       </div>
                     )}
 
                     {dayContent.module_3 && (
                       <div className="border-l-2 border-primary/50 pl-4 py-2">
-                        <h4 className="font-medium text-sm mb-1">Module 3</h4>
-                        <p className="text-sm">{dayContent.module_3}</p>
+                        <h4 className="font-medium text-sm mb-1 text-gray-900">Module 3</h4>
+                        <p className="text-sm text-gray-700">{dayContent.module_3}</p>
                       </div>
                     )}
                   </div>

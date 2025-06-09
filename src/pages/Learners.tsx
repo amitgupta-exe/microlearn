@@ -357,12 +357,12 @@ const Learners = () => {
   }
   
   return (
-    <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
+    <div className="w-full min-h-screen py-6 px-6 md:px-8 bg-gray-100 page-transition">
       <div className="max-w-[900px] mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Learners</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Learners</h1>
+            <p className="text-gray-600 mt-1">
               Manage your learners and their course assignments
             </p>
           </div>
@@ -379,7 +379,7 @@ const Learners = () => {
         </div>
 
         {/* Heading Row */}
-        <div className="grid grid-cols-4 gap-4 px-4 py-2 font-semibold border-b bg-muted rounded-t">
+        <div className="grid grid-cols-4 gap-4 px-4 py-2 font-semibold bg-gray-50 rounded-t text-gray-900">
           <div>Name</div>
           <div>Email</div>
           <div>Phone</div>
@@ -391,17 +391,17 @@ const Learners = () => {
           {isLoading ? (
             <div className="flex items-center justify-center h-32">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span className="ml-2">Loading learners...</span>
+              <span className="ml-2 text-gray-600">Loading learners...</span>
             </div>
           ) : filteredLearners.length === 0 ? (
-            <div className="text-center h-32 text-muted-foreground flex items-center justify-center">
+            <div className="text-center h-32 text-gray-400 flex items-center justify-center">
               {searchQuery ? 'No learners match your search' : 'No learners found. Create your first one!'}
             </div>
           ) : (
             filteredLearners.map(learner => (
               <div
                 key={learner.id}
-                className="grid grid-cols-4 gap-4 items-center px-4 py-3 border-b bg-card rounded"
+                className="grid grid-cols-4 gap-4 items-center px-4 py-3 bg-white rounded text-gray-900"
               >
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -417,7 +417,7 @@ const Learners = () => {
                       {learner.assigned_course.course_name}
                     </Badge>
                   ) : (
-                    <span className="text-muted-foreground">No course assigned</span>
+                    <span className="text-gray-400">No course assigned</span>
                   )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

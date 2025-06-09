@@ -1,7 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, BookOpen, MessageCircle, Loader2 } from 'lucide-react';
+import { Users, BookOpen, Loader2, Languages } from 'lucide-react';
 import DashboardCard from '@/components/DashboardCard';
 import {
   Card,
@@ -10,354 +8,183 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
-// Define type for analytics data
-interface AnalyticsData {
-  totalLearners: number;
-  activeCourses: number;
-  messagesSent: number;
-  messagesByPeriod: {
-    daily: { date: string; count: number }[];
-    weekly: { date: string; count: number }[];
-    monthly: { date: string; count: number }[];
-  };
-  learnersPerCourse: { name: string; value: number }[];
-  courseCompletionRates: { name: string; rate: number }[];
-}
-
-const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#84cc16'];
+const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#84cc16', '#facc15', '#f472b6', '#60a5fa'];
 
 const Analytics = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
-    totalLearners: 0,
-    activeCourses: 0,
-    messagesSent: 0,
-    messagesByPeriod: {
-      daily: [],
-      weekly: [],
-      monthly: []
-    },
-    learnersPerCourse: [],
-    courseCompletionRates: []
-  });
+  const [totalLearners, setTotalLearners] = useState(0);
+  const [totalCourses, setTotalCourses] = useState(0);
+  const [learnersPerCourse, setLearnersPerCourse] = useState<{ name: string, value: number }[]>([]);
+  const [courseCompletionRates, setCourseCompletionRates] = useState<{ name: string, rate: number }[]>([]);
+  const [coursesByLanguage, setCoursesByLanguage] = useState<{ language: string, value: number }[]>([]);
+  const [learnersByStatus, setLearnersByStatus] = useState<{ status: string, value: number }[]>([]);
+  const [coursesByDay, setCoursesByDay] = useState<{ day: number, value: number }[]>([]);
+  const [languagesCount, setLanguagesCount] = useState(0);
+  const [languagesPie, setLanguagesPie] = useState<{ language: string, value: number }[]>([]);
 
   useEffect(() => {
-    const fetchAnalyticsData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Fetch total learners count
-        const { count: learnersCount, error: learnersError } = await supabase
-          .from('learners')
-          .select('*', { count: 'exact', head: true });
-          
-        if (learnersError) {
-          console.error('Error fetching learners count:', learnersError);
+    const fetchAnalytics = async () => {
+      setIsLoading(true);
+
+      // Total learners
+      const { count: learnersCount, data: learnersData } = await supabase
+        .from('learners')
+        .select('*', { count: 'exact', head: false });
+      setTotalLearners(learnersCount || 0);
+
+      // Learners by status (active/inactive)
+      const statusMap = new Map();
+      learnersData?.forEach(row => {
+        const status = row.status || 'unknown';
+        statusMap.set(status, (statusMap.get(status) || 0) + 1);
+      });
+      setLearnersByStatus(Array.from(statusMap.entries()).map(([status, value]) => ({ status, value })));
+
+      // Total courses
+      const { count: coursesCount, data: coursesData } = await supabase
+        .from('courses')
+        .select('*', { count: 'exact', head: false });
+      setTotalCourses(coursesCount || 0);
+
+      // Courses by day (distribution)
+      const dayMap = new Map();
+      coursesData?.forEach(row => {
+        const day = row.day || 1;
+        dayMap.set(day, (dayMap.get(day) || 0) + 1);
+      });
+      setCoursesByDay(Array.from(dayMap.entries()).map(([day, value]) => ({ day, value })));
+
+      // Learners per course
+      const { data: learnersPerCourseRaw } = await supabase
+        .from('course_progress')
+        .select('course_id, course_name');
+      const learnersPerCourseMap = new Map();
+      learnersPerCourseRaw?.forEach(row => {
+        if (!learnersPerCourseMap.has(row.course_name)) {
+          learnersPerCourseMap.set(row.course_name, 0);
         }
-        
-        // Fetch active courses count
-        const { count: coursesCount, error: coursesError } = await supabase
-          .from('courses')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'active');
-          
-        if (coursesError) {
-          console.error('Error fetching courses count:', coursesError);
+        learnersPerCourseMap.set(row.course_name, learnersPerCourseMap.get(row.course_name) + 1);
+      });
+      setLearnersPerCourse(Array.from(learnersPerCourseMap.entries()).map(([name, value]) => ({ name, value })));
+
+      // Course completion rates
+      const { data: courseProgress } = await supabase
+        .from('course_progress')
+        .select('course_name, status');
+      const completionMap = new Map();
+      courseProgress?.forEach(row => {
+        if (!completionMap.has(row.course_name)) {
+          completionMap.set(row.course_name, { total: 0, completed: 0 });
         }
-        
-        // Fetch messages count
-        const { count: messagesCount, error: messagesError } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true });
-          
-        if (messagesError) {
-          console.error('Error fetching messages count:', messagesError);
-        }
-        
-        // Fetch messages data for different periods
-        // Note: In a real-world scenario, you might want to use SQL aggregation queries
-        // For now, we'll just create some simulated data based on the actual count
-        const dailyData = generateTimeSeriesData(7, messagesCount || 0, 'day');
-        const weeklyData = generateTimeSeriesData(4, messagesCount || 0, 'week');
-        const monthlyData = generateTimeSeriesData(6, messagesCount || 0, 'month');
-        
-        // Fetch courses with learner counts
-        const { data: coursesWithLearners, error: coursesWithLearnersError } = await supabase
-          .from('courses')
-          .select(`
-            id,
-            name,
-            learner_courses:learner_courses(learner_id)
-          `)
-          .eq('status', 'active');
-          
-        if (coursesWithLearnersError) {
-          console.error('Error fetching courses with learners:', coursesWithLearnersError);
-        }
-        
-        // Process learners per course data
-        const learnersPerCourse = coursesWithLearners
-          ? coursesWithLearners.map(course => ({
-              name: course.name,
-              value: Array.isArray(course.learner_courses) ? course.learner_courses.length : 0
-            }))
-              .filter(course => course.value > 0) // Only include courses with learners
-              .sort((a, b) => b.value - a.value) // Sort by learner count
-              .slice(0, 5) // Take top 5
-          : [];
-          
-        // If there are no courses with learners, add a placeholder
-        if (learnersPerCourse.length === 0 && (coursesCount || 0) > 0) {
-          learnersPerCourse.push({ name: 'No enrollments yet', value: 1 });
-        }
-        
-        // Fetch course completion rates
-        const { data: learnerCourses, error: learnerCoursesError } = await supabase
-          .from('learner_courses')
-          .select(`
-            course_id,
-            completion_percentage,
-            course:course_id(name)
-          `);
-          
-        if (learnerCoursesError) {
-          console.error('Error fetching learner courses:', learnerCoursesError);
-        }
-        
-        // Calculate completion rates per course
-        const courseCompletionMap = new Map();
-        
-        if (learnerCourses) {
-          learnerCourses.forEach(lc => {
-            const courseName = lc.course?.name || 'Unknown Course';
-            if (!courseCompletionMap.has(courseName)) {
-              courseCompletionMap.set(courseName, { 
-                total: 0, 
-                sum: 0 
-              });
-            }
-            
-            const courseData = courseCompletionMap.get(courseName);
-            courseData.total += 1;
-            courseData.sum += lc.completion_percentage || 0;
-            courseCompletionMap.set(courseName, courseData);
-          });
-        }
-        
-        // Convert to array and calculate average
-        const courseCompletionRates = Array.from(courseCompletionMap.entries())
-          .map(([name, data]) => ({
-            name,
-            rate: Math.round(data.sum / data.total)
-          }))
-          .filter(course => !isNaN(course.rate)) // Filter out any NaN values
-          .sort((a, b) => b.rate - a.rate); // Sort by completion rate
-          
-        // If there are no course completion rates, add placeholders
-        if (courseCompletionRates.length === 0 && (coursesCount || 0) > 0) {
-          courseCompletionRates.push(
-            { name: 'No completion data yet', rate: 0 }
-          );
-        }
-        
-        setAnalyticsData({
-          totalLearners: learnersCount || 0,
-          activeCourses: coursesCount || 0,
-          messagesSent: messagesCount || 0,
-          messagesByPeriod: {
-            daily: dailyData,
-            weekly: weeklyData,
-            monthly: monthlyData
-          },
-          learnersPerCourse,
-          courseCompletionRates
+        const entry = completionMap.get(row.course_name);
+        entry.total += 1;
+        if (row.status === 'completed') entry.completed += 1;
+        completionMap.set(row.course_name, entry);
+      });
+      setCourseCompletionRates(Array.from(completionMap.entries()).map(([name, { total, completed }]) => ({
+        name,
+        rate: total ? Math.round((completed / total) * 100) : 0,
+      })));
+
+      // Courses by language (join courses.request_id = registration_requests.request_id)
+      const { data: coursesWithLang } = await supabase
+        .from('courses')
+        .select('request_id');
+      const requestIds = coursesWithLang?.map(c => c.request_id).filter(Boolean);
+
+      let languageMap = new Map();
+      if (requestIds && requestIds.length > 0) {
+        const { data: regRequests } = await supabase
+          .from('registration_requests')
+          .select('request_id, language')
+          .in('request_id', requestIds);
+
+        regRequests?.forEach(row => {
+          const lang = row.language || 'Unknown';
+          languageMap.set(lang, (languageMap.get(lang) || 0) + 1);
         });
-      } catch (error) {
-        console.error('Error fetching analytics data:', error);
-      } finally {
-        setIsLoading(false);
       }
+      setCoursesByLanguage(Array.from(languageMap.entries()).map(([language, value]) => ({ language, value })));
+
+      // Fetch languages from registration_requests (FIXED LOGIC)
+      const { data: regRequests, error: langError } = await supabase
+        .from('registration_requests')
+        .select('language');
+
+        console.log(regRequests);
+        console.log(langError);
+        
+        
+
+      if (langError) {
+        setLanguagesCount(0);
+        setLanguagesPie([]);
+      } else if (regRequests && regRequests.length > 0) {
+        // Count unique languages and their occurrences
+        const langMap = new Map<string, number>();
+        regRequests.forEach(row => {
+          const lang = (row.language || 'Unknown').trim();
+          langMap.set(lang, (langMap.get(lang) || 0) + 1);
+        });
+        setLanguagesCount(langMap.size);
+        setLanguagesPie(Array.from(langMap.entries()).map(([language, value]) => ({ language, value })));
+      } else {
+        setLanguagesCount(0);
+        setLanguagesPie([]);
+      }
+
+      setIsLoading(false);
     };
-    
-    fetchAnalyticsData();
+
+    fetchAnalytics();
   }, []);
 
-  // Helper to generate time series data
-  const generateTimeSeriesData = (numPoints: number, total: number, period: 'day' | 'week' | 'month') => {
-    const result = [];
-    const baseValue = Math.max(1, Math.floor(total / numPoints));
-    
-    for (let i = 0; i < numPoints; i++) {
-      let label = '';
-      if (period === 'day') {
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const dayIndex = (new Date().getDay() - i) % 7;
-        label = days[dayIndex >= 0 ? dayIndex : dayIndex + 7];
-      } else if (period === 'week') {
-        label = `Week ${numPoints - i}`;
-      } else {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const monthIndex = (new Date().getMonth() - i) % 12;
-        label = months[monthIndex >= 0 ? monthIndex : monthIndex + 12];
-      }
-      
-      // Create a slightly random value based on the baseValue
-      const randomFactor = 0.5 + Math.random();
-      const count = Math.floor(baseValue * randomFactor);
-      
-      result.unshift({ date: label, count });
-    }
-    
-    return result;
-  };
-
   return (
-    <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
+    <div className="w-full min-h-screen py-6 px-6 md:px-8 bg-gray-100 page-transition">
       <div className="max-w-[1400px] mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground mt-1">Track your teaching platform performance</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Analytics</h1>
+          <p className="text-gray-600 mt-1">Track your teaching platform performance</p>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2">Loading analytics data...</span>
+            <span className="ml-2 text-gray-600">Loading analytics data...</span>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <DashboardCard
                 title="Total Learners"
-                value={analyticsData.totalLearners.toString()}
+                value={totalLearners.toString()}
                 icon={<Users size={24} />}
-                trend={{ value: 0, direction: 'up', label: 'current count' }}
               />
               <DashboardCard
-                title="Active Courses"
-                value={analyticsData.activeCourses.toString()}
+                title="Total Courses"
+                value={totalCourses.toString()}
                 icon={<BookOpen size={24} />}
-                trend={{ value: 0, direction: 'up', label: 'current count' }}
               />
               <DashboardCard
-                title="Messages Sent"
-                value={analyticsData.messagesSent.toString()}
-                icon={<MessageCircle size={24} />}
-                trend={{ value: 0, direction: 'up', label: 'current count' }}
+                title="Languages"
+                value={languagesCount.toString()}
+                icon={<Languages size={24} />}
               />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <Card className="glass-card">
+              {/* Learners Per Course Pie */}
+              <Card className="bg-white border border-gray-200">
                 <CardHeader>
-                  <CardTitle>Messages Sent</CardTitle>
-                  <CardDescription>Message volume over time</CardDescription>
+                  <CardTitle className="text-gray-900">Learners Per Course</CardTitle>
+                  <CardDescription className="text-gray-600">Distribution of learners across courses</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="daily">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="daily">Daily</TabsTrigger>
-                      <TabsTrigger value="weekly">Weekly</TabsTrigger>
-                      <TabsTrigger value="monthly">Monthly</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="daily" className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={analyticsData.messagesByPeriod.daily}
-                          margin={{
-                            top: 20,
-                            right: 30,
-                            left: 20,
-                            bottom: 5,
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                          <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                              borderRadius: '0.5rem',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                              border: 'none'
-                            }} 
-                          />
-                          <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </TabsContent>
-                    <TabsContent value="weekly" className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={analyticsData.messagesByPeriod.weekly}
-                          margin={{
-                            top: 20,
-                            right: 30,
-                            left: 20,
-                            bottom: 5,
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                          <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                              borderRadius: '0.5rem',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                              border: 'none'
-                            }} 
-                          />
-                          <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </TabsContent>
-                    <TabsContent value="monthly" className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={analyticsData.messagesByPeriod.monthly}
-                          margin={{
-                            top: 20,
-                            right: 30,
-                            left: 20,
-                            bottom: 5,
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                          <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                              borderRadius: '0.5rem',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                              border: 'none'
-                            }} 
-                          />
-                          <Bar dataKey="count" fill="#ec4899" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
-
-              <Card className="glass-card">
-                <CardHeader>
-                  <CardTitle>Learners Per Course</CardTitle>
-                  <CardDescription>Distribution of learners across courses</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {analyticsData.learnersPerCourse.length === 0 ? (
-                    <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                  {learnersPerCourse.length === 0 ? (
+                    <div className="flex items-center justify-center h-[300px] text-gray-400">
                       No data available yet
                     </div>
                   ) : (
@@ -365,7 +192,7 @@ const Analytics = () => {
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={analyticsData.learnersPerCourse}
+                            data={learnersPerCourse}
                             cx="50%"
                             cy="50%"
                             innerRadius={70}
@@ -374,18 +201,66 @@ const Analytics = () => {
                             dataKey="value"
                             label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                           >
-                            {analyticsData.learnersPerCourse.map((entry, index) => (
+                            {learnersPerCourse.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip 
+                          <Tooltip
                             formatter={(value) => [`${value} learners`, 'Enrolled']}
-                            contentStyle={{ 
+                            contentStyle={{
                               backgroundColor: 'rgba(255, 255, 255, 0.8)',
                               borderRadius: '0.5rem',
                               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                              border: 'none'
-                            }} 
+                              border: 'none',
+                              color: '#111827'
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Languages Pie */}
+              <Card className="bg-white border border-gray-200">
+                <CardHeader>
+                  <CardTitle className="text-gray-900">Languages Distribution</CardTitle>
+                  <CardDescription className="text-gray-600">Proportion of languages in registration requests</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {languagesPie.length === 0 ? (
+                    <div className="flex items-center justify-center h-[300px] text-gray-400">
+                      No data available yet
+                    </div>
+                  ) : (
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={languagesPie}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={70}
+                            outerRadius={120}
+                            paddingAngle={5}
+                            dataKey="value"
+                            nameKey="language"
+                            label={({ language, percent }) => `${language} ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {languagesPie.map((entry, index) => (
+                              <Cell key={`cell-lang-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value) => [`${value} requests`, 'Requests']}
+                            contentStyle={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                              borderRadius: '0.5rem',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                              border: 'none',
+                              color: '#111827'
+                            }}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -395,43 +270,120 @@ const Analytics = () => {
               </Card>
             </div>
 
-            <Card className="glass-card mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* Learners by Status Bar */}
+              <Card className="bg-white border border-gray-200">
+                <CardHeader>
+                  <CardTitle className="text-gray-900">Learners by Status</CardTitle>
+                  <CardDescription className="text-gray-600">Active vs Inactive Learners</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {learnersByStatus.length === 0 ? (
+                    <div className="flex items-center justify-center h-[300px] text-gray-400">
+                      No data available yet
+                    </div>
+                  ) : (
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={learnersByStatus}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis dataKey="status" />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                              borderRadius: '0.5rem',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                              border: 'none',
+                              color: '#111827'
+                            }}
+                          />
+                          <Legend />
+                          <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Courses by Day Bar */}
+              <Card className="bg-white border border-gray-200">
+                <CardHeader>
+                  <CardTitle className="text-gray-900">Courses by Day</CardTitle>
+                  <CardDescription className="text-gray-600">Distribution of courses by day count</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {coursesByDay.length === 0 ? (
+                    <div className="flex items-center justify-center h-[300px] text-gray-400">
+                      No data available yet
+                    </div>
+                  ) : (
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={coursesByDay}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis dataKey="day" />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                              borderRadius: '0.5rem',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                              border: 'none',
+                              color: '#111827'
+                            }}
+                          />
+                          <Legend />
+                          <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Course Completion Rate Pie */}
+            <Card className="bg-white border border-gray-200 mb-6">
               <CardHeader>
-                <CardTitle>Course Completion Rate</CardTitle>
-                <CardDescription>Percentage of learners who complete each course</CardDescription>
+                <CardTitle className="text-gray-900">Course Completion Rate</CardTitle>
+                <CardDescription className="text-gray-600">Percentage of learners who complete each course</CardDescription>
               </CardHeader>
               <CardContent>
-                {analyticsData.courseCompletionRates.length === 0 ? (
-                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                {courseCompletionRates.length === 0 ? (
+                  <div className="flex items-center justify-center h-[300px] text-gray-400">
                     No completion data available yet
                   </div>
                 ) : (
                   <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        layout="vertical"
-                        data={analyticsData.courseCompletionRates}
-                        margin={{
-                          top: 20,
-                          right: 30,
-                          left: 150,
-                          bottom: 5,
-                        }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={false} />
-                        <XAxis type="number" domain={[0, 100]} unit="%" />
-                        <YAxis type="category" dataKey="name" width={140} />
-                        <Tooltip 
+                      <PieChart>
+                        <Pie
+                          data={courseCompletionRates}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={70}
+                          outerRadius={120}
+                          paddingAngle={5}
+                          dataKey="rate"
+                          label={({ name, rate }) => `${name} ${rate}%`}
+                        >
+                          {courseCompletionRates.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
                           formatter={(value) => [`${value}%`, 'Completion Rate']}
-                          contentStyle={{ 
+                          contentStyle={{
                             backgroundColor: 'rgba(255, 255, 255, 0.8)',
                             borderRadius: '0.5rem',
                             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                            border: 'none'
-                          }} 
+                            border: 'none',
+                            color: '#111827'
+                          }}
                         />
-                        <Bar dataKey="rate" fill="#84cc16" radius={[0, 4, 4, 0]} />
-                      </BarChart>
+                      </PieChart>
                     </ResponsiveContainer>
                   </div>
                 )}

@@ -331,12 +331,12 @@ const Courses = () => {
   }
 
   return (
-    <div className="w-full min-h-screen py-6 px-6 md:px-8 page-transition">
+    <div className="w-full min-h-screen py-6 px-6 md:px-8 bg-gray-100 page-transition">
       <div className="max-w-[1400px] mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Courses</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Courses</h1>
+            <p className="text-gray-600 mt-1">
               Manage your course library
             </p>
           </div>
@@ -360,18 +360,18 @@ const Courses = () => {
           </TabsList>
         </Tabs>
 
-        <div className="rounded-lg border bg-card mb-8">
+        <div className="rounded-lg border border-gray-200 bg-white mb-8">
           <div className="p-4 flex flex-col sm:flex-row gap-4 justify-between">
             <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Search courses..."
-                className="pl-8 glass-input"
+                className="pl-8 bg-white text-gray-900"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="flex items-center text-sm text-muted-foreground">
+            <div className="flex items-center text-sm text-gray-500">
               {displayedGroups.length} courses
             </div>
           </div>
@@ -384,19 +384,19 @@ const Courses = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
             </div>
           ) : displayedGroups.length === 0 ? (
-            <div className="col-span-full flex justify-center items-center h-64 text-muted-foreground">
+            <div className="col-span-full flex justify-center items-center h-64 text-gray-400">
               {searchQuery ? 'No courses match your search' : 'No courses found'}
             </div>
           ) : (
             displayedGroups.map(([key, courses]) => (
               <Card
                 key={key}
-                className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                className="overflow-hidden bg-white cursor-pointer hover:shadow-lg transition-shadow border border-gray-200"
                 onClick={() => handleCourseCardClick(courses)}
               >
-                <div className="bg-gradient-to-r from-primary/15 to-primary/5 p-4 border-b">
+                <div className="bg-gray-50 p-4 border-b border-gray-100">
                   <div className="flex justify-between items-start mb-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                       <BookOpen size={14} />
                     </div>
                     <DropdownMenu>
@@ -429,7 +429,6 @@ const Courses = () => {
                             </>
                           )}
                         </DropdownMenuItem>
-
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
@@ -463,13 +462,13 @@ const Courses = () => {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <h3 className="font-medium text-lg line-clamp-1">{courses[0].course_name}</h3>
+                  <h3 className="font-medium text-lg line-clamp-1 text-gray-900">{courses[0].course_name}</h3>
                 </div>
                 <CardContent className="p-4">
-                  <div className="text-sm text-muted-foreground mb-4 line-clamp-2 h-10">
+                  <div className="text-sm text-gray-600 mb-4 line-clamp-2 h-10">
                     {courses.length} day course with modules
                   </div>
-                  <div className="flex justify-between items-center text-xs text-muted-foreground">
+                  <div className="flex justify-between items-center text-xs text-gray-500">
                     <div className="flex items-center gap-2">
                       <span>{courses.length} days</span>
                     </div>

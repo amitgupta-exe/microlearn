@@ -1,109 +1,228 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
-CREATE TABLE public.course_generation_requests (
-  request_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  course_title text NOT NULL,
-  topic text NOT NULL,
-  goal text NOT NULL,
-  style text NOT NULL,
-  language text NOT NULL,
-  created_at timestamp with time zone DEFAULT now(),
-  created_by uuid,
-  CONSTRAINT course_generation_requests_pkey PRIMARY KEY (request_id)
-);
-CREATE TABLE public.course_progress (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  learner_id uuid,
-  learner_name text,
-  course_id uuid,
-  course_name text,
-  status text CHECK (status = ANY (ARRAY['assigned'::text, 'started'::text, 'completed'::text, 'suspended'::text])),
-  current_day integer DEFAULT 1,
-  last_reminder_sent_at timestamp without time zone,
-  started_at timestamp without time zone,
-  completed_at timestamp without time zone,
-  progress_percent integer DEFAULT 0,
-  last_module_completed_at timestamp without time zone,
-  reminder_count integer DEFAULT 0,
-  feedback text,
-  notes text,
-  is_active boolean DEFAULT true,
-  day1_module1 boolean DEFAULT false,
-  day1_module2 boolean DEFAULT false,
-  day1_module3 boolean DEFAULT false,
-  day2_module1 boolean DEFAULT false,
-  day2_module2 boolean DEFAULT false,
-  day2_module3 boolean DEFAULT false,
-  day3_module1 boolean DEFAULT false,
-  day3_module2 boolean DEFAULT false,
-  day3_module3 boolean DEFAULT false,
-  phone_number text,
-  reminder_count_day1 integer DEFAULT 0,
-  reminder_count_day2 integer DEFAULT 0,
-  reminder_count_day3 integer DEFAULT 0,
-  created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT course_progress_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.courses (
-  id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  course_name text NOT NULL,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  created_by uuid NOT NULL,
-  visibility text NOT NULL DEFAULT 'private'::text CHECK (visibility = ANY (ARRAY['public'::text, 'private'::text])),
-  day integer NOT NULL DEFAULT 1,
-  module_1 text,
-  module_2 text,
-  module_3 text,
-  origin text NOT NULL DEFAULT 'microlearn_manual'::text CHECK (origin = ANY (ARRAY['migrated_from_airtable'::text, 'alfred'::text, 'microlearn_manual'::text, 'microlearn_cop'::text])),
-  request_id uuid,
-  CONSTRAINT courses_pkey PRIMARY KEY (id),
-  CONSTRAINT courses_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.learners (
-  id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  name text NOT NULL,
-  email text NOT NULL,
-  phone text NOT NULL,
-  status text NOT NULL CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text])),
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  created_by uuid NOT NULL,
-  assigned_course_id uuid,
-  CONSTRAINT learners_pkey PRIMARY KEY (id),
-  CONSTRAINT learners_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
-  CONSTRAINT learners_assigned_course_id_fkey FOREIGN KEY (assigned_course_id) REFERENCES public.courses(id)
-);
-CREATE TABLE public.registration_requests (
-  request_id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  name text NOT NULL,
-  number text NOT NULL,
-  topic text NOT NULL,
-  goal text NOT NULL,
-  style text NOT NULL,
-  language text NOT NULL,
-  generated boolean NOT NULL DEFAULT false,
-  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
-  approval_status text DEFAULT 'pending'::text CHECK (approval_status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])),
-  CONSTRAINT registration_requests_pkey PRIMARY KEY (request_id)
-);
-CREATE TABLE public.users (
-  id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  email text NOT NULL UNIQUE,
-  name text NOT NULL,
-  avatar_url text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  phone text UNIQUE,
-  course_id text,
-  next_day integer DEFAULT 1,
-  day_completed integer DEFAULT 0,
-  next_module integer DEFAULT 1,
-  module_completed integer DEFAULT 0,
-  last_msg text,
-  question_responses text,
-  interactive_responses text,
-  responses text,
-  CONSTRAINT users_pkey PRIMARY KEY (id)
-);
+create table public.course_generation_requests (
+  request_id uuid not null default gen_random_uuid (),
+  course_title text not null,
+  topic text not null,
+  goal text not null,
+  style text not null,
+  language text not null,
+  created_at timestamp with time zone null default now(),
+  created_by uuid null,
+  constraint course_generation_requests_pkey primary key (request_id)
+) TABLESPACE pg_default;
+
+
+create table public.course_progress (
+  id uuid not null default gen_random_uuid (),
+  learner_id uuid null,
+  learner_name text null,
+  course_id uuid null,
+  course_name text null,
+  status text null,
+  current_day integer null default 1,
+  last_reminder_sent_at timestamp without time zone null,
+  started_at timestamp without time zone null,
+  completed_at timestamp without time zone null,
+  progress_percent integer null default 0,
+  last_module_completed_at timestamp without time zone null,
+  reminder_count integer null default 0,
+  feedback text null,
+  notes text null,
+  is_active boolean null default true,
+  day1_module1 boolean null default false,
+  day1_module2 boolean null default false,
+  day1_module3 boolean null default false,
+  day2_module1 boolean null default false,
+  day2_module2 boolean null default false,
+  day2_module3 boolean null default false,
+  day3_module1 boolean null default false,
+  day3_module2 boolean null default false,
+  day3_module3 boolean null default false,
+  phone_number text null,
+  reminder_count_day1 integer null default 0,
+  reminder_count_day2 integer null default 0,
+  reminder_count_day3 integer null default 0,
+  created_at timestamp with time zone null default now(),
+  constraint course_progress_pkey primary key (id),
+  constraint course_progress_status_check check (
+    (
+      status = any (
+        array[
+          'assigned'::text,
+          'started'::text,
+          'completed'::text,
+          'suspended'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+create unique INDEX IF not exists unique_active_progress_per_learner on public.course_progress using btree (learner_id, status) TABLESPACE pg_default
+where
+  (
+    status = any (array['assigned'::text, 'started'::text])
+  );
+
+create unique INDEX IF not exists unique_active_progress_per_phone on public.course_progress using btree (phone_number) TABLESPACE pg_default
+where
+  (
+    status = any (array['assigned'::text, 'started'::text])
+  );
+
+
+
+
+
+create table public.courses (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  course_name text not null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  created_by uuid not null,
+  visibility text not null default 'private'::text,
+  day integer not null default 1,
+  module_1 text null,
+  module_2 text null,
+  module_3 text null,
+  origin text not null default 'microlearn_manual'::text,
+  request_id uuid null,
+  status text not null default 'approved'::text,
+  constraint courses_pkey primary key (id),
+  constraint courses_created_by_fkey foreign KEY (created_by) references users (id),
+  constraint courses_origin_check check (
+    (
+      origin = any (
+        array[
+          'migrated_from_airtable'::text,
+          'alfred'::text,
+          'microlearn_manual'::text,
+          'microlearn_cop'::text
+        ]
+      )
+    )
+  ),
+  constraint courses_status_check check (
+    (
+      status = any (
+        array[
+          'pending'::text,
+          'approved'::text,
+          'rejected'::text
+        ]
+      )
+    )
+  ),
+  constraint courses_visibility_check check (
+    (
+      visibility = any (array['public'::text, 'private'::text])
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_courses_created_by on public.courses using btree (created_by) TABLESPACE pg_default;
+
+
+
+
+create table public.learners (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  name text not null,
+  email text not null,
+  phone text not null,
+  status text not null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  created_by uuid not null,
+  assigned_course_id uuid null,
+  constraint learners_pkey primary key (id),
+  constraint learners_assigned_course_id_fkey foreign KEY (assigned_course_id) references courses (id) on delete set null,
+  constraint learners_created_by_fkey foreign KEY (created_by) references users (id),
+  constraint learners_status_check check (
+    (
+      status = any (array['active'::text, 'inactive'::text])
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_learners_created_by on public.learners using btree (created_by) TABLESPACE pg_default;
+
+create trigger on_learner_created
+after INSERT on learners for EACH row
+execute FUNCTION send_learner_welcome_message ();
+
+create table public.messages_sent (
+  id uuid not null default gen_random_uuid (),
+  user_id uuid not null,
+  learner_id uuid null,
+  message_type text null,
+  created_at timestamp with time zone null default now(),
+  constraint messages_sent_pkey primary key (id),
+  constraint messages_sent_learner_id_fkey foreign KEY (learner_id) references learners (id),
+  constraint messages_sent_user_id_fkey foreign KEY (user_id) references auth.users (id)
+) TABLESPACE pg_default;
+
+
+
+create table public.registration_requests (
+  request_id uuid not null default extensions.uuid_generate_v4 (),
+  name text not null,
+  number text not null,
+  topic text not null,
+  goal text not null,
+  style text not null,
+  language text not null,
+  generated boolean not null default false,
+  created_at timestamp with time zone null default timezone ('utc'::text, now()),
+  approval_status text null default 'pending'::text,
+  constraint registration_requests_pkey primary key (request_id),
+  constraint approval_status_check check (
+    (
+      approval_status = any (
+        array[
+          'approved'::text,
+          'rejected'::text,
+          'pending'::text
+        ]
+      )
+    )
+  ),
+  constraint registration_requests_approval_status_check check (
+    (
+      approval_status = any (
+        array[
+          'pending'::text,
+          'approved'::text,
+          'rejected'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+
+create table public.users (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  email text not null,
+  name text not null,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  phone text null,
+  role text not null default 'learner'::text,
+  constraint users_pkey primary key (id),
+  constraint users_email_key unique (email),
+  constraint users_phone_key unique (phone),
+  constraint users_role_check check (
+    (
+      role = any (
+        array[
+          'superadmin'::text,
+          'admin'::text,
+          'learner'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
