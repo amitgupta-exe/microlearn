@@ -73,15 +73,14 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (currentSession?.user && mounted) {
           console.log('👤 Found authenticated admin user:', currentSession.user.id, currentSession.user.email);
           
-          // Try to get user profile from users table first, then profiles table
-          let profile = null;
-          
-          console.log('🔍 Fetching user profile from users table...');
+          // Try to get user profile from users table
           const { data: userProfile, error: userError } = await supabase
             .from('users')
             .select('*')
             .eq('email', currentSession.user.email)
             .single();
+          
+          let profile: User;
           
           if (userProfile) {
             profile = {
@@ -93,40 +92,37 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               created_at: userProfile.created_at,
               updated_at: userProfile.updated_at,
             };
-            console.log('✅ Found user in users table:', profile);
+            console.log('✅ Found existing user in users table:', profile);
           } else {
-            console.log('⚠️ User not found in users table, checking profiles...');
+            // This is an existing Supabase user who doesn't exist in our users table yet
+            // Create them as an admin (preserving their Supabase auth ID)
+            profile = {
+              id: currentSession.user.id,
+              name: currentSession.user.user_metadata?.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
+              email: currentSession.user.email || '',
+              phone: null,
+              role: 'admin',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
             
-            // Fallback to profiles table
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', currentSession.user.id)
-              .single();
+            console.log('🔧 Creating admin profile for existing Supabase user:', profile);
             
-            if (profileData) {
-              profile = {
-                id: profileData.id,
-                name: profileData.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
-                email: currentSession.user.email || '',
-                phone: null,
-                role: 'admin',
-                created_at: profileData.created_at,
-                updated_at: profileData.updated_at,
-              };
-              console.log('✅ Found user in profiles table:', profile);
+            // Insert into users table
+            const { error: createError } = await supabase
+              .from('users')
+              .insert({
+                id: profile.id,
+                name: profile.name,
+                email: profile.email,
+                phone: profile.phone,
+                role: profile.role,
+              });
+            
+            if (createError) {
+              console.warn('⚠️ Could not create user in users table:', createError);
             } else {
-              // Create basic admin profile for authenticated user
-              profile = {
-                id: currentSession.user.id,
-                name: currentSession.user.user_metadata?.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
-                email: currentSession.user.email || '',
-                phone: null,
-                role: 'admin',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              };
-              console.log('🔧 Created basic admin profile:', profile);
+              console.log('✅ Successfully created admin user in users table');
             }
           }
           
@@ -160,7 +156,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (event === 'SIGNED_IN' && currentSession?.user) {
           console.log('✅ User signed in via Supabase:', currentSession.user.email);
           
-          // Try to get existing user from users table
+          // Check if user exists in our users table
           const { data: existingUser } = await supabase
             .from('users')
             .select('*')
@@ -181,7 +177,8 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             };
             console.log('✅ Found existing user:', userProfile);
           } else {
-            // Create new user in users table
+            // This should rarely happen now, but just in case
+            console.log('⚠️ User not found in users table, creating as admin');
             const newUser = {
               id: currentSession.user.id,
               name: currentSession.user.user_metadata?.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
@@ -213,7 +210,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 created_at: createdUser.created_at,
                 updated_at: createdUser.updated_at,
               };
-              console.log('✅ Created new user:', userProfile);
+              console.log('✅ Created new admin user:', userProfile);
             }
           }
           
@@ -272,25 +269,6 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       if (data.user) {
         console.log('✅ User created successfully:', data.user.email);
-        
-        // Create user in our users table
-        const newUser = {
-          id: data.user.id,
-          name: fullName,
-          email: email,
-          phone: null,
-          role: 'admin' as UserRole,
-        };
-        
-        const { error: userCreateError } = await supabase
-          .from('users')
-          .insert(newUser);
-        
-        if (userCreateError) {
-          console.warn('⚠️ Could not create user in users table:', userCreateError);
-        } else {
-          console.log('✅ User added to users table');
-        }
         
         toast({
           title: 'Account Created',
@@ -362,9 +340,18 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         
         if (error) {
           console.error('❌ Supabase login error:', error);
+          
+          // Provide more specific error messages
+          let errorMessage = 'Login failed. Please check your credentials.';
+          if (error.message.includes('Invalid login credentials')) {
+            errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+          } else if (error.message.includes('Email not confirmed')) {
+            errorMessage = 'Please confirm your email address before signing in.';
+          }
+          
           toast({
             title: 'Login Failed',
-            description: `${error.message}. Please check your email and password.`,
+            description: errorMessage,
             variant: 'destructive',
           });
           return { error };
@@ -372,10 +359,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         
         if (data.user) {
           console.log('✅ Supabase login successful for:', data.user.email);
-          toast({
-            title: 'Welcome!',
-            description: `Successfully signed in as ${data.user.email}`,
-          });
+          // The user profile will be set by the onAuthStateChange listener
         }
         
         return { error: null };
