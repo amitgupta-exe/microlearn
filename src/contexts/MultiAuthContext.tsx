@@ -66,63 +66,74 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         
         if (sessionError) {
           console.error('❌ Supabase session error:', sessionError);
-          toast({
-            title: 'Authentication Error',
-            description: `Supabase error: ${sessionError.message}`,
-            variant: 'destructive',
-          });
         }
         
         console.log('📋 Current Supabase session:', currentSession);
         
         if (currentSession?.user && mounted) {
-          console.log('👤 Found authenticated user:', currentSession.user.id, currentSession.user.email);
+          console.log('👤 Found authenticated admin user:', currentSession.user.id, currentSession.user.email);
           
-          // Try to get user profile from users table
-          console.log('🔍 Fetching user profile from database...');
-          const { data: profile, error: profileError } = await supabase
+          // Try to get user profile from users table first, then profiles table
+          let profile = null;
+          
+          console.log('🔍 Fetching user profile from users table...');
+          const { data: userProfile, error: userError } = await supabase
             .from('users')
             .select('*')
-            .eq('id', currentSession.user.id)
+            .eq('email', currentSession.user.email)
             .single();
           
-          console.log('📊 User profile query result:', { profile, error: profileError });
+          if (userProfile) {
+            profile = {
+              id: userProfile.id,
+              name: userProfile.name,
+              email: userProfile.email,
+              phone: userProfile.phone,
+              role: (userProfile.role as UserRole) || 'admin',
+              created_at: userProfile.created_at,
+              updated_at: userProfile.updated_at,
+            };
+            console.log('✅ Found user in users table:', profile);
+          } else {
+            console.log('⚠️ User not found in users table, checking profiles...');
+            
+            // Fallback to profiles table
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', currentSession.user.id)
+              .single();
+            
+            if (profileData) {
+              profile = {
+                id: profileData.id,
+                name: profileData.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
+                email: currentSession.user.email || '',
+                phone: null,
+                role: 'admin',
+                created_at: profileData.created_at,
+                updated_at: profileData.updated_at,
+              };
+              console.log('✅ Found user in profiles table:', profile);
+            } else {
+              // Create basic admin profile for authenticated user
+              profile = {
+                id: currentSession.user.id,
+                name: currentSession.user.user_metadata?.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
+                email: currentSession.user.email || '',
+                phone: null,
+                role: 'admin',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              };
+              console.log('🔧 Created basic admin profile:', profile);
+            }
+          }
           
           if (profile && mounted) {
-            const userProfile: User = {
-              id: profile.id,
-              name: profile.name,
-              email: profile.email,
-              phone: profile.phone,
-              role: profile.role as UserRole,
-              created_at: profile.created_at,
-              updated_at: profile.updated_at,
-            };
-            
-            console.log('✅ Setting user profile from database:', userProfile);
-            setUser(userProfile);
-            setUserProfile(userProfile);
-            setUserRole(profile.role as UserRole);
-            setSession(currentSession);
-          } else if (profileError && mounted) {
-            console.log('⚠️ No profile found, this might be expected for new users');
-            console.log('Profile error details:', profileError);
-            
-            // For existing authenticated users without profiles, create a basic profile
-            const basicUserProfile: User = {
-              id: currentSession.user.id,
-              name: currentSession.user.user_metadata?.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
-              email: currentSession.user.email || '',
-              phone: null,
-              role: 'admin',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-            
-            console.log('🔧 Setting basic user profile for authenticated user:', basicUserProfile);
-            setUser(basicUserProfile);
-            setUserProfile(basicUserProfile);
-            setUserRole('admin');
+            setUser(profile);
+            setUserProfile(profile);
+            setUserRole(profile.role);
             setSession(currentSession);
           }
         } else {
@@ -130,11 +141,6 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       } catch (error) {
         console.error('💥 Auth initialization error:', error);
-        toast({
-          title: 'Authentication Error',
-          description: `Failed to initialize auth: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          variant: 'destructive',
-        });
       } finally {
         if (mounted) {
           console.log('✅ Auth initialization complete');
@@ -154,20 +160,66 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (event === 'SIGNED_IN' && currentSession?.user) {
           console.log('✅ User signed in via Supabase:', currentSession.user.email);
           
-          // Create basic profile for immediate use
-          const basicUserProfile: User = {
-            id: currentSession.user.id,
-            name: currentSession.user.user_metadata?.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
-            email: currentSession.user.email || '',
-            phone: null,
-            role: 'admin',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
+          // Try to get existing user from users table
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', currentSession.user.email)
+            .single();
           
-          setUser(basicUserProfile);
-          setUserProfile(basicUserProfile);
-          setUserRole('admin');
+          let userProfile: User;
+          
+          if (existingUser) {
+            userProfile = {
+              id: existingUser.id,
+              name: existingUser.name,
+              email: existingUser.email,
+              phone: existingUser.phone,
+              role: (existingUser.role as UserRole) || 'admin',
+              created_at: existingUser.created_at,
+              updated_at: existingUser.updated_at,
+            };
+            console.log('✅ Found existing user:', userProfile);
+          } else {
+            // Create new user in users table
+            const newUser = {
+              id: currentSession.user.id,
+              name: currentSession.user.user_metadata?.full_name || currentSession.user.email?.split('@')[0] || 'Admin User',
+              email: currentSession.user.email || '',
+              phone: null,
+              role: 'admin' as UserRole,
+            };
+            
+            const { data: createdUser, error: createError } = await supabase
+              .from('users')
+              .insert(newUser)
+              .select()
+              .single();
+            
+            if (createError) {
+              console.error('❌ Error creating user:', createError);
+              userProfile = {
+                ...newUser,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              };
+            } else {
+              userProfile = {
+                id: createdUser.id,
+                name: createdUser.name,
+                email: createdUser.email,
+                phone: createdUser.phone,
+                role: createdUser.role as UserRole,
+                created_at: createdUser.created_at,
+                updated_at: createdUser.updated_at,
+              };
+              console.log('✅ Created new user:', userProfile);
+            }
+          }
+          
+          setUser(userProfile);
+          setUserProfile(userProfile);
+          setUserRole(userProfile.role);
           
           toast({
             title: 'Welcome!',
@@ -220,6 +272,26 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       if (data.user) {
         console.log('✅ User created successfully:', data.user.email);
+        
+        // Create user in our users table
+        const newUser = {
+          id: data.user.id,
+          name: fullName,
+          email: email,
+          phone: null,
+          role: 'admin' as UserRole,
+        };
+        
+        const { error: userCreateError } = await supabase
+          .from('users')
+          .insert(newUser);
+        
+        if (userCreateError) {
+          console.warn('⚠️ Could not create user in users table:', userCreateError);
+        } else {
+          console.log('✅ User added to users table');
+        }
+        
         toast({
           title: 'Account Created',
           description: 'Your account has been created successfully. You can now sign in.',
@@ -509,3 +581,6 @@ export const useMultiAuth = () => {
   }
   return context;
 };
+
+// Export useAuth as an alias for backward compatibility
+export const useAuth = useMultiAuth;

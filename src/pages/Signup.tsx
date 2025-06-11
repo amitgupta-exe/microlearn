@@ -51,20 +51,23 @@ const Signup: React.FC = () => {
     setSuccess(false);
 
     try {
+      console.log('🔄 Starting signup process for:', values.email);
       const { error } = await signUp(values.email, values.password, values.fullName);
       if (error) {
+        console.error('❌ Signup failed:', error);
         setError(error.message || 'Failed to create account');
         return;
       }
 
+      console.log('✅ Signup successful');
       setSuccess(true);
       form.reset();
       toast({
         title: 'Account created!',
-        description: 'Your admin account has been created successfully.',
+        description: 'Your admin account has been created successfully. You can now sign in.',
       });
     } catch (err) {
-      console.error('Signup error:', err);
+      console.error('💥 Signup error:', err);
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
@@ -193,6 +196,15 @@ const Signup: React.FC = () => {
               Sign in
             </Link>
           </p>
+        </div>
+
+        {/* Debug info */}
+        <div className="bg-gray-50 border border-gray-200 rounded p-4">
+          <h3 className="text-sm font-medium text-gray-900 mb-2">For Testing:</h3>
+          <div className="text-xs text-gray-600 space-y-1">
+            <div><strong>Admin Test Account:</strong> amit.vef@gmail.com / password123</div>
+            <div><strong>Or:</strong> mail.amit85764@gmail.com / password123</div>
+          </div>
         </div>
       </div>
     </div>
