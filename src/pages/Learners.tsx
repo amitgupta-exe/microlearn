@@ -108,11 +108,61 @@ const Learners = () => {
     }
   };
 
-  const handleFormSuccess = () => {
-    console.log('Learner form submitted successfully');
+  const handleLearnerSubmit = async (data: { name: string; email: string; phone: string }) => {
+    console.log('Submitting learner data:', data);
+    try {
+      if (selectedLearner) {
+        // Update existing learner
+        const { error } = await supabase
+          .from('learners')
+          .update({
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', selectedLearner.id);
+
+        if (error) throw error;
+        
+        toast({
+          title: 'Success',
+          description: 'Learner updated successfully',
+        });
+      } else {
+        // Create new learner
+        const { error } = await supabase
+          .from('learners')
+          .insert({
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+            status: 'active',
+            created_by: user?.id || '',
+          });
+
+        if (error) throw error;
+        
+        toast({
+          title: 'Success',
+          description: 'Learner created successfully',
+        });
+      }
+      
+      // Close form and refresh data
+      setIsFormOpen(false);
+      setSelectedLearner(null);
+      fetchLearners();
+    } catch (error) {
+      console.error('Error saving learner:', error);
+      throw error; // Re-throw so LearnerForm can handle the error display
+    }
+  };
+
+  const handleFormCancel = () => {
+    console.log('Learner form cancelled');
     setIsFormOpen(false);
     setSelectedLearner(null);
-    fetchLearners();
   };
 
   const handleImportSuccess = () => {
@@ -255,8 +305,8 @@ const Learners = () => {
             </DialogHeader>
             <LearnerForm
               learner={selectedLearner}
-              onSuccess={handleFormSuccess}
-              onCancel={() => setIsFormOpen(false)}
+              onSubmit={handleLearnerSubmit}
+              onCancel={handleFormCancel}
             />
           </DialogContent>
         </Dialog>
