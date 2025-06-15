@@ -9,6 +9,14 @@ import { Badge } from '@/components/ui/badge';
 import { Users, Phone, Mail, Calendar, BookOpen, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import LearnerForm from '@/components/LearnerForm';
+import LearnerImport from '@/components/LearnerImport';
 
 type Learner = Tables<'learners'>;
 
@@ -20,6 +28,8 @@ const Learners = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
+
+  console.log('Learners page - user:', user, 'userRole:', userRole, 'loading:', loading);
 
   useEffect(() => {
     if (!loading && user && userRole) {
@@ -37,6 +47,7 @@ const Learners = () => {
   }, [id, learners]);
 
   const fetchLearners = async () => {
+    console.log('Fetching learners for user:', user?.id, 'role:', userRole);
     try {
       let query = supabase.from('learners').select('*');
       
@@ -48,6 +59,7 @@ const Learners = () => {
       const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) throw error;
+      console.log('Fetched learners:', data);
       setLearners(data || []);
     } catch (error) {
       console.error('Error fetching learners:', error);
@@ -62,16 +74,19 @@ const Learners = () => {
   };
 
   const handleCreateLearner = () => {
+    console.log('Opening learner form for creation');
     setSelectedLearner(null);
     setIsFormOpen(true);
   };
 
   const handleEditLearner = (learner: Learner) => {
+    console.log('Opening learner form for editing:', learner);
     setSelectedLearner(learner);
     setIsFormOpen(true);
   };
 
   const handleDeleteLearner = async (learnerId: string) => {
+    console.log('Deleting learner:', learnerId);
     try {
       const { error } = await supabase.from('learners').delete().eq('id', learnerId);
       
@@ -94,12 +109,14 @@ const Learners = () => {
   };
 
   const handleFormSuccess = () => {
+    console.log('Learner form submitted successfully');
     setIsFormOpen(false);
     setSelectedLearner(null);
     fetchLearners();
   };
 
   const handleImportSuccess = () => {
+    console.log('Learner import completed successfully');
     setIsImportOpen(false);
     fetchLearners();
   };
@@ -227,6 +244,32 @@ const Learners = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Learner Form Dialog */}
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedLearner ? 'Edit Learner' : 'Add New Learner'}
+              </DialogTitle>
+            </DialogHeader>
+            <LearnerForm
+              learner={selectedLearner}
+              onSuccess={handleFormSuccess}
+              onCancel={() => setIsFormOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+
+        {/* Import Dialog */}
+        <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Import Learners</DialogTitle>
+            </DialogHeader>
+            <LearnerImport />
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
