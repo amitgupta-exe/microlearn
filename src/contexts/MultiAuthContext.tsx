@@ -41,23 +41,33 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const storedLearner = localStorage.getItem('learner_session');
         
         if (storedSuperAdmin && mounted) {
-          const userProfile = JSON.parse(storedSuperAdmin);
-          console.log('✅ Restored superadmin session:', userProfile);
-          setUser(userProfile);
-          setUserProfile(userProfile);
-          setUserRole('superadmin');
-          setLoading(false);
-          return;
+          try {
+            const userProfile = JSON.parse(storedSuperAdmin);
+            console.log('✅ Restored superadmin session:', userProfile);
+            setUser(userProfile);
+            setUserProfile(userProfile);
+            setUserRole('superadmin');
+            setLoading(false);
+            return;
+          } catch (e) {
+            console.warn('⚠️ Invalid superadmin session, clearing...');
+            localStorage.removeItem('superadmin_session');
+          }
         }
         
         if (storedLearner && mounted) {
-          const userProfile = JSON.parse(storedLearner);
-          console.log('✅ Restored learner session:', userProfile);
-          setUser(userProfile);
-          setUserProfile(userProfile);
-          setUserRole('learner');
-          setLoading(false);
-          return;
+          try {
+            const userProfile = JSON.parse(storedLearner);
+            console.log('✅ Restored learner session:', userProfile);
+            setUser(userProfile);
+            setUserProfile(userProfile);
+            setUserRole('learner');
+            setLoading(false);
+            return;
+          } catch (e) {
+            console.warn('⚠️ Invalid learner session, clearing...');
+            localStorage.removeItem('learner_session');
+          }
         }
 
         // Check Supabase session for admin users
@@ -93,6 +103,14 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               updated_at: userProfile.updated_at,
             };
             console.log('✅ Found existing user in users table:', profile);
+            
+            // Security check: ensure admin users can only access admin roles
+            if (profile.role !== 'admin' && profile.role !== 'superadmin') {
+              console.warn('⚠️ User has non-admin role, signing out for security');
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
           } else {
             // This is an existing Supabase user who doesn't exist in our users table yet
             // Create them as an admin (preserving their Supabase auth ID)
@@ -166,6 +184,18 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           let userProfile: User;
           
           if (existingUser) {
+            // Security check: ensure only admin users can sign in via Supabase
+            if (existingUser.role !== 'admin' && existingUser.role !== 'superadmin') {
+              console.warn('⚠️ Non-admin user attempting Supabase login, blocking');
+              await supabase.auth.signOut();
+              toast({
+                title: 'Access Denied',
+                description: 'This login method is only for administrators',
+                variant: 'destructive',
+              });
+              return;
+            }
+            
             userProfile = {
               id: existingUser.id,
               name: existingUser.name,
@@ -175,7 +205,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               created_at: existingUser.created_at,
               updated_at: existingUser.updated_at,
             };
-            console.log('✅ Found existing user:', userProfile);
+            console.log('✅ Found existing admin user:', userProfile);
           } else {
             // This should rarely happen now, but just in case
             console.log('⚠️ User not found in users table, creating as admin');

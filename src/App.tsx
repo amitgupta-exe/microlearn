@@ -26,6 +26,43 @@ import { User } from "@/lib/types";
 
 const queryClient = new QueryClient();
 
+// Home Route Component - handles routing based on auth state
+function HomeRoute() {
+  const { user, userRole, loading } = useMultiAuth();
+
+  console.log('HomeRoute - user:', user, 'userRole:', userRole, 'loading:', loading);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    console.log('No user found, redirecting to login');
+    return <Navigate to="/login" replace />;
+  }
+
+  // Redirect based on user role
+  if (userRole === 'learner') {
+    console.log('Learner detected, redirecting to learner dashboard');
+    return <Navigate to="/learner-dashboard" replace />;
+  }
+
+  if (userRole === 'superadmin') {
+    console.log('Super admin detected, redirecting to super admin dashboard');
+    return <Navigate to="/superadmin" replace />;
+  }
+
+  console.log('Regular admin user, showing admin dashboard');
+  return <Navigate to="/dashboard" replace />;
+}
+
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, userRole, loading } = useMultiAuth();
@@ -48,10 +85,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Redirect learners to their dashboard
+  // Prevent learners from accessing admin routes
   if (userRole === 'learner') {
-    console.log('Learner detected, redirecting to learner dashboard');
+    console.log('Learner trying to access admin route, redirecting to learner dashboard');
     return <Navigate to="/learner-dashboard" replace />;
+  }
+
+  // Prevent non-admins from accessing admin routes
+  if (userRole !== 'admin' && userRole !== 'superadmin') {
+    console.log('Non-admin trying to access admin route, redirecting to login');
+    return <Navigate to="/login" replace />;
   }
 
   // Redirect superadmins to their dashboard
@@ -140,6 +183,9 @@ function App() {
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/admin/login" element={<SuperAdminLogin />} />
                     
+                    {/* Home route - handles auth-based redirects */}
+                    <Route path="/" element={<HomeRoute />} />
+                    
                     {/* Super Admin routes - moved to /superadmin */}
                     <Route 
                       path="/superadmin" 
@@ -169,7 +215,7 @@ function App() {
                     />
 
                     {/* Protected routes with sidebar for regular admins */}
-                    <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                    <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                     <Route path="/learners" element={<ProtectedRoute><Learners /></ProtectedRoute>} />
                     <Route path="/learners/:id" element={<ProtectedRoute><Learners /></ProtectedRoute>} />
                     <Route path="/courses" element={<ProtectedRoute><Courses /></ProtectedRoute>} />
