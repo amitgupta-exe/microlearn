@@ -227,8 +227,9 @@ const Courses = () => {
   };
 
   const handleAssignCourse = (courses: Course[]) => {
-    setAssignCourses(courses);
-    setShowAssignDialog(true);
+    console.log('Opening assign dialog for courses:', courses);
+    setSelectedCourse(courses[0]); // Use the first course for assignment
+    setAssignDialogOpen(true);
   };
 
   // Find the group for the current id (for detail/edit)
@@ -400,7 +401,7 @@ const Courses = () => {
               />
             </div>
             <div className="flex items-center text-sm text-muted-foreground">
-              {displayedGroups.length} courses
+              {displayedGroups.length} unique courses
             </div>
           </div>
         </div>
@@ -461,12 +462,11 @@ const Courses = () => {
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedCourse(courses[0]);
-                            setAssignDialogOpen(true);
+                            handleAssignCourse(courses);
                           }}
                         >
                           <Users className="h-4 w-4 mr-2" />
-                          Assign to Learner
+                          Assign to Learners
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -541,6 +541,7 @@ const Courses = () => {
         onAssigned={() => {
           setAssignDialogOpen(false);
           setSelectedCourse(null);
+          toast.success('Course assignment completed');
         }}
       />
     </div>

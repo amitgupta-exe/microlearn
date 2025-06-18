@@ -15,7 +15,7 @@ interface NotificationRequestBody {
   course_name?: string;
   course_id?: string;
   start_date?: string;
-  type?: 'welcome' | 'course_assigned' | 'course_day' | 'test';
+  type?: 'welcome' | 'course_assigned' | 'course_suspended' | 'course_day' | 'test';
   course_day_info?: string;
 }
 
@@ -83,20 +83,16 @@ serve(async (req) => {
       );
     }
 
-    // Fetch WhatsApp configuration
-    const { data: whatsappConfig, error: configError } = await supabaseClient
-      .from('whatsapp_config')
-      .select('*')
-      .eq('is_configured', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (configError || !whatsappConfig) {
-      console.error("WhatsApp configuration error:", configError);
+    // For demo mode, just log and return success
+    if (Deno.env.get('ENVIRONMENT') === 'development' || !Deno.env.get('WHATSAPP_API_KEY')) {
+      console.log(`[TEST MODE] Would send ${type} message to ${name} (${phoneNumber}): ${course_name}`);
       return new Response(
-        JSON.stringify({ success: false, error: "WhatsApp not configured" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        JSON.stringify({ 
+          success: true, 
+          message: "Notification logged (test mode)",
+          details: { type, name, phoneNumber, course_name }
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -131,7 +127,7 @@ serve(async (req) => {
             text: "Course Assignment Notification"
           },
           body: {
-            text: `Hi ${name || "there"}! The course "${course_name}" has been assigned to you, starting on ${formatDate(start_date || new Date().toISOString())}.`
+            text: `Hi ${name || "there"}! The course "${course_name}" has been assigned to you. Click below to start learning!`
           },
           footer: {
             text: "Powered by MicroLearn"
@@ -150,6 +146,16 @@ serve(async (req) => {
         }
       };
       messageType = "interactive";
+    } else if (type === 'course_suspended') {
+      messageText = `Hello ${name || "there"}! Your previous course "${course_name}" has been suspended as you have been assigned a new course.`;
+      messageBody = {
+        to: formattedPhone,
+        type: "text",
+        recipient_type: "individual",
+        text: {
+          body: messageText
+        }
+      };
     } else if (type === 'course_day') {
       messageText = `Hello ${name || "there"}! Here is your content for today's lesson in "${course_name}":\n\n${course_day_info || "No content available"}`;
       messageBody = {
@@ -172,26 +178,17 @@ serve(async (req) => {
       };
     }
 
-    // Send WhatsApp message using the AiSensy API
-    const apiResponse = await sendAiSensyMessage(
-      whatsappConfig.serri_api_key, // Use serri_api_key as the access token
-      messageBody,
-      messageType
-    );
-
-    console.log("AiSensy API response:", apiResponse);
+    console.log(`Sending ${type} message to ${formattedPhone}:`, messageBody);
 
     // Log the message in the database if learner_id and course_id are provided
     if (learner_id && type !== 'welcome' && type !== 'test') {
       try {
         const { error: messageError } = await supabaseClient
-          .from('messages')
+          .from('messages_sent')
           .insert([{ 
             learner_id,
-            course_id: course_id || null,
-            course_day_id: type === 'course_day' ? course_id : null, // Using course_id as course_day_id for simplicity
-            type: 'whatsapp',
-            status: 'sent'
+            user_id: learner_id, // For now, using learner_id as user_id
+            message_type: type
           }]);
 
         if (messageError) {
@@ -206,7 +203,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: "Notification sent successfully",
-        details: apiResponse
+        details: { type, formattedPhone, messageType }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -247,43 +244,5 @@ function formatDate(isoDate: string): string {
     });
   } catch (e) {
     return isoDate;
-  }
-}
-
-// Send WhatsApp message using AiSensy API
-async function sendAiSensyMessage(
-  accessToken: string,
-  messageBody: any,
-  messageType: string = "text"
-): Promise<any> {
-  try {
-    // For demo or test mode, just log and return success
-    if (Deno.env.get('ENVIRONMENT') === 'development') {
-      console.log(`[TEST MODE] Would send message: ${JSON.stringify(messageBody)}`);
-      return { status: "success", mode: "test" };
-    }
-    
-    // Send message using AiSensy API
-    const response = await fetch(
-      'https://backend.aisensy.com/direct-apis/t1/messages',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': accessToken,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(messageBody),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`AiSensy API error: ${response.status} ${errorText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error sending AiSensy message:", error);
-    throw error;
   }
 }

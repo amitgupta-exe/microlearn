@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { toast } from 'sonner';
 import { Course, Learner } from '@/lib/types';
+import { normalizePhoneNumber } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -60,8 +61,14 @@ const CourseOverwriteDialog: React.FC<CourseOverwriteDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Course Assignment Conflict</DialogTitle>
           <DialogDescription>
-            {learner.name} is already assigned to "{currentCourse.course_name}". 
-            Do you want to reassign them to "{newCourse.course_name}"?
+            {learner.name} already has an active course assignment. 
+            Do you want to suspend their current progress and assign "{newCourse.course_name}"?
+            
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-sm text-yellow-800">
+                <strong>Note:</strong> Their current course progress will be suspended and they will receive a notification about the new assignment.
+              </p>
+            </div>
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -70,7 +77,7 @@ const CourseOverwriteDialog: React.FC<CourseOverwriteDialogProps> = ({
           </Button>
           <Button onClick={handleConfirm} disabled={isLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Reassign Course
+            Assign New Course
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -89,6 +96,8 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
     learner?: Learner;
     currentCourse?: Course;
   }>({ open: false });
+
+  console.log('CourseAssignment - course:', course.course_name);
 
   useEffect(() => {
     fetchLearners();
@@ -118,12 +127,46 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
         assigned_course: learner.assigned_course || undefined
       })) as Learner[];
 
+      console.log('Fetched learners for course assignment:', transformedData.length);
       setLearners(transformedData);
     } catch (error) {
       console.error('Error fetching learners:', error);
       toast.error('Failed to load learners');
     } finally {
       setIsLoadingLearners(false);
+    }
+  };
+
+  const sendWhatsAppNotification = async (learner: Learner, course: Course, type: 'assignment' | 'suspension') => {
+    console.log(`Sending ${type} WhatsApp notification to:`, learner.name);
+    try {
+      const notificationData = {
+        learner_id: learner.id,
+        learner_name: learner.name,
+        learner_phone: learner.phone,
+        course_id: course.id,
+        course_name: course.course_name,
+        type: type === 'assignment' ? 'course_assigned' : 'course_suspended'
+      };
+
+      const response = await fetch('/functions/v1/send-course-notification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyZWhvY3JsbWt6ZHBlc3VxYmtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4NTQyOTcsImV4cCI6MjA1NzQzMDI5N30.0h_DbjWlBv1lLAU9CT51wI5LpCKwvSZNTdN9efa57Zw'}`
+        },
+        body: JSON.stringify(notificationData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`${type} notification sent successfully:`, result);
+    } catch (error) {
+      console.error(`Error sending ${type} notification:`, error);
+      // Don't throw - we don't want to fail the assignment if notification fails
     }
   };
 
@@ -135,12 +178,31 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
       const selectedLearner = learners.find(l => l.id === selectedLearnerId);
       if (!selectedLearner) throw new Error('Learner not found');
 
-      // Check if learner already has an assigned course
-      if (selectedLearner.assigned_course_id && selectedLearner.assigned_course) {
+      console.log('Assigning course to learner:', selectedLearner.name);
+
+      const normalizedPhone = normalizePhoneNumber(selectedLearner.phone);
+      if (!normalizedPhone) {
+        throw new Error('Invalid phone number');
+      }
+
+      // Check if learner already has an active course assignment
+      const { data: existingActive, error: selectError } = await supabase
+        .from('course_progress')
+        .select('*')
+        .eq('phone_number', normalizedPhone)
+        .in('status', ['assigned', 'started']);
+
+      if (selectError) throw selectError;
+
+      if (existingActive && existingActive.length > 0) {
+        // Show overwrite dialog
         setOverwriteDialog({
           open: true,
           learner: selectedLearner,
-          currentCourse: selectedLearner.assigned_course,
+          currentCourse: { 
+            id: existingActive[0].course_id,
+            course_name: existingActive[0].course_name 
+          } as Course,
         });
         return;
       }
@@ -156,19 +218,47 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
 
   const performAssignment = async (learner: Learner, isOverwrite = false) => {
     try {
+      const normalizedPhone = normalizePhoneNumber(learner.phone);
+      if (!normalizedPhone) {
+        throw new Error('Invalid phone number');
+      }
+
       // If overwriting, suspend the previous course progress
-      if (isOverwrite && learner.assigned_course_id) {
-        await supabase
+      if (isOverwrite) {
+        const { data: existingActive, error: selectError } = await supabase
           .from('course_progress')
-          .update({ status: 'suspended' })
-          .eq('learner_id', learner.id)
-          .eq('course_id', learner.assigned_course_id);
+          .select('*')
+          .eq('phone_number', normalizedPhone)
+          .in('status', ['assigned', 'started']);
+
+        if (selectError) throw selectError;
+
+        if (existingActive && existingActive.length > 0) {
+          // Send suspension notifications first
+          for (const existing of existingActive) {
+            await sendWhatsAppNotification(
+              learner,
+              { id: existing.course_id, course_name: existing.course_name } as Course,
+              'suspension'
+            );
+          }
+
+          // Suspend existing progress
+          await supabase
+            .from('course_progress')
+            .update({ status: 'suspended' })
+            .eq('phone_number', normalizedPhone)
+            .in('status', ['assigned', 'started']);
+        }
       }
 
       // Update learner's assigned course
       const { error: updateError } = await supabase
         .from('learners')
-        .update({ assigned_course_id: course.id })
+        .update({ 
+          assigned_course_id: course.id,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', learner.id);
 
       if (updateError) throw updateError;
@@ -179,43 +269,20 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
         .insert({
           learner_id: learner.id,
           course_id: course.id!,
-          status: 'not_started',
+          status: 'assigned',
           progress_percent: 0,
           current_day: 1,
           course_name: course.course_name,
           learner_name: learner.name,
-          phone_number: learner.phone,
+          phone_number: normalizedPhone,
+          is_active: true,
+          last_module_completed_at: new Date().toISOString()
         });
 
       if (progressError) throw progressError;
 
-      // Record message sent
-      const { error: messageError } = await supabase
-        .from('messages_sent')
-        .insert({
-          user_id: user?.id!,
-          learner_id: learner.id,
-          message_type: 'course_assignment',
-        });
-
-      if (messageError) throw messageError;
-
-      // Send WhatsApp message (placeholder - implement your WhatsApp API call here)
-      try {
-        const response = await fetch('/api/send-whatsapp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: learner.phone,
-            message: `You have been assigned to course: ${course.course_name}`,
-            learner_name: learner.name,
-            course_name: course.course_name,
-          }),
-        });
-        console.log('WhatsApp message sent:', response.status);
-      } catch (whatsappError) {
-        console.warn('WhatsApp message failed:', whatsappError);
-      }
+      // Send WhatsApp assignment notification
+      await sendWhatsAppNotification(learner, course, 'assignment');
 
       toast.success(`Course assigned to ${learner.name} successfully`);
       setSelectedLearnerId('');
