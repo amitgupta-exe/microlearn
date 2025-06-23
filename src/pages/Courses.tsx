@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -37,10 +38,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import CourseForm from '@/components/CourseForm';
-// import CoursePromptForm from '@/components/CoursePromptForm';
+import CoursePromptForm from '@/components/CoursePromptForm';
 import CoursePreview from '@/components/CoursePreview';
 import CourseDetailDialog from '@/components/CourseDetailDialog';
-// import CourseAssignmentDialog from '@/components/CourseAssignmentDialog';
 import AssignCourseToLearner from '@/components/AssignCourseToLearner';
 import { Course } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,11 +70,17 @@ const Courses = () => {
   const showForm = isNew || isEdit;
   const showPromptForm = isPrompt;
 
+  console.log('Courses page - user:', user, 'current route:', id);
+
   // Fetch courses from Supabase
   useEffect(() => {
     const fetchCourses = async () => {
-      if (!user) return;
+      if (!user) {
+        console.log('No user found, skipping course fetch');
+        return;
+      }
 
+      console.log('Fetching courses for user:', user.id);
       setIsLoading(true);
       try {
         const { data, error } = await supabase
@@ -87,6 +93,8 @@ const Courses = () => {
           throw error;
         }
 
+        console.log('Raw courses data:', data);
+
         if (data) {
           // Group courses by request_id or course_name
           const grouped: { [key: string]: Course[] } = {};
@@ -98,6 +106,7 @@ const Courses = () => {
             grouped[key].push(course as Course);
           });
 
+          console.log('Grouped courses:', grouped);
           setCourseGroups(grouped);
         }
       } catch (error) {
@@ -117,6 +126,8 @@ const Courses = () => {
       return;
     }
 
+    console.log('Creating course with data:', data);
+
     try {
       const requestId = crypto.randomUUID();
 
@@ -133,10 +144,12 @@ const Courses = () => {
           visibility: "public",
           created_by: user.id,
           request_id: requestId,
-          origin: 'microlearn_manual',
+          origin: data.origin || 'microlearn_manual',
           created_at: new Date().toISOString()
         });
       }
+
+      console.log('Course entries to insert:', courseEntries);
 
       const { error } = await supabase
         .from('courses')
@@ -156,6 +169,7 @@ const Courses = () => {
   };
 
   const handleDeleteCourse = async (requestId: string) => {
+    console.log('Deleting course with requestId:', requestId);
     try {
       const { error } = await supabase
         .from('courses')
@@ -176,13 +190,13 @@ const Courses = () => {
     }
   };
 
-
-
   const handleToggleVisibility = async (requestId: string) => {
     const courses = courseGroups[requestId];
     if (!courses) return;
 
     const newVisibility = courses[0].visibility === 'public' ? 'private' : 'public';
+
+    console.log('Toggling visibility for course:', requestId, 'to:', newVisibility);
 
     try {
       const { error } = await supabase
@@ -213,14 +227,15 @@ const Courses = () => {
   };
 
   const handleAssignCourse = (courses: Course[]) => {
-    setAssignCourses(courses);
-    setShowAssignDialog(true);
+    console.log('Opening assign dialog for courses:', courses);
+    setSelectedCourse(courses[0]); // Use the first course for assignment
+    setAssignDialogOpen(true);
   };
 
-  // New: Find the group for the current id (for detail/edit)
+  // Find the group for the current id (for detail/edit)
   const currentGroup = id && courseGroups[id] ? courseGroups[id] : null;
 
-  // New: Card click navigates to detail page
+  // Card click navigates to detail page
   const handleCourseCardClick = (courses: Course[]) => {
     if (courses[0].request_id) {
       navigate(`/courses/${courses[0].request_id}`);
@@ -230,7 +245,7 @@ const Courses = () => {
     }
   };
 
-  // New: Edit handler
+  // Edit handler
   const handleEditCourse = (courses: Course[]) => {
     if (courses[0].request_id) {
       navigate(`/courses/${courses[0].request_id}?edit=1`);
@@ -272,14 +287,25 @@ const Courses = () => {
     );
   }
 
-  // Apply filters
+  // Apply filters with improved logic
   let displayedGroups = Object.entries(courseGroups);
 
-  if (visibilityFilter !== 'all') {
+  console.log('Applying filter:', visibilityFilter, 'user id:', user?.id);
+
+  if (visibilityFilter === 'private') {
+    // Show only courses created by current user (both public and private)
     displayedGroups = displayedGroups.filter(([_, courses]) =>
-      courses[0].visibility === visibilityFilter
+      courses[0].created_by === user?.id
+    );
+  } else if (visibilityFilter === 'public') {
+    // Show all public courses
+    displayedGroups = displayedGroups.filter(([_, courses]) =>
+      courses[0].visibility === 'public'
     );
   }
+  // For 'all', show everything
+
+  console.log('Filtered course groups:', displayedGroups.length);
 
   // Filter by search query
   displayedGroups = displayedGroups.filter(([_, courses]) =>
@@ -321,10 +347,13 @@ const Courses = () => {
             Back to Courses
           </Button>
 
-          {/* <CoursePromptForm
+          <CoursePromptForm
             onCancel={() => navigate('/courses')}
-            onSuccess={handlePromptSuccess}
-          /> */}
+            onSuccess={() => {
+              navigate('/courses');
+              window.location.reload();
+            }}
+          />
         </div>
       </div>
     );
@@ -371,8 +400,8 @@ const Courses = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="flex items-center text-sm text-gray-500">
-              {displayedGroups.length} courses
+            <div className="flex items-center text-sm text-muted-foreground">
+              {displayedGroups.length} unique courses
             </div>
           </div>
         </div>
@@ -432,12 +461,11 @@ const Courses = () => {
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedCourse(courses[0]);
-                            setAssignDialogOpen(true);
+                            handleAssignCourse(courses);
                           }}
                         >
                           <Users className="h-4 w-4 mr-2" />
-                          Assign to Learner
+                          Assign to Learners
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -465,8 +493,8 @@ const Courses = () => {
                   <h3 className="font-medium text-lg line-clamp-1 text-gray-900">{courses[0].course_name}</h3>
                 </div>
                 <CardContent className="p-4">
-                  <div className="text-sm text-gray-600 mb-4 line-clamp-2 h-10">
-                    {courses.length} day course with modules
+                  <div className="text-sm text-muted-foreground mb-4 line-clamp-2 h-10">
+                    {courses.length} day course with modules • Origin: {courses[0].origin}
                   </div>
                   <div className="flex justify-between items-center text-xs text-gray-500">
                     <div className="flex items-center gap-2">
@@ -505,7 +533,6 @@ const Courses = () => {
         onOpenChange={setShowDetailDialog}
       />
 
-
       <AssignCourseToLearner
         course={selectedCourse}
         open={assignDialogOpen}
@@ -513,7 +540,7 @@ const Courses = () => {
         onAssigned={() => {
           setAssignDialogOpen(false);
           setSelectedCourse(null);
-          // Optionally refetch courses or learners here
+          toast.success('Course assignment completed');
         }}
       />
     </div>

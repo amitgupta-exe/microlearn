@@ -1,3 +1,4 @@
+
 export interface Course {
   id?: string;
   request_id?: string;
@@ -11,6 +12,7 @@ export interface Course {
   created_at?: string;
   updated_at?: string;
   created_by?: string;
+  status?: string;
 }
 
 export interface Learner {
@@ -18,7 +20,7 @@ export interface Learner {
   name: string;
   phone: string;
   email: string;
-  status: 'active' | 'inactive';
+  status: string;
   assigned_course_id?: string;
   created_at: string;
   updated_at: string;
@@ -43,7 +45,44 @@ export interface CourseProgress {
   id: string;
   learner_id: string;
   course_id: string;
-  status: 'not_started' | 'in_progress' | 'completed' | 'suspended';
+  current_day: number;
+  last_reminder_sent_at?: string;
+  started_at?: string;
+  completed_at?: string;
+  progress_percent: number;
+  last_module_completed_at?: string;
+  reminder_count: number;
+  is_active: boolean;
+  day1_module1: boolean;
+  day1_module2: boolean;
+  day1_module3: boolean;
+  day2_module1: boolean;
+  day2_module2: boolean;
+  day2_module3: boolean;
+  day3_module1: boolean;
+  day3_module2: boolean;
+  day3_module3: boolean;
+  reminder_count_day1: number;
+  reminder_count_day2: number;
+  reminder_count_day3: number;
+  status?: string;
+  course_name?: string;
+  feedback?: string;
+  learner_name?: string;
+  phone_number?: string;
+  notes?: string;
+  created_at: string;
+  course?: Course;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: UserRole;
   created_at: string;
   updated_at: string;
 }
+
+export type UserRole = 'superadmin' | 'admin' | 'learner';

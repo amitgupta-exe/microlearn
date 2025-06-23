@@ -8,56 +8,58 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { useMultiAuth } from '@/contexts/MultiAuthContext';
+
+interface AnalyticsData {
+  totalLearners: number;
+  totalCourses: number;
+  messagesSent: number;
+  messagesByPeriod: {
+    daily: { date: string; count: number }[];
+    weekly: { date: string; count: number }[];
+    monthly: { date: string; count: number }[];
+  };
+  learnersPerCourse: { name: string; value: number }[];
+  courseCompletionRates: { name: string; rate: number }[];
+}
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#84cc16', '#facc15', '#f472b6', '#60a5fa'];
 
 const Analytics = () => {
+  const { user, userRole } = useMultiAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [totalLearners, setTotalLearners] = useState(0);
-  const [totalCourses, setTotalCourses] = useState(0);
-  const [learnersPerCourse, setLearnersPerCourse] = useState<{ name: string, value: number }[]>([]);
-  const [courseCompletionRates, setCourseCompletionRates] = useState<{ name: string, rate: number }[]>([]);
-  const [coursesByLanguage, setCoursesByLanguage] = useState<{ language: string, value: number }[]>([]);
-  const [learnersByStatus, setLearnersByStatus] = useState<{ status: string, value: number }[]>([]);
-  const [coursesByDay, setCoursesByDay] = useState<{ day: number, value: number }[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
+    totalLearners: 0,
+    totalCourses: 0,
+    messagesSent: 0,
+    messagesByPeriod: {
+      daily: [],
+      weekly: [],
+      monthly: []
+    },
+    learnersPerCourse: [],
+    courseCompletionRates: []
+  });
   const [languagesCount, setLanguagesCount] = useState(0);
   const [languagesPie, setLanguagesPie] = useState<{ language: string, value: number }[]>([]);
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
+    const fetchAnalyticsData = async () => {
       setIsLoading(true);
 
-      // Total learners
-      const { count: learnersCount, data: learnersData } = await supabase
+      // Fetch total learners
+      const { count: learnersCount } = await supabase
         .from('learners')
-        .select('*', { count: 'exact', head: false });
-      setTotalLearners(learnersCount || 0);
+        .select('*', { count: 'exact', head: true });
 
-      // Learners by status (active/inactive)
-      const statusMap = new Map();
-      learnersData?.forEach(row => {
-        const status = row.status || 'unknown';
-        statusMap.set(status, (statusMap.get(status) || 0) + 1);
-      });
-      setLearnersByStatus(Array.from(statusMap.entries()).map(([status, value]) => ({ status, value })));
-
-      // Total courses
-      const { count: coursesCount, data: coursesData } = await supabase
+      // Fetch total courses
+      const { count: coursesCount } = await supabase
         .from('courses')
-        .select('*', { count: 'exact', head: false });
-      setTotalCourses(coursesCount || 0);
+        .select('*', { count: 'exact', head: true });
 
-      // Courses by day (distribution)
-      const dayMap = new Map();
-      coursesData?.forEach(row => {
-        const day = row.day || 1;
-        dayMap.set(day, (dayMap.get(day) || 0) + 1);
-      });
-      setCoursesByDay(Array.from(dayMap.entries()).map(([day, value]) => ({ day, value })));
-
-      // Learners per course
+      // Fetch learners per course
       const { data: learnersPerCourseRaw } = await supabase
         .from('course_progress')
         .select('course_id, course_name');
@@ -68,9 +70,9 @@ const Analytics = () => {
         }
         learnersPerCourseMap.set(row.course_name, learnersPerCourseMap.get(row.course_name) + 1);
       });
-      setLearnersPerCourse(Array.from(learnersPerCourseMap.entries()).map(([name, value]) => ({ name, value })));
+      const learnersPerCourse = Array.from(learnersPerCourseMap.entries()).map(([name, value]) => ({ name, value }));
 
-      // Course completion rates
+      // Fetch course completion rates
       const { data: courseProgress } = await supabase
         .from('course_progress')
         .select('course_name, status');
@@ -84,46 +86,16 @@ const Analytics = () => {
         if (row.status === 'completed') entry.completed += 1;
         completionMap.set(row.course_name, entry);
       });
-      setCourseCompletionRates(Array.from(completionMap.entries()).map(([name, { total, completed }]) => ({
+      const courseCompletionRates = Array.from(completionMap.entries()).map(([name, { total, completed }]) => ({
         name,
         rate: total ? Math.round((completed / total) * 100) : 0,
-      })));
+      }));
 
-      // Courses by language (join courses.request_id = registration_requests.request_id)
-      const { data: coursesWithLang } = await supabase
-        .from('courses')
-        .select('request_id');
-      const requestIds = coursesWithLang?.map(c => c.request_id).filter(Boolean);
-
-      let languageMap = new Map();
-      if (requestIds && requestIds.length > 0) {
-        const { data: regRequests } = await supabase
-          .from('registration_requests')
-          .select('request_id, language')
-          .in('request_id', requestIds);
-
-        regRequests?.forEach(row => {
-          const lang = row.language || 'Unknown';
-          languageMap.set(lang, (languageMap.get(lang) || 0) + 1);
-        });
-      }
-      setCoursesByLanguage(Array.from(languageMap.entries()).map(([language, value]) => ({ language, value })));
-
-      // Fetch languages from registration_requests (FIXED LOGIC)
+      // Fetch languages from registration_requests
       const { data: regRequests, error: langError } = await supabase
         .from('registration_requests')
         .select('language');
-
-        console.log(regRequests);
-        console.log(langError);
-        
-        
-
-      if (langError) {
-        setLanguagesCount(0);
-        setLanguagesPie([]);
-      } else if (regRequests && regRequests.length > 0) {
-        // Count unique languages and their occurrences
+      if (!langError && regRequests && regRequests.length > 0) {
         const langMap = new Map<string, number>();
         regRequests.forEach(row => {
           const lang = (row.language || 'Unknown').trim();
@@ -136,11 +108,32 @@ const Analytics = () => {
         setLanguagesPie([]);
       }
 
+      setAnalyticsData({
+        totalLearners: learnersCount || 0,
+        totalCourses: coursesCount || 0,
+        messagesSent: 0, // Update if you have messages logic
+        messagesByPeriod: {
+          daily: [],
+          weekly: [],
+          monthly: []
+        },
+        learnersPerCourse,
+        courseCompletionRates
+      });
+
       setIsLoading(false);
     };
 
-    fetchAnalytics();
+    fetchAnalyticsData();
   }, []);
+
+  if (userRole === 'learner') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Access denied. Analytics are only available for admins and super admins.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen py-6 px-6 md:px-8 bg-gray-100 page-transition">
@@ -160,12 +153,12 @@ const Analytics = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <DashboardCard
                 title="Total Learners"
-                value={totalLearners.toString()}
+                value={analyticsData.totalLearners.toString()}
                 icon={<Users size={24} />}
               />
               <DashboardCard
                 title="Total Courses"
-                value={totalCourses.toString()}
+                value={analyticsData.totalCourses.toString()}
                 icon={<BookOpen size={24} />}
               />
               <DashboardCard
@@ -183,7 +176,7 @@ const Analytics = () => {
                   <CardDescription className="text-gray-600">Distribution of learners across courses</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {learnersPerCourse.length === 0 ? (
+                  {analyticsData.learnersPerCourse.length === 0 ? (
                     <div className="flex items-center justify-center h-[300px] text-gray-400">
                       No data available yet
                     </div>
@@ -192,7 +185,7 @@ const Analytics = () => {
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={learnersPerCourse}
+                            data={analyticsData.learnersPerCourse}
                             cx="50%"
                             cy="50%"
                             innerRadius={70}
@@ -201,7 +194,7 @@ const Analytics = () => {
                             dataKey="value"
                             label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                           >
-                            {learnersPerCourse.map((entry, index) => (
+                            {analyticsData.learnersPerCourse.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
@@ -270,80 +263,6 @@ const Analytics = () => {
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              {/* Learners by Status Bar */}
-              <Card className="bg-white border border-gray-200">
-                <CardHeader>
-                  <CardTitle className="text-gray-900">Learners by Status</CardTitle>
-                  <CardDescription className="text-gray-600">Active vs Inactive Learners</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {learnersByStatus.length === 0 ? (
-                    <div className="flex items-center justify-center h-[300px] text-gray-400">
-                      No data available yet
-                    </div>
-                  ) : (
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={learnersByStatus}>
-                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                          <XAxis dataKey="status" />
-                          <YAxis allowDecimals={false} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                              borderRadius: '0.5rem',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                              border: 'none',
-                              color: '#111827'
-                            }}
-                          />
-                          <Legend />
-                          <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Courses by Day Bar */}
-              <Card className="bg-white border border-gray-200">
-                <CardHeader>
-                  <CardTitle className="text-gray-900">Courses by Day</CardTitle>
-                  <CardDescription className="text-gray-600">Distribution of courses by day count</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {coursesByDay.length === 0 ? (
-                    <div className="flex items-center justify-center h-[300px] text-gray-400">
-                      No data available yet
-                    </div>
-                  ) : (
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={coursesByDay}>
-                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                          <XAxis dataKey="day" />
-                          <YAxis allowDecimals={false} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                              borderRadius: '0.5rem',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                              border: 'none',
-                              color: '#111827'
-                            }}
-                          />
-                          <Legend />
-                          <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
             {/* Course Completion Rate Pie */}
             <Card className="bg-white border border-gray-200 mb-6">
               <CardHeader>
@@ -351,7 +270,7 @@ const Analytics = () => {
                 <CardDescription className="text-gray-600">Percentage of learners who complete each course</CardDescription>
               </CardHeader>
               <CardContent>
-                {courseCompletionRates.length === 0 ? (
+                {analyticsData.courseCompletionRates.length === 0 ? (
                   <div className="flex items-center justify-center h-[300px] text-gray-400">
                     No completion data available yet
                   </div>
@@ -360,7 +279,7 @@ const Analytics = () => {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={courseCompletionRates}
+                          data={analyticsData.courseCompletionRates}
                           cx="50%"
                           cy="50%"
                           innerRadius={70}
@@ -369,7 +288,7 @@ const Analytics = () => {
                           dataKey="rate"
                           label={({ name, rate }) => `${name} ${rate}%`}
                         >
-                          {courseCompletionRates.map((entry, index) => (
+                          {analyticsData.courseCompletionRates.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>

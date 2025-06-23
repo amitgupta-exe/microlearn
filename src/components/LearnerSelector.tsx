@@ -20,6 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Learner } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,17 +28,28 @@ import { supabase } from '@/integrations/supabase/client';
 interface LearnerSelectorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelectLearner: (learner: Learner) => void;
+  onSelectLearner?: (learner: Learner) => void;
+  onSelectLearners?: (learners: Learner[]) => void;
+  multiSelect?: boolean;
+  title?: string;
+  description?: string;
 }
 
 const LearnerSelector: React.FC<LearnerSelectorProps> = ({
   open,
   onOpenChange,
   onSelectLearner,
+  onSelectLearners,
+  multiSelect = false,
+  title = "Select Learner",
+  description = "Choose a learner to assign this course to",
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [learners, setLearners] = useState<Learner[]>([]);
+  const [selectedLearners, setSelectedLearners] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  console.log('LearnerSelector - multiSelect:', multiSelect, 'open:', open);
 
   useEffect(() => {
     const fetchLearners = async () => {
@@ -68,6 +80,7 @@ const LearnerSelector: React.FC<LearnerSelectorProps> = ({
           status: learner.status as 'active' | 'inactive'
         }));
 
+        console.log('Fetched learners:', learnersWithCourses.length);
         setLearners(learnersWithCourses);
       } catch (error) {
         console.error('Error in learners fetch:', error);
@@ -79,6 +92,8 @@ const LearnerSelector: React.FC<LearnerSelectorProps> = ({
 
     if (open) {
       fetchLearners();
+      setSelectedLearners([]);
+      setSearchQuery('');
     }
   }, [open]);
 
@@ -89,32 +104,62 @@ const LearnerSelector: React.FC<LearnerSelectorProps> = ({
     learner.phone.includes(searchQuery)
   );
 
+  const handleLearnerSelect = (learner: Learner) => {
+    if (multiSelect) {
+      const isSelected = selectedLearners.includes(learner.id);
+      if (isSelected) {
+        setSelectedLearners(prev => prev.filter(id => id !== learner.id));
+      } else {
+        setSelectedLearners(prev => [...prev, learner.id]);
+      }
+    } else {
+      onSelectLearner?.(learner);
+      onOpenChange(false);
+    }
+  };
+
+  const handleConfirmSelection = () => {
+    if (multiSelect && onSelectLearners) {
+      const selected = learners.filter(learner => selectedLearners.includes(learner.id));
+      onSelectLearners(selected);
+      onOpenChange(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Select Learner</DialogTitle>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Choose a learner to assign this course to
+            {description}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="p-2 flex items-center gap-2">
-          <div className="relative flex-grow">
+        {/* Search Bar - Fixed at top */}
+        <div className="flex-shrink-0 p-4 border-b bg-gray-50">
+          <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search learners..."
-              className="pl-8 glass-input"
+              placeholder="Search learners by name, email, or phone..."
+              className="pl-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          {multiSelect && selectedLearners.length > 0 && (
+            <div className="mt-2 text-sm text-blue-600">
+              {selectedLearners.length} learner(s) selected
+            </div>
+          )}
         </div>
 
-        <div className="overflow-y-auto flex-grow">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-white z-10">
               <TableRow>
+                {multiSelect && <TableHead className="w-[50px]">Select</TableHead>}
                 <TableHead className="w-[250px]">Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
@@ -124,7 +169,7 @@ const LearnerSelector: React.FC<LearnerSelectorProps> = ({
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center h-32">
+                  <TableCell colSpan={multiSelect ? 5 : 4} className="text-center h-32">
                     <div className="flex items-center justify-center">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
                       <span className="ml-2">Loading learners...</span>
@@ -133,7 +178,7 @@ const LearnerSelector: React.FC<LearnerSelectorProps> = ({
                 </TableRow>
               ) : filteredLearners.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center h-32 text-muted-foreground">
+                  <TableCell colSpan={multiSelect ? 5 : 4} className="text-center h-32 text-muted-foreground">
                     {searchQuery ? 'No learners match your search' : 'No learners found'}
                   </TableCell>
                 </TableRow>
@@ -141,9 +186,19 @@ const LearnerSelector: React.FC<LearnerSelectorProps> = ({
                 filteredLearners.map(learner => (
                   <TableRow 
                     key={learner.id} 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => onSelectLearner(learner)}
+                    className={`cursor-pointer hover:bg-muted/50 ${
+                      multiSelect && selectedLearners.includes(learner.id) ? 'bg-blue-50' : ''
+                    }`}
+                    onClick={() => handleLearnerSelect(learner)}
                   >
+                    {multiSelect && (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedLearners.includes(learner.id)}
+                          onCheckedChange={() => handleLearnerSelect(learner)}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -166,10 +221,19 @@ const LearnerSelector: React.FC<LearnerSelectorProps> = ({
           </Table>
         </div>
 
-        <DialogFooter className="pt-4">
+        {/* Action Buttons - Fixed at bottom */}
+        <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
+          {multiSelect && (
+            <Button 
+              onClick={handleConfirmSelection}
+              disabled={selectedLearners.length === 0}
+            >
+              Select {selectedLearners.length} Learner{selectedLearners.length !== 1 ? 's' : ''}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

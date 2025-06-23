@@ -139,15 +139,7 @@ export type Database = {
           started_at?: string | null
           status?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "course_progress_learner_id_fkey"
-            columns: ["learner_id"]
-            isOneToOne: false
-            referencedRelation: "registration_requests"
-            referencedColumns: ["request_id"]
-          },
-        ]
+        Relationships: []
       }
       courses: {
         Row: {
@@ -161,6 +153,7 @@ export type Database = {
           module_3: string | null
           origin: string
           request_id: string | null
+          status: string
           updated_at: string
           visibility: string
         }
@@ -175,6 +168,7 @@ export type Database = {
           module_3?: string | null
           origin?: string
           request_id?: string | null
+          status?: string
           updated_at?: string
           visibility?: string
         }
@@ -189,6 +183,7 @@ export type Database = {
           module_3?: string | null
           origin?: string
           request_id?: string | null
+          status?: string
           updated_at?: string
           visibility?: string
         }
@@ -253,6 +248,62 @@ export type Database = {
           },
         ]
       }
+      messages_sent: {
+        Row: {
+          created_at: string | null
+          id: string
+          learner_id: string | null
+          message_type: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          learner_id?: string | null
+          message_type?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          learner_id?: string | null
+          message_type?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_sent_learner_id_fkey"
+            columns: ["learner_id"]
+            isOneToOne: false
+            referencedRelation: "learners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          full_name: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       registration_requests: {
         Row: {
           approval_status: string | null
@@ -294,57 +345,30 @@ export type Database = {
       }
       users: {
         Row: {
-          avatar_url: string | null
-          course_id: string | null
           created_at: string
-          day_completed: number | null
           email: string
           id: string
-          interactive_responses: string | null
-          last_msg: string | null
-          module_completed: number | null
           name: string
-          next_day: number | null
-          next_module: number | null
           phone: string | null
-          question_responses: string | null
-          responses: string | null
+          role: string
           updated_at: string
         }
         Insert: {
-          avatar_url?: string | null
-          course_id?: string | null
           created_at?: string
-          day_completed?: number | null
           email: string
           id?: string
-          interactive_responses?: string | null
-          last_msg?: string | null
-          module_completed?: number | null
           name: string
-          next_day?: number | null
-          next_module?: number | null
           phone?: string | null
-          question_responses?: string | null
-          responses?: string | null
+          role?: string
           updated_at?: string
         }
         Update: {
-          avatar_url?: string | null
-          course_id?: string | null
           created_at?: string
-          day_completed?: number | null
           email?: string
           id?: string
-          interactive_responses?: string | null
-          last_msg?: string | null
-          module_completed?: number | null
           name?: string
-          next_day?: number | null
-          next_module?: number | null
           phone?: string | null
-          question_responses?: string | null
-          responses?: string | null
+          role?: string
           updated_at?: string
         }
         Relationships: []
