@@ -26,12 +26,16 @@ import { User } from "@/lib/types";
 
 const queryClient = new QueryClient();
 
-// Home Route Component - handles routing based on auth state
+/**
+ * Home Route Component - handles routing based on auth state
+ * Redirects users to appropriate dashboard based on their role
+ */
 function HomeRoute() {
   const { user, userRole, loading } = useMultiAuth();
 
   console.log('HomeRoute - user:', user, 'userRole:', userRole, 'loading:', loading);
 
+  // Show loading spinner while checking authentication
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
@@ -43,27 +47,33 @@ function HomeRoute() {
     );
   }
 
-  if (!user) {
-    console.log('No user found, redirecting to login');
+  // Redirect to login if no authenticated user
+  if (!user || !userRole) {
+    console.log('No authenticated user found, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
-  // Redirect based on user role
-  if (userRole === 'learner') {
-    console.log('Learner detected, redirecting to learner dashboard');
-    return <Navigate to="/learner-dashboard" replace />;
+  // Role-based routing
+  switch (userRole) {
+    case 'learner':
+      console.log('Learner detected, redirecting to learner dashboard');
+      return <Navigate to="/learner-dashboard" replace />;
+    
+    case 'superadmin':
+      console.log('Super admin detected, redirecting to super admin dashboard');
+      return <Navigate to="/superadmin" replace />;
+    
+    case 'admin':
+    default:
+      console.log('Admin user detected, redirecting to admin dashboard');
+      return <Navigate to="/dashboard" replace />;
   }
-
-  if (userRole === 'superadmin') {
-    console.log('Super admin detected, redirecting to super admin dashboard');
-    return <Navigate to="/superadmin" replace />;
-  }
-
-  console.log('Regular admin user, showing admin dashboard');
-  return <Navigate to="/dashboard" replace />;
 }
 
-// Protected Route Component
+/**
+ * Protected Route Component for Admin Users
+ * Ensures only authenticated admin/superadmin users can access admin routes
+ */
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, userRole, loading } = useMultiAuth();
 
@@ -80,8 +90,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
-    console.log('No user found, redirecting to login');
+  // Redirect to login if no authenticated user
+  if (!user || !userRole) {
+    console.log('No authenticated user found, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
@@ -91,19 +102,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/learner-dashboard" replace />;
   }
 
-  // Prevent non-admins from accessing admin routes
+  // Prevent non-admin users from accessing admin routes
   if (userRole !== 'admin' && userRole !== 'superadmin') {
     console.log('Non-admin trying to access admin route, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
-  // Redirect superadmins to their dashboard
+  // Redirect superadmins to their specific dashboard
   if (userRole === 'superadmin') {
     console.log('Super admin detected, redirecting to super admin dashboard');
     return <Navigate to="/superadmin" replace />;
   }
 
-  console.log('Regular admin user, showing sidebar layout');
+  // Render admin interface with sidebar
+  console.log('Admin user authenticated, showing sidebar layout');
   return (
     <div className="flex h-screen bg-white">
       <Sidebar user={user as any} />
@@ -114,7 +126,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Super Admin Protected Route
+/**
+ * Super Admin Protected Route
+ * Ensures only superadmin users can access superadmin routes
+ */
 function SuperAdminProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, userRole, loading } = useMultiAuth();
 
@@ -139,7 +154,10 @@ function SuperAdminProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Learner Protected Route
+/**
+ * Learner Protected Route
+ * Ensures only learner users can access learner routes
+ */
 function LearnerProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, userRole, loading } = useMultiAuth();
 
@@ -186,7 +204,7 @@ function App() {
                     {/* Home route - handles auth-based redirects */}
                     <Route path="/" element={<HomeRoute />} />
                     
-                    {/* Super Admin routes - moved to /superadmin */}
+                    {/* Super Admin routes */}
                     <Route 
                       path="/superadmin" 
                       element={

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { normalizePhoneNumber } from '@/lib/utils';
+import { sendCourseAssignmentNotification, sendCourseSuspensionNotification } from '@/integrations/wati/functions';
 
 interface Course {
   id: string;
@@ -20,6 +21,7 @@ interface Course {
   created_at: string;
   status: string;
   request_id: string;
+  visibility: string;
 }
 
 interface CourseProgress {
@@ -32,8 +34,18 @@ interface CourseProgress {
   status: string;
   started_at: string;
   completed_at: string | null;
+  phone_number: string;
+  created_at: string;
 }
 
+/**
+ * Learner Dashboard - Self-service course management
+ * Features:
+ * - View current and previous courses
+ * - Self-assign public courses
+ * - Overwrite self-assigned courses (not admin-assigned)
+ * - Search and explore available courses
+ */
 const LearnerDashboard: React.FC = () => {
   const { user, userProfile, signOut } = useMultiAuth();
   const [courses, setCourses] = useState<Course[]>([]);
@@ -45,6 +57,7 @@ const LearnerDashboard: React.FC = () => {
     open: boolean;
     course?: Course;
     existingCourse?: string;
+    canOverwrite?: boolean;
   }>({ open: false });
 
   console.log('LearnerDashboard - userProfile:', userProfile);
@@ -56,6 +69,9 @@ const LearnerDashboard: React.FC = () => {
     }
   }, [userProfile]);
 
+  /**
+   * Fetch all approved and public courses available for self-assignment
+   */
   const fetchAvailableCourses = async () => {
     try {
       console.log('📚 Fetching available courses...');
@@ -64,6 +80,7 @@ const LearnerDashboard: React.FC = () => {
         .from('courses')
         .select('*')
         .eq('status', 'approved')
+        .eq('visibility', 'public') // Only public courses for self-service
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -76,7 +93,7 @@ const LearnerDashboard: React.FC = () => {
         return;
       }
 
-      console.log('📋 All courses:', data);
+      console.log('📋 All public courses:', data?.length);
 
       // Group courses by request_id and take the latest one for each request_id
       const uniqueCourses = data?.reduce((acc: Course[], course) => {
@@ -87,7 +104,7 @@ const LearnerDashboard: React.FC = () => {
         return acc;
       }, []) || [];
 
-      console.log('✅ Unique courses (grouped by request_id):', uniqueCourses);
+      console.log('✅ Unique public courses (grouped by request_id):', uniqueCourses.length);
       setCourses(uniqueCourses);
     } catch (error) {
       console.error('💥 Exception fetching courses:', error);
@@ -101,17 +118,20 @@ const LearnerDashboard: React.FC = () => {
     }
   };
 
+  /**
+   * Fetch all courses assigned to or enrolled by the learner
+   */
   const fetchEnrolledCourses = async () => {
     try {
       console.log('📖 Fetching enrolled courses for user:', userProfile?.id);
       
       const normalizedPhone = normalizePhoneNumber(userProfile?.phone || '');
       
-      // Fetch by both learner_id and phone_number for comprehensive results
+      // Fetch by phone number to get comprehensive results
       const { data, error } = await supabase
         .from('course_progress')
         .select('*')
-        .or(`learner_id.eq.${userProfile?.id},phone_number.eq.${normalizedPhone}`)
+        .eq('phone_number', normalizedPhone)
         .order('started_at', { ascending: false });
 
       if (error) {
@@ -119,31 +139,67 @@ const LearnerDashboard: React.FC = () => {
         return;
       }
 
-      console.log('📋 Enrolled courses:', data);
+      console.log('📋 All course progress records:', data?.length);
       setEnrolledCourses(data || []);
     } catch (error) {
       console.error('💥 Exception fetching enrolled courses:', error);
     }
   };
 
-  const checkExistingProgress = async (): Promise<string | null> => {
-    if (!userProfile) return null;
+  /**
+   * Check if learner can overwrite existing course
+   * Rules:
+   * 1. If no active course - can assign
+   * 2. If existing course was assigned by admin - cannot overwrite
+   * 3. If existing course was self-assigned - can overwrite
+   */
+  const checkCanOverwrite = async (): Promise<{ canOverwrite: boolean; existingCourse?: string }> => {
+    if (!userProfile) return { canOverwrite: false };
     
     const normalizedPhone = normalizePhoneNumber(userProfile.phone || '');
     
+    // Get active course progress
     const { data: existingActive } = await supabase
       .from('course_progress')
       .select('*')
       .eq('phone_number', normalizedPhone)
       .in('status', ['assigned', 'started']);
 
-    if (existingActive && existingActive.length > 0) {
-      return existingActive[0].course_name;
+    if (!existingActive || existingActive.length === 0) {
+      return { canOverwrite: true }; // No active course, can assign
     }
 
-    return null;
+    const activeCourse = existingActive[0];
+    
+    // Check if there's an admin in the system who assigned this course
+    // If learner_id matches any admin user, it was admin-assigned
+    if (activeCourse.learner_id) {
+      const { data: adminUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', activeCourse.learner_id)
+        .in('role', ['admin', 'superadmin'])
+        .single();
+
+      if (adminUser) {
+        // Course was assigned by admin, cannot overwrite
+        return { 
+          canOverwrite: false, 
+          existingCourse: activeCourse.course_name 
+        };
+      }
+    }
+
+    // Course was self-assigned or assigned via WhatsApp (no admin reference)
+    return { 
+      canOverwrite: true, 
+      existingCourse: activeCourse.course_name 
+    };
   };
 
+  /**
+   * Handle self-service course enrollment
+   */
   const handleEnrollCourse = async (course: Course, confirmOverwrite: boolean = false) => {
     if (!userProfile) {
       toast({
@@ -154,14 +210,25 @@ const LearnerDashboard: React.FC = () => {
       return;
     }
 
-    // Check for existing active courses if not confirming overwrite
+    // Check enrollment eligibility if not confirming overwrite
     if (!confirmOverwrite) {
-      const existingCourseName = await checkExistingProgress();
-      if (existingCourseName) {
+      const { canOverwrite, existingCourse } = await checkCanOverwrite();
+      
+      if (existingCourse && !canOverwrite) {
+        toast({
+          title: 'Cannot Overwrite Course',
+          description: `You have an active course "${existingCourse}" assigned by an admin. Contact your administrator to change courses.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      if (existingCourse && canOverwrite) {
         setConfirmDialog({
           open: true,
           course,
-          existingCourse: existingCourseName
+          existingCourse,
+          canOverwrite: true
         });
         return;
       }
@@ -170,24 +237,47 @@ const LearnerDashboard: React.FC = () => {
     setEnrolling(course.id);
 
     try {
-      console.log('📝 Enrolling in course:', course.course_name, 'User:', userProfile.name);
+      console.log('📝 Self-enrolling in course:', course.course_name, 'User:', userProfile.name);
 
       const normalizedPhone = normalizePhoneNumber(userProfile.phone || '');
 
       // If confirming overwrite, suspend existing courses
       if (confirmOverwrite) {
-        await supabase
+        console.log('⏸️ Suspending existing self-assigned courses...');
+        
+        const { data: existingCourses } = await supabase
           .from('course_progress')
-          .update({ status: 'suspended' })
+          .select('*')
           .eq('phone_number', normalizedPhone)
           .in('status', ['assigned', 'started']);
+
+        if (existingCourses && existingCourses.length > 0) {
+          await supabase
+            .from('course_progress')
+            .update({ status: 'suspended' })
+            .eq('phone_number', normalizedPhone)
+            .in('status', ['assigned', 'started']);
+
+          // Send suspension notification
+          for (const existingCourse of existingCourses) {
+            try {
+              await sendCourseSuspensionNotification(
+                userProfile.name,
+                existingCourse.course_name,
+                normalizedPhone
+              );
+            } catch (notificationError) {
+              console.warn('⚠️ Failed to send suspension notification:', notificationError);
+            }
+          }
+        }
       }
 
       // Check if already enrolled in this specific course
       const { data: existingProgress } = await supabase
         .from('course_progress')
         .select('*')
-        .eq('learner_id', userProfile.id)
+        .eq('phone_number', normalizedPhone)
         .eq('course_id', course.id)
         .single();
 
@@ -201,11 +291,11 @@ const LearnerDashboard: React.FC = () => {
         return;
       }
 
-      // Create course progress entry
+      // Create course progress entry for self-assignment
       const { data: progressData, error: progressError } = await supabase
         .from('course_progress')
         .insert({
-          learner_id: userProfile.id,
+          learner_id: userProfile.id, // Self-assigned, so learner_id = user id
           course_id: course.id,
           learner_name: userProfile.name,
           phone_number: normalizedPhone,
@@ -229,7 +319,20 @@ const LearnerDashboard: React.FC = () => {
         return;
       }
 
-      console.log('✅ Successfully enrolled in course:', progressData);
+      console.log('✅ Successfully self-enrolled in course:', progressData);
+
+      // Send WhatsApp notification for self-assignment
+      try {
+        await sendCourseAssignmentNotification(
+          userProfile.name,
+          course.course_name,
+          normalizedPhone
+        );
+        console.log('📱 WhatsApp notification sent successfully');
+      } catch (notificationError) {
+        console.warn('⚠️ Failed to send WhatsApp notification:', notificationError);
+        // Don't fail the enrollment if notification fails
+      }
 
       toast({
         title: 'Enrollment Successful',
@@ -250,6 +353,9 @@ const LearnerDashboard: React.FC = () => {
     }
   };
 
+  /**
+   * Get status color based on course progress status
+   */
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -264,6 +370,9 @@ const LearnerDashboard: React.FC = () => {
     }
   };
 
+  /**
+   * Get readable status text
+   */
   const getStatusText = (status: string) => {
     switch (status) {
       case 'assigned':
@@ -484,14 +593,14 @@ const LearnerDashboard: React.FC = () => {
               {/* Available Courses */}
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  Available Courses ({filteredCourses.length})
+                  Available Public Courses ({filteredCourses.length})
                 </h2>
                 {filteredCourses.length === 0 ? (
                   <Card>
                     <CardContent className="text-center py-8">
                       <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <p className="text-gray-600">
-                        {searchQuery ? 'No courses match your search' : 'No courses available at the moment.'}
+                        {searchQuery ? 'No courses match your search' : 'No public courses available at the moment.'}
                       </p>
                     </CardContent>
                   </Card>
