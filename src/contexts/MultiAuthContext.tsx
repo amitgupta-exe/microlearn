@@ -1,7 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User as SupabaseUser } from '@supabase/supabase-js';
 import { User, UserRole } from '@/lib/types';
 
 interface MultiAuthContextType {
@@ -11,7 +10,8 @@ interface MultiAuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
-  learnerLogin: (phone: string) => Promise<{ error: any }>;
+  learnerLogin: (phone: string, password: string) => Promise<{ error: any }>;
+  signInSuperAdmin: (password: string) => Promise<{ error: any }>;
   resetPassword: (email: string) => Promise<{ error: any }>;
 }
 
@@ -23,7 +23,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Always start fresh - no session persistence as requested
+    // Always start fresh - no session persistence
     console.log('🔄 Starting fresh authentication session (no cache)');
     setUser(null);
     setUserRole(null);
@@ -31,26 +31,13 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   /**
-   * Sign in for admin/superadmin users
+   * Sign in for admin users
    */
   const signIn = async (email: string, password: string) => {
     console.log('🔐 Attempting to sign in:', email);
     setLoading(true);
 
     try {
-      // Check if it's superadmin login
-      if (email === 'superadmin' && password === 'superadmin123') {
-        setUser({
-          id: 'superadmin',
-          email: 'superadmin@system.com',
-          name: 'Super Admin',
-          role: 'superadmin'
-        });
-        setUserRole('superadmin');
-        setLoading(false);
-        return { error: null };
-      }
-
       // Regular admin login via Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -100,9 +87,38 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   /**
-   * Learner login using phone number
+   * Super Admin login with hardcoded credentials
    */
-  const learnerLogin = async (phone: string) => {
+  const signInSuperAdmin = async (password: string) => {
+    console.log('🔐 Attempting super admin login');
+    setLoading(true);
+
+    try {
+      if (password === 'superadmin') {
+        setUser({
+          id: 'superadmin',
+          email: 'superadmin@system.com',
+          name: 'Super Admin',
+          role: 'superadmin'
+        });
+        setUserRole('superadmin');
+        setLoading(false);
+        return { error: null };
+      } else {
+        setLoading(false);
+        return { error: { message: 'Invalid password' } };
+      }
+    } catch (error) {
+      console.error('💥 Super admin login exception:', error);
+      setLoading(false);
+      return { error };
+    }
+  };
+
+  /**
+   * Learner login using phone number and password
+   */
+  const learnerLogin = async (phone: string, password: string) => {
     console.log('📱 Attempting learner login:', phone);
     setLoading(true);
 
@@ -118,6 +134,14 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         console.error('❌ Learner not found:', learnerError);
         setLoading(false);
         return { error: { message: 'Learner not found with this phone number' } };
+      }
+
+      // For simplicity, password is the phone number without country code
+      const expectedPassword = phone.replace(/^\+?[0-9]{1,3}/, '');
+      if (password !== expectedPassword && password !== phone) {
+        console.error('❌ Invalid password for learner');
+        setLoading(false);
+        return { error: { message: 'Invalid password' } };
       }
 
       console.log('✅ Learner login successful:', learnerData);
@@ -233,6 +257,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       signOut,
       signUp,
       learnerLogin,
+      signInSuperAdmin,
       resetPassword,
     }}>
       {children}

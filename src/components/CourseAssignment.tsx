@@ -107,10 +107,7 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
     try {
       let query = supabase
         .from('learners')
-        .select(`
-          *,
-          assigned_course:courses!learners_assigned_course_id_fkey (*)
-        `);
+        .select('*');
 
       // Filter based on user role
       if (userRole === 'admin') {
@@ -121,14 +118,8 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
 
       if (error) throw error;
 
-      // Transform the data to match our types
-      const transformedData = (data || []).map(learner => ({
-        ...learner,
-        assigned_course: learner.assigned_course || undefined
-      })) as Learner[];
-
-      console.log('Fetched learners for course assignment:', transformedData.length);
-      setLearners(transformedData);
+      console.log('Fetched learners for course assignment:', data?.length || 0);
+      setLearners(data || []);
     } catch (error) {
       console.error('Error fetching learners:', error);
       toast.error('Failed to load learners');
@@ -364,10 +355,10 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
                       <Phone className="h-3 w-3" />
                       <span>{selectedLearner.phone}</span>
                     </div>
-                    {selectedLearner.assigned_course && (
+                    {selectedLearner.assigned_course_id && (
                       <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
                         <p className="text-sm text-yellow-800">
-                          Currently assigned to: <strong>{selectedLearner.assigned_course.course_name}</strong>
+                          Currently has an assigned course
                         </p>
                       </div>
                     )}

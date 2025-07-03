@@ -32,7 +32,7 @@ const CourseOverwriteDialog: React.FC<CourseOverwriteDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Course Already Assigned</DialogTitle>
           <DialogDescription>
-            {learner.name} is already enrolled in "{learner.assigned_course?.course_name}". 
+            {learner.name} already has a course assigned. 
             Do you want to overwrite this assignment with "{newCourse.course_name}"?
             
             <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">

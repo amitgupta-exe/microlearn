@@ -1,62 +1,58 @@
-
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { Link } from 'react-router-dom';
+import { Plus, Edit, Trash2, Loader2, Search } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Users, Phone, Mail, Calendar, BookOpen, Plus, ArrowLeft, Search } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import { Tables } from '@/integrations/supabase/types';
+import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import LearnerForm from '@/components/LearnerForm';
-import LearnerImport from '@/components/LearnerImport';
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { useMultiAuth } from '@/contexts/MultiAuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { Learner } from '@/lib/types';
 import AssignLearnerToCourse from '@/components/AssignLearnerToCourse';
 
-type Learner = Tables<'learners'>;
-
-/**
- * Enhanced Learners Page - Manage learners and assign courses
- * Features: search, filtering, course assignment with confirmation
- */
-const Learners = () => {
-  const { id } = useParams();
-  const { user, userRole, loading } = useRequireAuth();
+const Learners: React.FC = () => {
   const [learners, setLearners] = useState<Learner[]>([]);
-  const [filteredLearners, setFilteredLearners] = useState<Learner[]>([]);
-  const [selectedLearner, setSelectedLearner] = useState<Learner | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [newLearner, setNewLearner] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    status: 'active' as 'active' | 'inactive',
+  });
+  const [editingLearner, setEditingLearner] = useState<Learner | null>(null);
+  const [deletingLearnerId, setDeletingLearnerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [isAssignOpen, setIsAssignOpen] = useState(false);
-  const [dataLoading, setDataLoading] = useState(true);
-
-  console.log('Learners page - user:', user, 'userRole:', userRole, 'loading:', loading);
+  const [filteredLearners, setFilteredLearners] = useState<Learner[]>([]);
+  const [selectedLearnerForAssignment, setSelectedLearnerForAssignment] = useState<Learner | null>(null);
+  const { user } = useMultiAuth();
 
   useEffect(() => {
-    if (!loading && user && userRole) {
-      fetchLearners();
-    }
-  }, [user, userRole, loading]);
+    fetchLearners();
+  }, [user]);
 
   useEffect(() => {
-    if (id && learners.length > 0) {
-      const learner = learners.find(l => l.id === id);
-      if (learner) {
-        setSelectedLearner(learner);
-      }
-    }
-  }, [id, learners]);
-
-  useEffect(() => {
-    // Filter learners based on search query
     const filtered = learners.filter(learner =>
       learner.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       learner.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -65,410 +61,414 @@ const Learners = () => {
     setFilteredLearners(filtered);
   }, [learners, searchQuery]);
 
-  /**
-   * Fetch learners based on user role
-   * Admins see only their learners, superadmins see all
-   */
   const fetchLearners = async () => {
-    console.log('Fetching learners for user:', user?.id, 'role:', userRole);
     try {
-      let query = supabase.from('learners').select('*');
+      setLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
       
-      // Filter by admin if not superadmin
-      if (userRole === 'admin') {
-        query = query.eq('created_by', user?.id);
+      if (!userData?.user) {
+        toast.error('You must be logged in to view learners');
+        return;
       }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      console.log('Fetched learners:', data?.length);
-      setLearners(data || []);
-      setFilteredLearners(data || []);
+
+      const { data, error } = await supabase
+        .from('learners')
+        .select('*')
+        .eq('created_by', userData.user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching learners:', error);
+        toast.error('Failed to load learners');
+        return;
+      }
+
+      // Transform the data to match our Learner type
+      const transformedLearners = (data || []).map(learner => ({
+        ...learner,
+        status: learner.status as 'active' | 'inactive',
+        hasActiveCourse: false,
+        activeCourse: null
+      }));
+
+      console.log('Fetched learners:', transformedLearners.length);
+      setLearners(transformedLearners);
     } catch (error) {
-      console.error('Error fetching learners:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch learners',
-        variant: 'destructive',
-      });
+      console.error('Error in learners fetch:', error);
+      toast.error('An error occurred while loading learners');
     } finally {
-      setDataLoading(false);
+      setLoading(false);
     }
   };
 
-  /**
-   * Handle creating a new learner
-   */
-  const handleCreateLearner = () => {
-    console.log('Opening learner form for creation');
-    setSelectedLearner(null);
-    setIsFormOpen(true);
-  };
-
-  /**
-   * Handle editing an existing learner
-   */
-  const handleEditLearner = (learner: Learner) => {
-    console.log('Opening learner form for editing:', learner.name);
-    setSelectedLearner(learner);
-    setIsFormOpen(true);
-  };
-
-  /**
-   * Handle deleting a learner
-   */
-  const handleDeleteLearner = async (learnerId: string) => {
-    console.log('Deleting learner:', learnerId);
+  const handleCreateLearner = async () => {
     try {
-      const { error } = await supabase.from('learners').delete().eq('id', learnerId);
-      
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: 'Learner deleted successfully',
-      });
-      
-      fetchLearners();
-      setSelectedLearner(null);
-    } catch (error) {
-      console.error('Error deleting learner:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete learner',
-        variant: 'destructive',
-      });
-    }
-  };
+      setLoading(true);
+      const { data: userData } = await supabase.auth.getUser();
 
-  /**
-   * Handle assigning a course to a learner
-   */
-  const handleAssignCourse = (learner: Learner) => {
-    console.log('Opening course assignment for learner:', learner.name);
-    setSelectedLearner(learner);
-    setIsAssignOpen(true);
-  };
-
-  /**
-   * Handle learner form submission (create/update)
-   */
-  const handleLearnerSubmit = async (data: { name: string; email: string; phone: string }) => {
-    console.log('Submitting learner data:', data);
-    try {
-      if (selectedLearner) {
-        // Update existing learner
-        const { error } = await supabase
-          .from('learners')
-          .update({
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', selectedLearner.id);
-
-        if (error) throw error;
-        
-        toast({
-          title: 'Success',
-          description: 'Learner updated successfully',
-        });
-      } else {
-        // Create new learner
-        const { error } = await supabase
-          .from('learners')
-          .insert({
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            status: 'active',
-            created_by: user?.id || '',
-          });
-
-        if (error) throw error;
-        
-        toast({
-          title: 'Success',
-          description: 'Learner created successfully',
-        });
+      if (!userData?.user) {
+        toast.error('You must be logged in to create learners');
+        return;
       }
-      
-      // Close form and refresh data
-      setIsFormOpen(false);
-      setSelectedLearner(null);
-      fetchLearners();
+
+      const { error } = await supabase
+        .from('learners')
+        .insert({
+          ...newLearner,
+          created_by: userData.user.id,
+        });
+
+      if (error) {
+        console.error('Error creating learner:', error);
+        toast.error('Failed to create learner');
+        return;
+      }
+
+      toast.success('Learner created successfully');
+      setShowCreateDialog(false);
+      setNewLearner({ name: '', email: '', phone: '', status: 'active' });
+      await fetchLearners();
     } catch (error) {
-      console.error('Error saving learner:', error);
-      throw error; // Re-throw so LearnerForm can handle the error display
+      console.error('Error in create learner:', error);
+      toast.error('An error occurred while creating the learner');
+    } finally {
+      setLoading(false);
     }
   };
 
-  /**
-   * Handle form cancellation
-   */
-  const handleFormCancel = () => {
-    console.log('Learner form cancelled');
-    setIsFormOpen(false);
-    setSelectedLearner(null);
+  const handleEditLearner = (learner: Learner) => {
+    setEditingLearner({
+      ...learner,
+      status: learner.status as 'active' | 'inactive'
+    });
+    setShowEditDialog(true);
   };
 
-  /**
-   * Handle successful import
-   */
-  const handleImportSuccess = () => {
-    console.log('Learner import completed successfully');
-    setIsImportOpen(false);
-    fetchLearners();
+  const handleUpdateLearner = async () => {
+    if (!editingLearner) return;
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from('learners')
+        .update({
+          name: editingLearner.name,
+          email: editingLearner.email,
+          phone: editingLearner.phone,
+          status: editingLearner.status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingLearner.id);
+
+      if (error) {
+        console.error('Error updating learner:', error);
+        toast.error('Failed to update learner');
+        return;
+      }
+
+      toast.success('Learner updated successfully');
+      setShowEditDialog(false);
+      setEditingLearner(null);
+      await fetchLearners();
+    } catch (error) {
+      console.error('Error in update learner:', error);
+      toast.error('An error occurred while updating the learner');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  /**
-   * Handle successful course assignment
-   */
-  const handleAssignSuccess = () => {
-    console.log('Course assignment completed successfully');
-    setIsAssignOpen(false);
-    fetchLearners();
+  const handleDeleteLearner = (id: string) => {
+    setDeletingLearnerId(id);
+    setShowDeleteDialog(true);
   };
 
-  if (loading || dataLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  const confirmDeleteLearner = async () => {
+    if (!deletingLearnerId) return;
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from('learners')
+        .delete()
+        .eq('id', deletingLearnerId);
+
+      if (error) {
+        console.error('Error deleting learner:', error);
+        toast.error('Failed to delete learner');
+        return;
+      }
+
+      toast.success('Learner deleted successfully');
+      setShowDeleteDialog(false);
+      setDeletingLearnerId(null);
+      await fetchLearners();
+    } catch (error) {
+      console.error('Error in delete learner:', error);
+      toast.error('An error occurred while deleting the learner');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssignCourse = (learner: Learner) => {
+    setSelectedLearnerForAssignment(learner);
+    setShowAssignDialog(true);
+  };
 
   return (
-    <div className="w-full py-6 px-6 md:px-8 page-transition">
-      <div className="max-w-[1400px] mx-auto">
-        {/* Header Section */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Learners</h1>
-            <p className="text-gray-600 mt-1">
-              Manage your learners and track their progress
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setIsImportOpen(true)} variant="outline">
-              Import Learners
-            </Button>
-            <Button onClick={handleCreateLearner} className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Learner
-            </Button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between space-y-2 md:space-y-0">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Manage Learners</h2>
+          <p className="text-muted-foreground">
+            Track and manage all your learners.
+          </p>
         </div>
-
-        {selectedLearner ? (
-          /* Individual Learner Detail View */
-          <Card className="bg-white shadow-sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedLearner(null)}
-                    className="text-gray-600 hover:text-gray-900"
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-1" />
-                    Back to Learners
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={() => handleAssignCourse(selectedLearner)}
-                    variant="outline"
-                    className="border-blue-200 text-blue-700 hover:bg-blue-50"
-                  >
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Assign Course
-                  </Button>
-                  <Button onClick={() => handleEditLearner(selectedLearner)} className="bg-blue-600 hover:bg-blue-700">
-                    Edit Learner
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    onClick={() => handleDeleteLearner(selectedLearner.id)}
-                  >
-                    Delete Learner
-                  </Button>
-                </div>
-              </div>
-              <CardTitle className="flex items-center gap-2 text-gray-900">
-                <Users className="h-5 w-5" />
-                {selectedLearner.name}
-              </CardTitle>
-              <CardDescription className="text-gray-600">Learner Details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-gray-500" />
-                  <span className="text-gray-700">{selectedLearner.phone}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-gray-500" />
-                  <span className="text-gray-700">{selectedLearner.email}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  <span className="text-gray-700">Joined {new Date(selectedLearner.created_at).toLocaleDateString()}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-gray-500" />
-                  <Badge 
-                    variant="outline"
-                    className={selectedLearner.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' : ''}
-                  >
-                    {selectedLearner.status}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          /* Learners Grid View with Search */
-          <div className="space-y-6">
-            {/* Search Bar */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search learners..."
-                className="pl-8 bg-white"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            {/* Learners Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredLearners.map((learner) => (
-                <Card 
-                  key={learner.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow bg-white border border-gray-200" 
-                  onClick={() => setSelectedLearner(learner)}
-                >
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between text-gray-900">
-                      <span className="truncate">{learner.name}</span>
-                      <Badge 
-                        variant="outline"
-                        className={learner.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' : ''}
-                      >
-                        {learner.status}
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <Phone className="h-3 w-3 text-gray-500" />
-                        <span className="text-xs text-gray-600">{learner.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Mail className="h-3 w-3 text-gray-500" />
-                        <span className="text-xs text-gray-600">{learner.email}</span>
-                      </div>
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between text-sm text-gray-600">
-                      <span>Joined {new Date(learner.created_at).toLocaleDateString()}</span>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAssignCourse(learner);
-                        }}
-                        className="border-blue-200 text-blue-700 hover:bg-blue-50"
-                      >
-                        <BookOpen className="h-3 w-3 mr-1" />
-                        Assign
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Empty State */}
-            {filteredLearners.length === 0 && (
-              <Card className="bg-white">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Users className="h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-semibold mb-2 text-gray-900">
-                    {searchQuery ? 'No learners found' : 'No learners found'}
-                  </h3>
-                  <p className="text-gray-600 text-center mb-4">
-                    {searchQuery 
-                      ? 'No learners match your search criteria.' 
-                      : 'Get started by adding your first learner or importing a list.'
-                    }
-                  </p>
-                  {!searchQuery && (
-                    <div className="flex gap-2">
-                      <Button onClick={() => setIsImportOpen(true)} variant="outline">
-                        Import Learners
-                      </Button>
-                      <Button onClick={handleCreateLearner} className="bg-blue-600 hover:bg-blue-700">
-                        Add First Learner
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
-
-        {/* Learner Form Dialog */}
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogContent className="max-w-md bg-white">
-            <DialogHeader>
-              <DialogTitle className="text-gray-900">
-                {selectedLearner ? 'Edit Learner' : 'Add New Learner'}
-              </DialogTitle>
-            </DialogHeader>
-            <LearnerForm
-              learner={selectedLearner}
-              onSubmit={handleLearnerSubmit}
-              onCancel={handleFormCancel}
-            />
-          </DialogContent>
-        </Dialog>
-
-        {/* Import Dialog */}
-        <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
-            <DialogHeader>
-              <DialogTitle className="text-gray-900">Import Learners</DialogTitle>
-            </DialogHeader>
-            <LearnerImport onSuccess={handleImportSuccess} />
-          </DialogContent>
-        </Dialog>
-
-        {/* Assign Course Dialog */}
-        <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
-            <DialogHeader>
-              <DialogTitle className="text-gray-900">Assign Course</DialogTitle>
-            </DialogHeader>
-            {selectedLearner && (
-              <AssignLearnerToCourse
-                learner={selectedLearner}
-                onSuccess={handleAssignSuccess}
-                onCancel={() => setIsAssignOpen(false)}
-              />
-            )}
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center space-x-2">
+          <Input
+            placeholder="Search learners..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Learner
+          </Button>
+        </div>
       </div>
+      <div className="border rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading learners...
+                </TableCell>
+              </TableRow>
+            ) : filteredLearners.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center">
+                  No learners found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredLearners.map((learner) => (
+                <TableRow key={learner.id}>
+                  <TableCell>{learner.name}</TableCell>
+                  <TableCell>{learner.email}</TableCell>
+                  <TableCell>{learner.phone}</TableCell>
+                  <TableCell>
+                    <Badge variant={learner.status === 'active' ? 'default' : 'outline'}>
+                      {learner.status === 'active' ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAssignCourse(learner)}
+                    >
+                      Assign Course
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditLearner(learner)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteLearner(learner.id)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Create Learner Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Learner</DialogTitle>
+            <DialogDescription>
+              Add a new learner to the system.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={newLearner.name}
+                onChange={(e) => setNewLearner({ ...newLearner, name: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="email" className="text-right">
+                Email
+              </Label>
+              <Input
+                type="email"
+                id="email"
+                value={newLearner.email}
+                onChange={(e) => setNewLearner({ ...newLearner, email: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="phone" className="text-right">
+                Phone
+              </Label>
+              <Input
+                id="phone"
+                value={newLearner.phone}
+                onChange={(e) => setNewLearner({ ...newLearner, phone: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="status" className="text-right">
+                Status
+              </Label>
+              <select
+                id="status"
+                className="col-span-3 rounded-md border-gray-200 shadow-sm focus:border-blue-400 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                value={newLearner.status}
+                onChange={(e) => setNewLearner({ ...newLearner, status: e.target.value as 'active' | 'inactive' })}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" onClick={handleCreateLearner}>
+              Create Learner
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Learner Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Learner</DialogTitle>
+            <DialogDescription>
+              Edit the details of the selected learner.
+            </DialogDescription>
+          </DialogHeader>
+          {editingLearner && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="name"
+                  value={editingLearner.name}
+                  onChange={(e) => setEditingLearner({ ...editingLearner, name: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right">
+                  Email
+                </Label>
+                <Input
+                  type="email"
+                  id="email"
+                  value={editingLearner.email}
+                  onChange={(e) => setEditingLearner({ ...editingLearner, email: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="phone" className="text-right">
+                  Phone
+                </Label>
+                <Input
+                  id="phone"
+                  value={editingLearner.phone}
+                  onChange={(e) => setEditingLearner({ ...editingLearner, phone: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="status" className="text-right">
+                  Status
+                </Label>
+                <select
+                  id="status"
+                  className="col-span-3 rounded-md border-gray-200 shadow-sm focus:border-blue-400 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                  value={editingLearner.status}
+                  onChange={(e) => setEditingLearner({ ...editingLearner, status: e.target.value as 'active' | 'inactive' })}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="submit" onClick={handleUpdateLearner}>
+              Update Learner
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Learner Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Learner</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this learner? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteLearner}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assignment Dialog */}
+      <AssignLearnerToCourse
+        open={showAssignDialog}
+        onOpenChange={setShowAssignDialog}
+        learner={selectedLearnerForAssignment}
+      />
     </div>
   );
 };

@@ -14,11 +14,13 @@ import Courses from "./pages/Courses";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
+import AdminLogin from "./pages/AdminLogin";
+import SuperAdminLogin from "./pages/SuperAdminLogin";
+import LearnerLogin from "./pages/LearnerLogin";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AuthCallback from "./pages/AuthCallback";
-import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import LearnerDashboard from "./pages/LearnerDashboard";
 import NotFound from "./pages/NotFound";
@@ -136,11 +138,13 @@ function App() {
                     {/* Public routes */}
                     <Route path="/" element={<Home />} />
                     <Route path="/login" element={<Login />} />
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route path="/superadmin/login" element={<SuperAdminLogin />} />
+                    <Route path="/learner/login" element={<LearnerLogin />} />
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
-                    <Route path="/admin/login" element={<SuperAdminLogin />} />
                     
                     {/* Super Admin routes */}
                     <Route 
