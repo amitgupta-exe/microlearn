@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Loader2, Search, BookOpen, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { toast } from 'sonner';
-import { Course, Learner } from '@/lib/types';
+import { Learner, CourseGroup } from '@/lib/types';
 import CourseOverwriteDialog from './CourseOverwriteDialog';
 
 interface AssignLearnerToCourseProps {
@@ -17,33 +18,17 @@ interface AssignLearnerToCourseProps {
   onAssignmentComplete?: () => void;
 }
 
-interface CourseGroup {
-  id: string;
-  course_name: string;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  status: string;
-  visibility: string;
-  origin: string;
-  total_days: number;
-}
-
 const normalizePhoneNumber = (phone: string): string => {
-  // Remove any non-digit characters except +
   const cleaned = phone.replace(/[^\d+]/g, '');
   
-  // If it starts with +, keep it as is
   if (cleaned.startsWith('+')) {
     return cleaned;
   }
   
-  // If it's a 10-digit number, assume it's Indian and add +91
   if (cleaned.length === 10 && /^\d{10}$/.test(cleaned)) {
     return `+91${cleaned}`;
   }
   
-  // Return as is if already formatted or different format
   return cleaned;
 };
 
@@ -61,7 +46,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCourses, setIsLoadingCourses] = useState(true);
   const [showOverwriteDialog, setShowOverwriteDialog] = useState(false);
-  const [currentCourse, setCurrentCourse] = useState<Course | null>(null);
+  const [currentCourse, setCurrentCourse] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && user) {
@@ -84,7 +69,6 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
         .from('courses')
         .select('*');
 
-      // Filter based on user role
       if (userRole === 'admin') {
         query = query.eq('created_by', user?.id);
       }
@@ -100,7 +84,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
         const key = `${course.course_name}_${course.created_by}`;
         if (!courseGroups[key]) {
           courseGroups[key] = {
-            id: course.id, // Use the first course's ID as the group ID
+            id: course.id,
             course_name: course.course_name,
             created_at: course.created_at,
             updated_at: course.updated_at,
@@ -112,7 +96,6 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
           };
         } else {
           courseGroups[key].total_days += 1;
-          // Keep the most recent updated_at
           if (course.updated_at > courseGroups[key].updated_at) {
             courseGroups[key].updated_at = course.updated_at;
           }
@@ -148,11 +131,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
       if (selectError) throw selectError;
 
       if (existingActive && existingActive.length > 0) {
-        // Show overwrite dialog
-        setCurrentCourse({
-          id: existingActive[0].course_id,
-          course_name: existingActive[0].course_name
-        } as Course);
+        setCurrentCourse(existingActive[0].course_name);
         setShowOverwriteDialog(true);
         return;
       }
@@ -175,7 +154,6 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
         throw new Error('Invalid phone number');
       }
 
-      // If overwriting, suspend the previous course progress
       if (isOverwrite) {
         await supabase
           .from('course_progress')
@@ -184,7 +162,6 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
           .in('status', ['assigned', 'started']);
       }
 
-      // Update learner's assigned course
       const { error: updateError } = await supabase
         .from('learners')
         .update({ 
@@ -195,7 +172,6 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
 
       if (updateError) throw updateError;
 
-      // Create course progress entry
       const { error: progressError } = await supabase
         .from('course_progress')
         .insert({
@@ -215,7 +191,6 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
 
       toast.success(`Course "${selectedCourse.course_name}" assigned to ${learner.name} successfully`);
       
-      // Reset state
       setSelectedCourse(null);
       setSearchQuery('');
       onOpenChange(false);
@@ -246,7 +221,6 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -257,7 +231,6 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
               />
             </div>
 
-            {/* Course List */}
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {isLoadingCourses ? (
                 <div className="flex items-center justify-center py-8">
@@ -304,7 +277,6 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
               )}
             </div>
 
-            {/* Selected Course Info */}
             {selectedCourse && (
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h4 className="font-medium text-blue-900 mb-2">Selected Course</h4>
@@ -315,7 +287,6 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="flex justify-end space-x-2 pt-4">
               <Button
                 variant="outline"
@@ -337,15 +308,13 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
       </Dialog>
 
       {/* Overwrite Confirmation Dialog */}
-      {currentCourse && (
-        <CourseOverwriteDialog
-          open={showOverwriteDialog}
-          onOpenChange={setShowOverwriteDialog}
-          learner={learner}
-          newCourse={selectedCourse as Course}
-          onConfirm={handleOverwriteConfirm}
-        />
-      )}
+      <CourseOverwriteDialog
+        open={showOverwriteDialog}
+        onOpenChange={setShowOverwriteDialog}
+        learner={learner}
+        newCourse={{ id: selectedCourse?.id || '', course_name: selectedCourse?.course_name || '' } as any}
+        onConfirm={handleOverwriteConfirm}
+      />
     </>
   );
 };

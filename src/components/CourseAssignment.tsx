@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Course, Learner } from '@/lib/types';
 import { normalizePhoneNumber } from '@/lib/utils';
 import CourseOverwriteDialog from './CourseOverwriteDialog';
+import ConfirmDialog from './ConfirmDialog';
 
 interface CourseAssignmentProps {
   course: Course;
@@ -26,6 +27,14 @@ interface LearnerWithProgress extends Learner {
   };
 }
 
+interface OverwriteState {
+  [key: string]: {
+    open: boolean;
+    learner: LearnerWithProgress;
+    currentCourse: string;
+  };
+}
+
 const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmentComplete }) => {
   const { user, userRole } = useMultiAuth();
   const [learners, setLearners] = useState<LearnerWithProgress[]>([]);
@@ -34,15 +43,9 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
   const [selectedLearners, setSelectedLearners] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingLearners, setIsLoadingLearners] = useState(true);
-  const [overwriteDialogs, setOverwriteDialogs] = useState<{
-    [key: string]: {
-      open: boolean;
-      learner: LearnerWithProgress;
-      currentCourse: Course;
-    }
-  }>({});
-
-  console.log('CourseAssignment - course:', course.course_name);
+  const [overwriteDialogs, setOverwriteDialogs] = useState<OverwriteState>({});
+  const [showOverwriteAllDialog, setShowOverwriteAllDialog] = useState(false);
+  const [conflictingLearners, setConflictingLearners] = useState<LearnerWithProgress[]>([]);
 
   useEffect(() => {
     fetchLearners();
@@ -61,15 +64,8 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
     try {
       let query = supabase
         .from('learners')
-        .select(`
-          *,
-          assigned_course:assigned_course_id(
-            id,
-            course_name
-          )
-        `);
+        .select('*');
 
-      // Filter based on user role
       if (userRole === 'admin') {
         query = query.eq('created_by', user?.id);
       }
@@ -78,13 +74,11 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
 
       if (error) throw error;
 
-      // Fetch progress for each learner
       const learnersWithProgress: LearnerWithProgress[] = [];
       
       for (const learner of data || []) {
         const normalizedPhone = normalizePhoneNumber(learner.phone);
         
-        // Get current progress
         const { data: progressData } = await supabase
           .from('course_progress')
           .select('status, current_day, progress_percent, course_name')
@@ -99,7 +93,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
         });
       }
 
-      console.log('Fetched learners for course assignment:', learnersWithProgress.length);
       setLearners(learnersWithProgress);
     } catch (error) {
       console.error('Error fetching learners:', error);
@@ -122,42 +115,45 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
 
     setIsLoading(true);
     try {
-      const conflictingLearners: LearnerWithProgress[] = [];
-      const readyLearners: LearnerWithProgress[] = [];
+      const conflicts: LearnerWithProgress[] = [];
+      const ready: LearnerWithProgress[] = [];
 
-      // Check for conflicts
       for (const learnerId of selectedLearners) {
         const learner = learners.find(l => l.id === learnerId);
         if (!learner) continue;
 
         if (learner.progress) {
-          conflictingLearners.push(learner);
+          conflicts.push(learner);
         } else {
-          readyLearners.push(learner);
+          ready.push(learner);
         }
       }
 
       // Assign to ready learners immediately
-      for (const learner of readyLearners) {
+      for (const learner of ready) {
         await performAssignment(learner, false);
       }
 
-      // Show overwrite dialogs for conflicting learners
-      const newOverwriteDialogs: typeof overwriteDialogs = {};
-      conflictingLearners.forEach(learner => {
-        newOverwriteDialogs[learner.id] = {
-          open: true,
-          learner,
-          currentCourse: {
-            id: learner.progress?.course_name || '',
-            course_name: learner.progress?.course_name || 'Unknown Course'
-          } as Course
-        };
-      });
-      setOverwriteDialogs(newOverwriteDialogs);
+      if (conflicts.length > 0) {
+        setConflictingLearners(conflicts);
+        if (conflicts.length > 1) {
+          setShowOverwriteAllDialog(true);
+        } else {
+          // Show individual dialog for single conflict
+          const learner = conflicts[0];
+          setOverwriteDialogs({
+            [learner.id]: {
+              open: true,
+              learner,
+              currentCourse: learner.progress?.course_name || 'Unknown'
+            }
+          });
+        }
+      }
 
-      if (readyLearners.length > 0) {
-        toast.success(`Successfully assigned course to ${readyLearners.length} learner(s)`);
+      if (ready.length > 0) {
+        toast.success(`Successfully assigned course to ${ready.length} learner(s)`);
+        setSelectedLearners(prev => prev.filter(id => !ready.some(l => l.id === id)));
       }
 
     } catch (error) {
@@ -175,7 +171,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
         throw new Error('Invalid phone number');
       }
 
-      // If overwriting, suspend the previous course progress
       if (isOverwrite) {
         await supabase
           .from('course_progress')
@@ -184,7 +179,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
           .in('status', ['assigned', 'started']);
       }
 
-      // Update learner's assigned course
       const { error: updateError } = await supabase
         .from('learners')
         .update({ 
@@ -195,7 +189,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
 
       if (updateError) throw updateError;
 
-      // Create course progress entry
       const { error: progressError } = await supabase
         .from('course_progress')
         .insert({
@@ -230,13 +223,11 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
       await performAssignment(dialog.learner, true);
       toast.success(`Course assigned to ${dialog.learner.name} successfully`);
       
-      // Close this dialog
       setOverwriteDialogs(prev => ({
         ...prev,
         [learnerId]: { ...prev[learnerId], open: false }
       }));
       
-      // Remove from selected learners
       setSelectedLearners(prev => prev.filter(id => id !== learnerId));
     } catch (error) {
       console.error('Error confirming overwrite:', error);
@@ -249,6 +240,34 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
       [learnerId]: { ...prev[learnerId], open: false }
     }));
     setSelectedLearners(prev => prev.filter(id => id !== learnerId));
+  };
+
+  const handleOverwriteAll = async () => {
+    try {
+      for (const learner of conflictingLearners) {
+        await performAssignment(learner, true);
+      }
+      toast.success(`Course assigned to all ${conflictingLearners.length} learners`);
+      setSelectedLearners(prev => prev.filter(id => !conflictingLearners.some(l => l.id === id)));
+      setConflictingLearners([]);
+      setShowOverwriteAllDialog(false);
+    } catch (error) {
+      console.error('Error in overwrite all:', error);
+      toast.error('Failed to assign courses');
+    }
+  };
+
+  const handleSelectiveOverwrite = () => {
+    setShowOverwriteAllDialog(false);
+    const newDialogs: OverwriteState = {};
+    conflictingLearners.forEach(learner => {
+      newDialogs[learner.id] = {
+        open: true,
+        learner,
+        currentCourse: learner.progress?.course_name || 'Unknown'
+      };
+    });
+    setOverwriteDialogs(newDialogs);
   };
 
   if (isLoadingLearners) {
@@ -272,7 +291,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -283,7 +301,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
             />
           </div>
 
-          {/* Selected Count */}
           {selectedLearners.length > 0 && (
             <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
               <span className="text-sm text-blue-800">
@@ -300,7 +317,6 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
             </div>
           )}
 
-          {/* Learners List */}
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {filteredLearners.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
@@ -359,7 +375,19 @@ const CourseAssignment: React.FC<CourseAssignmentProps> = ({ course, onAssignmen
         </CardContent>
       </Card>
 
-      {/* Overwrite Dialogs */}
+      {/* Overwrite All Dialog */}
+      <ConfirmDialog
+        open={showOverwriteAllDialog}
+        onOpenChange={setShowOverwriteAllDialog}
+        title="Multiple Course Conflicts"
+        description={`${conflictingLearners.length} learners already have active courses. Would you like to overwrite all of them or select individually?`}
+        confirmText="Overwrite All"
+        cancelText="Select Individual"
+        onConfirm={handleOverwriteAll}
+        variant="destructive"
+      />
+
+      {/* Individual Overwrite Dialogs */}
       {Object.entries(overwriteDialogs).map(([learnerId, dialog]) => (
         <CourseOverwriteDialog
           key={learnerId}

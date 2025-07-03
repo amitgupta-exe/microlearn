@@ -20,4 +20,20 @@ export interface User {
   name: string;
   phone?: string;
   role: UserRole;
+  app_metadata?: any;
+  user_metadata?: any;
+  aud?: string;
+  created_at?: string;
+}
+
+export interface CourseGroup {
+  id: string;
+  course_name: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  status: string;
+  visibility: string;
+  origin: string;
+  total_days: number;
 }

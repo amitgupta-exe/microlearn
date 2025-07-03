@@ -3,7 +3,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { GraduationCap, Users, BookOpen, Phone, Mail, MapPin } from 'lucide-react';
+import { GraduationCap, Users, BookOpen, Phone, Mail, MapPin, ChevronDown, Shield, User } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 /**
  * Landing Page Component
@@ -20,11 +26,42 @@ const Home: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900">EduLearn</h1>
           </div>
           <div className="flex gap-3">
-            <Link to="/login">
-              <Button variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50">
-                Login
-              </Button>
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50">
+                  Login <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 bg-white z-50">
+                <DropdownMenuItem asChild>
+                  <Link to="/admin/login" className="w-full flex items-center gap-2 p-2">
+                    <Users className="h-4 w-4 text-blue-600" />
+                    <div>
+                      <div className="font-medium">Admin Login</div>
+                      <div className="text-sm text-gray-500">Manage courses and learners</div>
+                    </div>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/learner/login" className="w-full flex items-center gap-2 p-2">
+                    <User className="h-4 w-4 text-green-600" />
+                    <div>
+                      <div className="font-medium">Learner Login</div>
+                      <div className="text-sm text-gray-500">Access your courses</div>
+                    </div>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/superadmin/login" className="w-full flex items-center gap-2 p-2">
+                    <Shield className="h-4 w-4 text-red-600" />
+                    <div>
+                      <div className="font-medium">Super Admin</div>
+                      <div className="text-sm text-gray-500">Full system access</div>
+                    </div>
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Link to="/signup">
               <Button className="bg-blue-600 hover:bg-blue-700">
                 Sign Up
@@ -51,11 +88,24 @@ const Home: React.FC = () => {
                 Get Started Free
               </Button>
             </Link>
-            <Link to="/login">
-              <Button size="lg" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 px-8 py-3 text-lg">
-                Login to Dashboard
-              </Button>
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="lg" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 px-8 py-3 text-lg">
+                  Login to Dashboard <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 bg-white z-50">
+                <DropdownMenuItem asChild>
+                  <Link to="/admin/login">Admin Dashboard</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/learner/login">Learner Dashboard</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/superadmin/login">Super Admin</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
