@@ -1,25 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useMultiAuth } from '@/contexts/MultiAuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
-import { LogOut, Users, BookOpen, FileText, TrendingUp, CheckCircle, Eye } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Loader2, Users, BookOpen, FileText, Search } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface Analytics {
-  totalCourses: number;
-  totalLearners: number;
-  totalRegistrations: number;
-  approvedCourses: number;
-  pendingCourses: number;
-  activeLearners: number;
-}
+import { supabase } from '@/integrations/supabase/client';
+import { useSuperAdmin } from '@/contexts/SuperAdminContext';
 
 interface RegistrationRequest {
   request_id: string;
@@ -33,76 +23,33 @@ interface RegistrationRequest {
   created_at: string;
 }
 
-interface GroupedCourse {
-  request_id: string;
-  course_name: string;
-  status: string;
+interface AdminStats {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
   created_at: string;
-  modules: any[];
+  learner_count: number;
+  course_count: number;
 }
 
 const SuperAdminDashboard = () => {
-  const { signOut, userProfile } = useMultiAuth();
-  const navigate = useNavigate();
-  const [analytics, setAnalytics] = useState<Analytics>({
-    totalCourses: 0,
-    totalLearners: 0,
-    totalRegistrations: 0,
-    approvedCourses: 0,
-    pendingCourses: 0,
-    activeLearners: 0,
-  });
-  const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>([]);
-  const [groupedCourses, setGroupedCourses] = useState<GroupedCourse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { logout } = useSuperAdmin();
+  const [requests, setRequests] = useState<RegistrationRequest[]>([]);
+  const [adminStats, setAdminStats] = useState<AdminStats[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  console.log('SuperAdminDashboard loading...');
 
   useEffect(() => {
-    fetchAnalytics();
     fetchRegistrationRequests();
-    fetchCourses();
+    fetchAdminStats();
   }, []);
 
-  const fetchAnalytics = async () => {
-    try {
-      console.log('Fetching analytics...');
-      
-      // Fetch course analytics
-      const { data: courses } = await supabase.from('courses').select('status');
-      const { data: learners } = await supabase.from('users').select('role').eq('role', 'learner');
-      const { data: registrations } = await supabase.from('registration_requests').select('approval_status');
-      const { data: courseProgress } = await supabase.from('course_progress').select('status');
-
-      const totalCourses = courses?.length || 0;
-      const approvedCourses = courses?.filter(c => c.status === 'approved').length || 0;
-      const pendingCourses = courses?.filter(c => c.status === 'pending').length || 0;
-      
-      const totalLearners = learners?.length || 0;
-      const activeLearners = courseProgress?.filter(cp => cp.status === 'started' || cp.status === 'assigned').length || 0;
-      
-      const totalRegistrations = registrations?.length || 0;
-
-      console.log('Analytics:', {
-        totalCourses,
-        totalLearners,
-        totalRegistrations,
-        approvedCourses,
-        pendingCourses,
-        activeLearners,
-      });
-
-      setAnalytics({
-        totalCourses,
-        totalLearners,
-        totalRegistrations,
-        approvedCourses,
-        pendingCourses,
-        activeLearners,
-      });
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
-    }
-  };
-
+  /**
+   * Fetch all registration requests for approval
+   */
   const fetchRegistrationRequests = async () => {
     try {
       console.log('Fetching registration requests...');
@@ -116,58 +63,77 @@ const SuperAdminDashboard = () => {
         throw error;
       }
 
-      console.log('Registration requests:', data);
-      setRegistrationRequests(data || []);
+      console.log('Fetched registration requests:', data?.length);
+      setRequests(data || []);
     } catch (error) {
-      console.error('Error in fetchRegistrationRequests:', error);
+      console.error('Error fetching registration requests:', error);
       toast.error('Failed to load registration requests');
     }
   };
 
-  const fetchCourses = async () => {
+  /**
+   * Fetch admin statistics (learners and courses count)
+   */
+  const fetchAdminStats = async () => {
     try {
-      console.log('Fetching courses...');
-      const { data, error } = await supabase
-        .from('courses')
+      console.log('Fetching admin statistics...');
+      
+      // Get all admin users
+      const { data: admins, error: adminError } = await supabase
+        .from('users')
         .select('*')
+        .eq('role', 'admin')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching courses:', error);
-        throw error;
+      if (adminError) {
+        console.error('Error fetching admins:', adminError);
+        throw adminError;
       }
 
-      console.log('Courses:', data);
+      // Get learner counts for each admin
+      const adminStatsPromises = admins?.map(async (admin) => {
+        const [learnersResult, coursesResult] = await Promise.all([
+          supabase
+            .from('learners')
+            .select('id', { count: 'exact' })
+            .eq('created_by', admin.id),
+          supabase
+            .from('courses')
+            .select('request_id')
+            .eq('created_by', admin.id)
+        ]);
 
-      // Group courses by request_id
-      const grouped = data?.reduce((acc: { [key: string]: GroupedCourse }, course: any) => {
-        const requestId = course.request_id || 'no-request-id';
-        
-        if (!acc[requestId]) {
-          acc[requestId] = {
-            request_id: requestId,
-            course_name: course.course_name || 'Untitled Course',
-            status: course.status || 'pending',
-            created_at: course.created_at || '',
-            modules: []
-          };
-        }
-        
-        acc[requestId].modules.push(course);
-        return acc;
-      }, {}) || {};
+        // Count unique request_ids for courses
+        const uniqueCourses = coursesResult.data?.reduce((acc: string[], course) => {
+          if (course.request_id && !acc.includes(course.request_id)) {
+            acc.push(course.request_id);
+          }
+          return acc;
+        }, []) || [];
 
-      console.log('Grouped courses:', Object.values(grouped));
-      setGroupedCourses(Object.values(grouped));
+        return {
+          ...admin,
+          learner_count: learnersResult.count || 0,
+          course_count: uniqueCourses.length
+        };
+      }) || [];
+
+      const adminStatsData = await Promise.all(adminStatsPromises);
+      console.log('Admin statistics:', adminStatsData);
+      setAdminStats(adminStatsData);
+
     } catch (error) {
-      console.error('Error in fetchCourses:', error);
-      toast.error('Failed to load courses');
+      console.error('Error fetching admin statistics:', error);
+      toast.error('Failed to load admin statistics');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const updateRegistrationStatus = async (requestId: string, status: 'pending' | 'approved' | 'rejected') => {
+  /**
+   * Update registration request status
+   */
+  const updateRegistrationStatus = async (requestId: string, status: string) => {
     try {
       console.log('Updating registration status:', requestId, status);
       
@@ -181,7 +147,8 @@ const SuperAdminDashboard = () => {
         throw error;
       }
 
-      setRegistrationRequests(prev => 
+      // Update local state
+      setRequests(prev => 
         prev.map(request => 
           request.request_id === requestId 
             ? { ...request, approval_status: status }
@@ -189,50 +156,16 @@ const SuperAdminDashboard = () => {
         )
       );
 
-      toast.success(`Registration ${status} successfully`);
-      await fetchAnalytics(); // Refresh analytics
+      toast.success(`Registration request ${status} successfully`);
     } catch (error) {
       console.error('Error updating registration status:', error);
       toast.error('Failed to update registration status');
     }
   };
 
-  const updateCourseStatus = async (requestId: string, status: 'pending' | 'approved' | 'rejected') => {
-    try {
-      console.log('Updating course status:', requestId, status);
-      
-      const { error } = await supabase
-        .from('courses')
-        .update({ status })
-        .eq('request_id', requestId);
-
-      if (error) {
-        console.error('Error updating course status:', error);
-        throw error;
-      }
-
-      setGroupedCourses(prev => 
-        prev.map(course => 
-          course.request_id === requestId 
-            ? { ...course, status }
-            : course
-        )
-      );
-
-      toast.success(`Course ${status} successfully`);
-      await fetchAnalytics(); // Refresh analytics
-    } catch (error) {
-      console.error('Error updating course status:', error);
-      toast.error('Failed to update course status');
-    }
-  };
-
-  const handleSignOut = () => {
-    console.log('Super admin signing out...');
-    signOut();
-    navigate('/login');
-  };
-
+  /**
+   * Get status badge color
+   */
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved': return 'bg-green-500';
@@ -242,257 +175,194 @@ const SuperAdminDashboard = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  // Filter requests based on search query
+  const filteredRequests = requests.filter(request =>
+    request.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    request.number.includes(searchQuery) ||
+    request.topic.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+      <div className="container mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Super Admin Dashboard</h1>
-            <p className="text-gray-600">Welcome back, {userProfile?.name}</p>
+            <h1 className="text-3xl font-bold text-gray-900">Super Admin Dashboard</h1>
+            <p className="text-gray-600 mt-1">Manage registration requests and admin statistics</p>
           </div>
-          <Button onClick={handleSignOut} variant="outline" className="flex items-center gap-2">
-            <LogOut className="h-4 w-4" />
+          <Button variant="outline" onClick={logout}>
             Sign Out
           </Button>
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Analytics Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Courses</CardTitle>
-              <BookOpen className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{analytics.totalCourses}</div>
-              <p className="text-xs text-blue-100">
-                {analytics.approvedCourses} approved, {analytics.pendingCourses} pending
-              </p>
-            </CardContent>
-          </Card>
+        {/* Admin Statistics */}
+        <Card className="mb-8 bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-gray-900 flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Admin Statistics
+            </CardTitle>
+            <CardDescription className="text-gray-600">
+              Overview of all admin users and their activity
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                <span className="ml-2 text-gray-600">Loading admin statistics...</span>
+              </div>
+            ) : (
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-gray-700">Admin Name</TableHead>
+                      <TableHead className="text-gray-700">Email</TableHead>
+                      <TableHead className="text-gray-700">Phone</TableHead>
+                      <TableHead className="text-gray-700">Learners</TableHead>
+                      <TableHead className="text-gray-700">Courses</TableHead>
+                      <TableHead className="text-gray-700">Joined</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {adminStats.map((admin) => (
+                      <TableRow key={admin.id} className="hover:bg-gray-50">
+                        <TableCell className="font-medium text-gray-900">
+                          {admin.name}
+                        </TableCell>
+                        <TableCell className="text-gray-600">
+                          {admin.email}
+                        </TableCell>
+                        <TableCell className="text-gray-600">
+                          {admin.phone || 'Not provided'}
+                        </TableCell>
+                        <TableCell className="text-gray-900">
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                            {admin.learner_count}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-gray-900">
+                          <Badge variant="outline" className="bg-green-50 text-green-700">
+                            {admin.course_count}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-gray-600">
+                          {new Date(admin.created_at).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Learners</CardTitle>
-              <Users className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{analytics.totalLearners}</div>
-              <p className="text-xs text-green-100">
-                {analytics.activeLearners} active learners
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Registration Requests</CardTitle>
-              <FileText className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{analytics.totalRegistrations}</div>
-              <p className="text-xs text-purple-100">Total requests received</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Course Completion</CardTitle>
-              <TrendingUp className="h-4 w-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">85%</div>
-              <p className="text-xs text-orange-100">Average completion rate</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Navigation Tabs */}
-        <Tabs defaultValue="registrations" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="registrations" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Registration Approval
-            </TabsTrigger>
-            <TabsTrigger value="courses" className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4" />
-              Course Approval
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="registrations">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+        {/* Registration Requests */}
+        <Card className="bg-white shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-gray-900 flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Registration Requests Management
+                  Registration Requests
                 </CardTitle>
-                <CardDescription>
-                  Review and approve learner registration requests
+                <CardDescription className="text-gray-600">
+                  Review and approve registration requests
                 </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-auto">
-                  <Table>
-                    <TableHeader>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search requests..."
+                  className="pl-8 w-64"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                <span className="ml-2 text-gray-600">Loading registration requests...</span>
+              </div>
+            ) : (
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-gray-700">Name</TableHead>
+                      <TableHead className="text-gray-700">Phone</TableHead>
+                      <TableHead className="text-gray-700">Topic</TableHead>
+                      <TableHead className="text-gray-700">Goal</TableHead>
+                      <TableHead className="text-gray-700">Status</TableHead>
+                      <TableHead className="text-gray-700">Created</TableHead>
+                      <TableHead className="text-gray-700">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRequests.length === 0 ? (
                       <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Topic</TableHead>
-                        <TableHead>Goal</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableCell colSpan={7} className="text-center h-32 text-gray-500">
+                          {searchQuery ? 'No registration requests match your search' : 'No registration requests found'}
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {registrationRequests.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center h-32 text-gray-500">
-                            No registration requests found
+                    ) : (
+                      filteredRequests.map((request) => (
+                        <TableRow key={request.request_id} className="hover:bg-gray-50">
+                          <TableCell className="font-medium text-gray-900">
+                            {request.name}
+                          </TableCell>
+                          <TableCell className="text-gray-600">
+                            {request.number}
+                          </TableCell>
+                          <TableCell className="text-gray-600">
+                            {request.topic}
+                          </TableCell>
+                          <TableCell className="text-gray-600">
+                            {request.goal}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant="secondary"
+                              className={`${getStatusColor(request.approval_status)} text-white`}
+                            >
+                              {request.approval_status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-gray-600">
+                            {new Date(request.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={request.approval_status}
+                              onValueChange={(value) => 
+                                updateRegistrationStatus(request.request_id, value)
+                              }
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="approved">Approved</SelectItem>
+                                <SelectItem value="rejected">Rejected</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                         </TableRow>
-                      ) : (
-                        registrationRequests.map((request) => (
-                          <TableRow key={request.request_id}>
-                            <TableCell className="font-medium">{request.name}</TableCell>
-                            <TableCell>{request.number}</TableCell>
-                            <TableCell>{request.topic}</TableCell>
-                            <TableCell>{request.goal}</TableCell>
-                            <TableCell>
-                              <Badge 
-                                variant="secondary"
-                                className={`${getStatusColor(request.approval_status)} text-white`}
-                              >
-                                {request.approval_status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={request.approval_status}
-                                onValueChange={(value: 'pending' | 'approved' | 'rejected') => 
-                                  updateRegistrationStatus(request.request_id, value)
-                                }
-                              >
-                                <SelectTrigger className="w-32">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="approved">Approved</SelectItem>
-                                  <SelectItem value="rejected">Rejected</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="courses">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" />
-                  Course Approval Management
-                </CardTitle>
-                <CardDescription>
-                  Review and approve course content submissions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Request ID</TableHead>
-                        <TableHead>Course Name</TableHead>
-                        <TableHead>Modules</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Actions</TableHead>
-                        <TableHead>View Details</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {groupedCourses.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center h-32 text-gray-500">
-                            No course requests found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        groupedCourses.map((course) => (
-                          <TableRow key={course.request_id}>
-                            <TableCell className="font-mono text-sm">
-                              {course.request_id.slice(0, 8)}...
-                            </TableCell>
-                            <TableCell className="font-medium">{course.course_name}</TableCell>
-                            <TableCell>{course.modules.length} modules</TableCell>
-                            <TableCell>
-                              <Badge 
-                                variant="secondary"
-                                className={`${getStatusColor(course.status)} text-white`}
-                              >
-                                {course.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {new Date(course.created_at).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={course.status}
-                                onValueChange={(value: 'pending' | 'approved' | 'rejected') => 
-                                  updateCourseStatus(course.request_id, value)
-                                }
-                              >
-                                <SelectTrigger className="w-32">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="approved">Approved</SelectItem>
-                                  <SelectItem value="rejected">Rejected</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => navigate('/superadmin/course-approval')}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

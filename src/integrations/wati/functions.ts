@@ -122,7 +122,7 @@ export async function sendCourseAssignmentNotification(
   
   const headerText = "Course Assignment Notification";
   const bodyText = `Hi ${learnerName}! The course "${courseName}" has been assigned to you. Click below to start learning!`;
-  const buttons = [{ title: "Let's MicroLearn" }];
+  const buttons = [{ title: "Start Learning" }];
 
   await sendInteractiveButtonsMessage(phoneNumber, headerText, bodyText, buttons);
 }

@@ -9,48 +9,50 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { toast } from '@/hooks/use-toast';
-import { AlertCircle, ArrowLeft, Shield } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Users } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 
-const superAdminLoginSchema = z.object({
+const adminLoginSchema = z.object({
+  email: z.string().email({ message: 'Please enter a valid email address' }),
   password: z.string().min(1, { message: 'Password is required' }),
 });
 
-type SuperAdminLoginFormValues = z.infer<typeof superAdminLoginSchema>;
+type AdminLoginFormValues = z.infer<typeof adminLoginSchema>;
 
-const SuperAdminLogin: React.FC = () => {
-  const { signInSuperAdmin } = useMultiAuth();
+const AdminLogin: React.FC = () => {
+  const { signIn } = useMultiAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const form = useForm<SuperAdminLoginFormValues>({
-    resolver: zodResolver(superAdminLoginSchema),
+  const form = useForm<AdminLoginFormValues>({
+    resolver: zodResolver(adminLoginSchema),
     defaultValues: {
+      email: '',
       password: '',
     },
   });
 
-  const onSubmit = async (values: SuperAdminLoginFormValues) => {
+  const onSubmit = async (values: AdminLoginFormValues) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const { error } = await signInSuperAdmin(values.password);
+      const { error } = await signIn(values.email, values.password);
       if (error) {
-        setError('Invalid password');
+        setError('Invalid email or password');
         return;
       }
 
       toast({
-        title: 'Welcome Super Admin!',
+        title: 'Welcome back!',
         description: 'You have successfully logged in.',
       });
       
-      navigate('/superadmin');
+      navigate('/dashboard');
     } catch (err) {
-      console.error('Super admin login error:', err);
+      console.error('Admin login error:', err);
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
@@ -66,23 +68,23 @@ const SuperAdminLogin: React.FC = () => {
             <span className="text-gray-600">Back to Home</span>
           </Link>
           <div className="flex items-center gap-2">
-            <Shield className="h-8 w-8 text-red-600" />
-            <h1 className="text-2xl font-bold text-gray-900">EduLearn</h1>
+            <Users className="h-8 w-8 text-blue-600" />
+            <h1 className="text-2xl font-bold text-gray-900">Microlearn</h1>
           </div>
         </div>
       </header>
 
       <div className="flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
-          <Card className="border-2 border-red-200 bg-white shadow-lg">
-            <CardHeader className="text-center bg-red-50">
+          <Card className="border-2 border-blue-200 bg-white shadow-lg">
+            <CardHeader className="text-center bg-blue-50">
               <div className="flex items-center justify-center mb-2">
-                <div className="p-2 rounded-full bg-red-500">
-                  <Shield className="h-6 w-6 text-white" />
+                <div className="p-2 rounded-full bg-blue-500">
+                  <Users className="h-6 w-6 text-white" />
                 </div>
               </div>
-              <CardTitle className="text-red-700">Super Admin Login</CardTitle>
-              <CardDescription className="text-gray-600">Full system access</CardDescription>
+              <CardTitle className="text-blue-700">Admin Login</CardTitle>
+              <CardDescription className="text-gray-600">Manage courses and learners</CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-4 pt-6">
@@ -97,17 +99,45 @@ const SuperAdminLogin: React.FC = () => {
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700">Email address</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="email" 
+                            placeholder="admin@example.com" 
+                            {...field}
+                            disabled={isLoading}
+                            className="bg-white border-gray-300 focus:border-blue-400"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700">Password</FormLabel>
+                        <div className="flex items-center justify-between">
+                          <FormLabel className="text-gray-700">Password</FormLabel>
+                          <Link 
+                            to="/forgot-password" 
+                            className="text-sm font-medium text-blue-600 hover:underline"
+                          >
+                            Forgot password?
+                          </Link>
+                        </div>
                         <FormControl>
                           <Input 
                             type="password" 
-                            placeholder="Enter super admin password"
+                            placeholder="Enter your password"
                             {...field}
                             disabled={isLoading}
-                            className="bg-white border-gray-300 focus:border-red-400"
+                            className="bg-white border-gray-300 focus:border-blue-400"
                           />
                         </FormControl>
                         <FormMessage />
@@ -117,13 +147,22 @@ const SuperAdminLogin: React.FC = () => {
 
                   <Button 
                     type="submit" 
-                    className="w-full text-white bg-red-500 hover:bg-red-600"
+                    className="w-full text-white bg-blue-500 hover:bg-blue-600"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Signing in...' : 'Sign in as Super Admin'}
+                    {isLoading ? 'Signing in...' : 'Sign in as Admin'}
                   </Button>
                 </form>
               </Form>
+
+              <div className="text-center">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{' '}
+                  <Link to="/signup" className="font-medium text-blue-600 hover:underline">
+                    Sign up
+                  </Link>
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -132,4 +171,4 @@ const SuperAdminLogin: React.FC = () => {
   );
 };
 
-export default SuperAdminLogin;
+export default AdminLogin;

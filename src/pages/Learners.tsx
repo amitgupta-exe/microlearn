@@ -1,433 +1,215 @@
-
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Users, Phone, Mail, Calendar, BookOpen, Plus, ArrowLeft } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import { Tables } from '@/integrations/supabase/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Search, User, Plus, FileUp, MoreHorizontal } from 'lucide-react';
+import { toast } from 'sonner';
 import LearnerForm from '@/components/LearnerForm';
 import LearnerImport from '@/components/LearnerImport';
 import AssignLearnerToCourse from '@/components/AssignLearnerToCourse';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
-type Learner = Tables<"learners">;
+// Helper: Normalize phone for login/lookup
+const normalizePhone = (phone) => phone.replace(/\D/g, '').replace(/^0+/, '').replace(/^91/, '');
 
-/**
- * Learners Page - Manage learners and assign courses
- * Features:
- * - View all learners in grid/detail view
- * - Create, edit, delete learners
- * - Import learners from CSV
- * - Assign courses to individual learners
- */
-const Learners = () => {
-  const { id } = useParams();
-  const { user, userRole, loading } = useRequireAuth();
-  const [learners, setLearners] = useState<Learner[]>([]);
-  const [selectedLearner, setSelectedLearner] = useState<Learner | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [isAssignOpen, setIsAssignOpen] = useState(false);
-  const [dataLoading, setDataLoading] = useState(true);
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+const Learners: React.FC = () => {
+  // State
+  const [learners, setLearners] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showLearnerForm, setShowLearnerForm] = useState(false);
+  const [editingLearner, setEditingLearner] = useState(null);
+  const [showLearnerImport, setShowLearnerImport] = useState(false);
+  const [showAssignCourse, setShowAssignCourse] = useState(false);
+  const [selectedLearner, setSelectedLearner] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  console.log(
-    "Learners page - user:",
-    user,
-    "userRole:",
-    userRole,
-    "loading:",
-    loading
-  );
-
-  useEffect(() => {
-    if (!loading && user && userRole) {
-      fetchLearners();
-    }
-  }, [user, userRole, loading]);
-
-  useEffect(() => {
-    if (id && learners.length > 0) {
-      const learner = learners.find((l) => l.id === id);
-      if (learner) {
-        setSelectedLearner(learner);
-      }
-    }
-  }, [id, learners]);
-
-  /**
-   * Fetch learners based on user role
-   * Admins see only their learners, superadmins see all
-   */
+  // Fetch learners and their progress in a single query
   const fetchLearners = async () => {
-    console.log("Fetching learners for user:", user?.id, "role:", userRole);
+    setIsLoading(true);
     try {
-      let query = supabase.from("learners").select("*");
-
-      // Filter by admin if not superadmin
-      if (userRole === "admin") {
-        query = query.eq("created_by", user?.id);
-      }
-
-      const { data, error } = await query.order("created_at", {
-        ascending: false,
+      const { data: learners, error: learnersError } = await supabase.from('learners').select('*');
+      const { data: progress, error: progressError } = await supabase.from('course_progress').select('learner_id, status, course_name, current_day');
+      if (learnersError || progressError) throw learnersError || progressError;
+      // Map progress to learners
+      const progressMap = new Map();
+      progress.forEach(p => {
+        if (!progressMap.has(p.learner_id)) progressMap.set(p.learner_id, []);
+        progressMap.get(p.learner_id).push(p);
       });
-
-      if (error) throw error;
-      console.log('Fetched learners:', data?.length);
-      setLearners(data || []);
+      const learnersWithProgress = learners.map(l => ({
+        ...l,
+        progress: progressMap.get(l.id) || []
+      }));
+      setLearners(learnersWithProgress);
     } catch (error) {
-      console.error("Error fetching learners:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch learners",
-        variant: "destructive",
-      });
+      toast.error('Failed to load learners');
     } finally {
-      setDataLoading(false);
       setIsLoading(false);
     }
   };
 
-  /**
-   * Handle creating a new learner
-   */
-  const handleCreateLearner = () => {
-    console.log("Opening learner form for creation");
-    setSelectedLearner(null);
-    setIsFormOpen(true);
-  };
+  useEffect(() => {
+    fetchLearners();
+  }, []);
 
-  /**
-   * Handle editing an existing learner
-   */
-  const handleEditLearner = (learner: Learner) => {
-    console.log('Opening learner form for editing:', learner.name);
+  // Handlers
+  const handleAssignCourse = (learner) => {
     setSelectedLearner(learner);
-    setIsFormOpen(true);
+    setShowAssignCourse(true);
   };
-
-  /**
-   * Handle deleting a learner
-   */
-  const handleDeleteLearner = async (learnerId: string) => {
-    console.log("Deleting learner:", learnerId);
+  const handleEditLearner = (learner) => {
+    setEditingLearner(learner);
+    setShowLearnerForm(true);
+  };
+  const handleDeleteLearner = async (learner) => {
     try {
-      const { error } = await supabase.from("learners").delete().eq("id", learnerId);
-
+      const { error } = await supabase.from('learners').delete().eq('id', learner.id);
       if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Learner deleted successfully",
-      });
-
+      toast.success('Learner deleted successfully');
       fetchLearners();
-      setSelectedLearner(null);
     } catch (error) {
-      console.error("Error deleting learner:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete learner",
-        variant: "destructive",
-      });
+      toast.error('Failed to delete learner');
     }
   };
 
-  /**
-   * Handle assigning a course to a learner
-   */
-  const handleAssignCourse = (learner: Learner) => {
-    console.log('Opening course assignment for learner:', learner.name);
-    setSelectedLearner(learner);
-    setIsAssignOpen(true);
-  };
-
-  /**
-   * Handle learner form submission (create/update)
-   */
-  const handleLearnerSubmit = async (data: { name: string; email: string; phone: string }) => {
-    console.log('Submitting learner data:', data);
-    try {
-      if (selectedLearner) {
-        // Update existing learner
-        const { error } = await supabase
-          .from("learners")
-          .update({
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", selectedLearner.id);
-
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Learner updated successfully",
-        });
-      } else {
-        // Create new learner
-        const { error } = await supabase
-          .from("learners")
-          .insert({
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            status: "active",
-            created_by: user?.id || "",
-          });
-
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Learner created successfully",
-        });
-      }
-
-      // Close form and refresh data
-      setIsFormOpen(false);
-      setSelectedLearner(null);
-      fetchLearners();
-    } catch (error) {
-      console.error("Error saving learner:", error);
-      throw error; // Re-throw so LearnerForm can handle the error display
-    }
-  };
-
-  /**
-   * Handle form cancellation
-   */
-  const handleFormCancel = () => {
-    console.log("Learner form cancelled");
-    setIsFormOpen(false);
-    setSelectedLearner(null);
-  };
-
-  /**
-   * Handle successful import
-   */
-  const handleImportSuccess = () => {
-    console.log("Learner import completed successfully");
-    setIsImportOpen(false);
-    fetchLearners();
-  };
-
-  /**
-   * Handle successful course assignment
-   */
-  const handleAssignSuccess = () => {
-    console.log('Course assignment completed successfully');
-    setIsAssignOpen(false);
-    fetchLearners();
-  };
-
-  if (loading || dataLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // Filtered learners by search
+  const filteredLearners = learners.filter(l =>
+    l.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    l.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    l.phone?.includes(searchQuery)
+  );
 
   return (
-    <div className="w-full min-h-screen py-6 px-6 md:px-8 bg-gray-100">
-      <div className="max-w-[1400px] mx-auto">
-        {/* Header Section */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Learners</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage your learners and track their progress
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setIsImportOpen(true)} variant="outline">
-              Import Learners
-            </Button>
-            <Button onClick={handleCreateLearner}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Learner
-            </Button>
-          </div>
+    <div className="space-y-6 p-6">
+      {/* Header and Actions */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold text-gray-900">Learners</h1>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowLearnerImport(true)} variant="outline">
+            <FileUp className="mr-2 h-4 w-4" /> Import Learners
+          </Button>
+          <Button onClick={() => setShowLearnerForm(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Add Learner
+          </Button>
         </div>
-
-        {/* Main Content */}
-        {selectedLearner ? (
-          /* Individual Learner Detail View */
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedLearner(null)}
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-1" />
-                    Back to Learners
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={() => handleAssignCourse(selectedLearner)}
-                    variant="outline"
-                  >
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Assign Course
-                  </Button>
-                  <Button onClick={() => handleEditLearner(selectedLearner)}>
-                    Edit Learner
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    onClick={() => handleDeleteLearner(selectedLearner.id)}
-                  >
-                    Delete Learner
-                  </Button>
-                </div>
-              </div>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                {selectedLearner.name}
-              </CardTitle>
-              <CardDescription>Learner Details</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{selectedLearner.phone}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{selectedLearner.email}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Joined {new Date(selectedLearner.created_at).toLocaleDateString()}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-muted-foreground" />
-                  <Badge variant="outline">{selectedLearner.status}</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          /* Learners Grid View */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {learners.map((learner) => (
-              <Card 
-                key={learner.id} 
-                className="cursor-pointer hover:shadow-md transition-shadow" 
-                onClick={() => setSelectedLearner(learner)}
-              >
-                <CardHeader>
-                  <CardTitle className="text-gray-900">{learner.name}</CardTitle>
-                  <CardDescription className="text-gray-600">
-                    {learner.email}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>Joined {new Date(learner.created_at).toLocaleDateString()}</span>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAssignCourse(learner);
-                      }}
-                    >
-                      <BookOpen className="h-3 w-3 mr-1" />
-                      Assign
-                    </Button>
+      </div>
+      {/* Search */}
+      <div className="relative max-w-md mb-4">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input
+          placeholder="Search learners..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+      {/* Learner Cards */}
+      {isLoading ? (
+        <div className="text-center py-12 text-gray-400">Loading learners...</div>
+      ) : filteredLearners.length === 0 ? (
+        <div className="text-center py-12 text-gray-400">No learners found.</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredLearners.map((learner) => {
+            // Find the most recent active/assigned course for this learner
+            const assignedCourse = learner.progress.find(
+              (p) => p.status === "assigned" || p.status === "started"
+            );
+            return (
+              <Card key={learner.id} className="hover:shadow-lg transition-shadow relative">
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-gray-900">{learner.name}</div>
+                      <div className="text-xs text-gray-500">{learner.email}</div>
+                      <div className="text-xs text-gray-500">{learner.phone}</div>
+                      {/* Assigned course info */}
+                      {assignedCourse ? (
+                        <div className="text-xs text-blue-700 mt-1">
+                          Assigned Course: <span className="font-semibold">{assignedCourse.course_name}</span>
+                          {assignedCourse.current_day && (
+                            <span className="ml-2 text-gray-500">(Day {assignedCourse.current_day})</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-400 mt-1">No course assigned</div>
+                      )}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="p-2 rounded-full hover:bg-gray-100 focus:outline-none">
+                          <MoreHorizontal className="h-5 w-5 text-gray-500" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleAssignCourse(learner)}>
+                          Assign Course
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditLearner(learner)}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDeleteLearner(learner)}>
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {learners.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Users className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No learners found</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                Get started by adding your first learner or importing a list.
-              </p>
-              <div className="flex gap-2">
-                <Button onClick={() => setIsImportOpen(true)} variant="outline">
-                  Import Learners
-                </Button>
-                <Button onClick={handleCreateLearner}>
-                  Add First Learner
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Learner Form Dialog */}
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {selectedLearner ? 'Edit Learner' : 'Add New Learner'}
-              </DialogTitle>
-            </DialogHeader>
-            <LearnerForm
-              learner={selectedLearner}
-              onSubmit={handleLearnerSubmit}
-              onCancel={handleFormCancel}
-            />
-          </DialogContent>
-        </Dialog>
-
-        {/* Import Dialog */}
-        <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Import Learners</DialogTitle>
-            </DialogHeader>
-            <LearnerImport onSuccess={handleImportSuccess} />
-          </DialogContent>
-        </Dialog>
-
-        {/* Assign Course Dialog */}
-        <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Assign Course</DialogTitle>
-            </DialogHeader>
-            {selectedLearner && (
-              <AssignLearnerToCourse
-                learner={selectedLearner}
-                onSuccess={handleAssignSuccess}
-                onCancel={() => setIsAssignOpen(false)}
-              />
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
+            );
+          })}
+        </div>
+      )}
+      {/* Learner Form Dialog */}
+      <Dialog open={showLearnerForm} onOpenChange={(open) => {
+        setShowLearnerForm(open);
+        if (!open) setEditingLearner(null);
+      }}>
+        <DialogContent>
+          <LearnerForm
+            learner={editingLearner}
+            onSubmit={async (data) => {
+              await fetchLearners();
+              setShowLearnerForm(false);
+              setEditingLearner(null);
+            }}
+            onCancel={() => {
+              setShowLearnerForm(false);
+              setEditingLearner(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+      {/* Learner Import Dialog */}
+      <Dialog open={showLearnerImport} onOpenChange={setShowLearnerImport}>
+        <DialogContent>
+          <LearnerImport
+            onSuccess={() => {
+              fetchLearners();
+              setShowLearnerImport(false);
+            }}
+            onCancel={() => setShowLearnerImport(false)}
+          />
+        </DialogContent>
+      </Dialog>
+      {/* Assign Course Dialog */}
+      <AssignLearnerToCourse
+        open={showAssignCourse}
+        onOpenChange={setShowAssignCourse}
+        learner={selectedLearner}
+        onAssignmentComplete={() => {
+          setShowAssignCourse(false);
+          setSelectedLearner(null);
+          fetchLearners();
+        }}
+      />
     </div>
   );
 };

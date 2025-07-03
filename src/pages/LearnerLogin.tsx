@@ -9,48 +9,50 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { toast } from '@/hooks/use-toast';
-import { AlertCircle, ArrowLeft, Shield } from 'lucide-react';
+import { AlertCircle, ArrowLeft, GraduationCap } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 
-const superAdminLoginSchema = z.object({
+const learnerLoginSchema = z.object({
+  phone: z.string().min(10, { message: 'Please enter a valid phone number' }),
   password: z.string().min(1, { message: 'Password is required' }),
 });
 
-type SuperAdminLoginFormValues = z.infer<typeof superAdminLoginSchema>;
+type LearnerLoginFormValues = z.infer<typeof learnerLoginSchema>;
 
-const SuperAdminLogin: React.FC = () => {
-  const { signInSuperAdmin } = useMultiAuth();
+const LearnerLogin: React.FC = () => {
+  const { learnerLogin } = useMultiAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const form = useForm<SuperAdminLoginFormValues>({
-    resolver: zodResolver(superAdminLoginSchema),
+  const form = useForm<LearnerLoginFormValues>({
+    resolver: zodResolver(learnerLoginSchema),
     defaultValues: {
+      phone: '',
       password: '',
     },
   });
 
-  const onSubmit = async (values: SuperAdminLoginFormValues) => {
+  const onSubmit = async (values: LearnerLoginFormValues) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const { error } = await signInSuperAdmin(values.password);
+      const { error } = await learnerLogin(values.phone, values.password);
       if (error) {
-        setError('Invalid password');
+        setError('Invalid phone number or password');
         return;
       }
 
       toast({
-        title: 'Welcome Super Admin!',
+        title: 'Welcome back!',
         description: 'You have successfully logged in.',
       });
       
-      navigate('/superadmin');
+      navigate('/learner-dashboard');
     } catch (err) {
-      console.error('Super admin login error:', err);
+      console.error('Learner login error:', err);
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
@@ -66,7 +68,7 @@ const SuperAdminLogin: React.FC = () => {
             <span className="text-gray-600">Back to Home</span>
           </Link>
           <div className="flex items-center gap-2">
-            <Shield className="h-8 w-8 text-red-600" />
+            <GraduationCap className="h-8 w-8 text-green-600" />
             <h1 className="text-2xl font-bold text-gray-900">EduLearn</h1>
           </div>
         </div>
@@ -74,15 +76,15 @@ const SuperAdminLogin: React.FC = () => {
 
       <div className="flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
-          <Card className="border-2 border-red-200 bg-white shadow-lg">
-            <CardHeader className="text-center bg-red-50">
+          <Card className="border-2 border-green-200 bg-white shadow-lg">
+            <CardHeader className="text-center bg-green-50">
               <div className="flex items-center justify-center mb-2">
-                <div className="p-2 rounded-full bg-red-500">
-                  <Shield className="h-6 w-6 text-white" />
+                <div className="p-2 rounded-full bg-green-500">
+                  <GraduationCap className="h-6 w-6 text-white" />
                 </div>
               </div>
-              <CardTitle className="text-red-700">Super Admin Login</CardTitle>
-              <CardDescription className="text-gray-600">Full system access</CardDescription>
+              <CardTitle className="text-green-700">Learner Login</CardTitle>
+              <CardDescription className="text-gray-600">Access your courses</CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-4 pt-6">
@@ -97,17 +99,17 @@ const SuperAdminLogin: React.FC = () => {
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="password"
+                    name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700">Password</FormLabel>
+                        <FormLabel className="text-gray-700">Phone Number</FormLabel>
                         <FormControl>
                           <Input 
-                            type="password" 
-                            placeholder="Enter super admin password"
+                            type="tel" 
+                            placeholder="Enter your phone number" 
                             {...field}
                             disabled={isLoading}
-                            className="bg-white border-gray-300 focus:border-red-400"
+                            className="bg-white border-gray-300 focus:border-green-400"
                           />
                         </FormControl>
                         <FormMessage />
@@ -115,12 +117,33 @@ const SuperAdminLogin: React.FC = () => {
                     )}
                   />
 
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700">Password</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="password" 
+                            placeholder="Enter your password (default: your phone number)"
+                            {...field}
+                            disabled={isLoading}
+                            className="bg-white border-gray-300 focus:border-green-400"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                        <p className="text-xs text-gray-500">Default password is your phone number without country code</p>
+                      </FormItem>
+                    )}
+                  />
+
                   <Button 
                     type="submit" 
-                    className="w-full text-white bg-red-500 hover:bg-red-600"
+                    className="w-full text-white bg-green-500 hover:bg-green-600"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Signing in...' : 'Sign in as Super Admin'}
+                    {isLoading ? 'Signing in...' : 'Sign in as Learner'}
                   </Button>
                 </form>
               </Form>
@@ -132,4 +155,4 @@ const SuperAdminLogin: React.FC = () => {
   );
 };
 
-export default SuperAdminLogin;
+export default LearnerLogin;

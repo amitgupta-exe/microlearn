@@ -2,115 +2,103 @@
 import React, { useState, useEffect } from 'react';
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { toast } from '@/hooks/use-toast';
-import { BookOpen, Calendar, Clock, Trophy, Plus, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { 
+  BookOpen, 
+  Clock, 
+  CheckCircle, 
+  Pause, 
+  Search, 
+  LogOut, 
+  GraduationCap,
+  User
+} from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { Tables } from '@/integrations/supabase/types';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { normalizePhoneNumber } from '@/lib/utils';
 import { sendCourseAssignmentNotification, sendCourseSuspensionNotification } from '@/integrations/wati/functions';
+import { normalizePhoneNumber } from '@/lib/utils';
 
-interface Course {
-  id: string;
-  course_name: string;
-  day: number;
-  created_at: string;
-  status: string;
-  request_id: string;
-  visibility: string;
-}
+type CourseProgress = Tables<'course_progress'>;
+type Course = Tables<'courses'>;
 
-interface CourseProgress {
-  id: string;
-  course_id: string;
-  learner_id: string;
-  course_name: string;
-  progress_percent: number;
-  current_day: number;
-  status: string;
-  started_at: string;
-  completed_at: string | null;
-  phone_number: string;
-  created_at: string;
+interface CourseWithProgress extends Course {
+  progress?: CourseProgress;
 }
 
 /**
- * Learner Dashboard - Self-service course management
- * Features:
- * - View current and previous courses
- * - Self-assign public courses
- * - Overwrite self-assigned courses (not admin-assigned)
- * - Search and explore available courses
+ * Learner Dashboard - View assigned courses and explore public courses
+ * Features: self-assignment, overwrite protection, course exploration
  */
 const LearnerDashboard: React.FC = () => {
-  const { user, userProfile, signOut } = useMultiAuth();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [enrolledCourses, setEnrolledCourses] = useState<CourseProgress[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [enrolling, setEnrolling] = useState<string | null>(null);
+  const { user, signOut } = useMultiAuth();
+  const [myCourses, setMyCourses] = useState<CourseProgress[]>([]);
+  const [publicCourses, setPublicCourses] = useState<CourseWithProgress[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [assigningCourse, setAssigningCourse] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     course?: Course;
-    existingCourse?: string;
-    canOverwrite?: boolean;
+    hasAdminAssigned?: boolean;
   }>({ open: false });
 
-  console.log('LearnerDashboard - userProfile:', userProfile);
+  console.log('LearnerDashboard - user:', user);
 
   useEffect(() => {
-    fetchAvailableCourses();
-    if (userProfile) {
-      fetchEnrolledCourses();
+    if (user) {
+      fetchData();
     }
-  }, [userProfile]);
+  }, [user]);
 
   /**
-   * Fetch all approved and public courses available for self-assignment
+   * Fetch learner's courses and available public courses
    */
-  const fetchAvailableCourses = async () => {
+  const fetchData = async () => {
+    if (!user?.phone) return;
+
+    setLoading(true);
     try {
-      console.log('📚 Fetching available courses...');
-      
-      const { data, error } = await supabase
-        .from('courses')
+      // Fetch learner's course progress
+      const { data: progressData, error: progressError } = await supabase
+        .from('course_progress')
         .select('*')
-        .eq('status', 'approved')
-        .eq('visibility', 'public') // Only public courses for self-service
+        .eq('phone_number', normalizePhoneNumber(user.phone))
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('❌ Error fetching courses:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch available courses',
-          variant: 'destructive',
-        });
-        return;
+      if (progressError) {
+        console.error('Error fetching progress:', progressError);
+      } else {
+        setMyCourses(progressData || []);
       }
 
-      console.log('📋 All public courses:', data?.length);
+      // Fetch public courses
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('visibility', 'public')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false });
 
-      // Group courses by request_id and take the latest one for each request_id
-      const uniqueCourses = data?.reduce((acc: Course[], course) => {
-        const existingCourse = acc.find(c => c.request_id === course.request_id);
-        if (!existingCourse) {
-          acc.push(course);
-        }
-        return acc;
-      }, []) || [];
-
-      console.log('✅ Unique public courses (grouped by request_id):', uniqueCourses.length);
-      setCourses(uniqueCourses);
+      if (coursesError) {
+        console.error('Error fetching courses:', coursesError);
+      } else {
+        // Add progress info to public courses
+        const coursesWithProgress = (coursesData || []).map(course => {
+          const progress = progressData?.find(p => p.course_id === course.id);
+          return { ...course, progress };
+        });
+        setPublicCourses(coursesWithProgress);
+      }
     } catch (error) {
-      console.error('💥 Exception fetching courses:', error);
+      console.error('Error fetching data:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch courses',
+        description: 'Failed to load courses',
         variant: 'destructive',
       });
     } finally {
@@ -119,296 +107,191 @@ const LearnerDashboard: React.FC = () => {
   };
 
   /**
-   * Fetch all courses assigned to or enrolled by the learner
+   * Check if learner can assign/overwrite a course
    */
-  const fetchEnrolledCourses = async () => {
-    try {
-      console.log('📖 Fetching enrolled courses for user:', userProfile?.id);
-      
-      const normalizedPhone = normalizePhoneNumber(userProfile?.phone || '');
-      
-      // Fetch by phone number to get comprehensive results
-      const { data, error } = await supabase
-        .from('course_progress')
-        .select('*')
-        .eq('phone_number', normalizedPhone)
-        .order('started_at', { ascending: false });
+  const canAssignCourse = async (courseId: string): Promise<{ canAssign: boolean; hasAdminAssigned: boolean }> => {
+    if (!user?.phone) return { canAssign: false, hasAdminAssigned: false };
 
-      if (error) {
-        console.error('❌ Error fetching enrolled courses:', error);
-        return;
-      }
-
-      console.log('📋 All course progress records:', data?.length);
-      setEnrolledCourses(data || []);
-    } catch (error) {
-      console.error('💥 Exception fetching enrolled courses:', error);
-    }
-  };
-
-  /**
-   * Check if learner can overwrite existing course
-   * Rules:
-   * 1. If no active course - can assign
-   * 2. If existing course was assigned by admin - cannot overwrite
-   * 3. If existing course was self-assigned - can overwrite
-   */
-  const checkCanOverwrite = async (): Promise<{ canOverwrite: boolean; existingCourse?: string }> => {
-    if (!userProfile) return { canOverwrite: false };
-    
-    const normalizedPhone = normalizePhoneNumber(userProfile.phone || '');
-    
-    // Get active course progress
-    const { data: existingActive } = await supabase
+    // Check for existing active course progress
+    const { data: existingProgress } = await supabase
       .from('course_progress')
-      .select('*')
-      .eq('phone_number', normalizedPhone)
-      .in('status', ['assigned', 'started']);
+      .select('*, learners(*)')
+      .eq('phone_number', normalizePhoneNumber(user.phone))
+      .in('status', ['assigned', 'started'])
+      .single();
 
-    if (!existingActive || existingActive.length === 0) {
-      return { canOverwrite: true }; // No active course, can assign
+    if (!existingProgress) {
+      return { canAssign: true, hasAdminAssigned: false };
     }
 
-    const activeCourse = existingActive[0];
-    
-    // Check if there's an admin in the system who assigned this course
-    // If learner_id matches any admin user, it was admin-assigned
-    if (activeCourse.learner_id) {
-      const { data: adminUser } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', activeCourse.learner_id)
-        .in('role', ['admin', 'superadmin'])
-        .single();
+    // Check if the existing course was assigned by an admin
+    const { data: learnerData } = await supabase
+      .from('learners')
+      .select('created_by, users(*)')
+      .eq('phone', user.phone)
+      .single();
 
-      if (adminUser) {
-        // Course was assigned by admin, cannot overwrite
-        return { 
-          canOverwrite: false, 
-          existingCourse: activeCourse.course_name 
-        };
-      }
+    if (learnerData?.created_by) {
+      // Course was assigned by an admin - cannot overwrite
+      return { canAssign: false, hasAdminAssigned: true };
     }
 
-    // Course was self-assigned or assigned via WhatsApp (no admin reference)
-    return { 
-      canOverwrite: true, 
-      existingCourse: activeCourse.course_name 
-    };
+    // Self-assigned course - can overwrite
+    return { canAssign: true, hasAdminAssigned: false };
   };
 
   /**
-   * Handle self-service course enrollment
+   * Handle course self-assignment
    */
-  const handleEnrollCourse = async (course: Course, confirmOverwrite: boolean = false) => {
-    if (!userProfile) {
+  const handleSelfAssign = async (course: Course) => {
+    if (!user?.phone) return;
+
+    const { canAssign, hasAdminAssigned } = await canAssignCourse(course.id);
+
+    if (!canAssign && hasAdminAssigned) {
       toast({
-        title: 'Error',
-        description: 'Please log in to enroll in courses',
+        title: 'Cannot Assign Course',
+        description: 'You have an active course assigned by an admin. Please complete it first.',
         variant: 'destructive',
       });
       return;
     }
 
-    // Check enrollment eligibility if not confirming overwrite
-    if (!confirmOverwrite) {
-      const { canOverwrite, existingCourse } = await checkCanOverwrite();
-      
-      if (existingCourse && !canOverwrite) {
-        toast({
-          title: 'Cannot Overwrite Course',
-          description: `You have an active course "${existingCourse}" assigned by an admin. Contact your administrator to change courses.`,
-          variant: 'destructive',
-        });
-        return;
-      }
-      
-      if (existingCourse && canOverwrite) {
-        setConfirmDialog({
-          open: true,
-          course,
-          existingCourse,
-          canOverwrite: true
-        });
-        return;
-      }
+    if (!canAssign) {
+      setConfirmDialog({
+        open: true,
+        course,
+        hasAdminAssigned
+      });
+      return;
     }
 
-    setEnrolling(course.id);
+    await assignCourse(course);
+  };
+
+  /**
+   * Assign course to learner
+   */
+  const assignCourse = async (course: Course) => {
+    if (!user?.phone) return;
+
+    setAssigningCourse(course.id);
+    const normalizedPhone = normalizePhoneNumber(user.phone);
 
     try {
-      console.log('📝 Self-enrolling in course:', course.course_name, 'User:', userProfile.name);
-
-      const normalizedPhone = normalizePhoneNumber(userProfile.phone || '');
-
-      // If confirming overwrite, suspend existing courses
-      if (confirmOverwrite) {
-        console.log('⏸️ Suspending existing self-assigned courses...');
-        
-        const { data: existingCourses } = await supabase
-          .from('course_progress')
-          .select('*')
-          .eq('phone_number', normalizedPhone)
-          .in('status', ['assigned', 'started']);
-
-        if (existingCourses && existingCourses.length > 0) {
-          await supabase
-            .from('course_progress')
-            .update({ status: 'suspended' })
-            .eq('phone_number', normalizedPhone)
-            .in('status', ['assigned', 'started']);
-
-          // Send suspension notification
-          for (const existingCourse of existingCourses) {
-            try {
-              await sendCourseSuspensionNotification(
-                userProfile.name,
-                existingCourse.course_name,
-                normalizedPhone
-              );
-            } catch (notificationError) {
-              console.warn('⚠️ Failed to send suspension notification:', notificationError);
-            }
-          }
-        }
-      }
-
-      // Check if already enrolled in this specific course
-      const { data: existingProgress } = await supabase
+      // Check for existing active progress and suspend it
+      const { data: existingActive } = await supabase
         .from('course_progress')
         .select('*')
         .eq('phone_number', normalizedPhone)
-        .eq('course_id', course.id)
-        .single();
+        .in('status', ['assigned', 'started']);
 
-      if (existingProgress && !confirmOverwrite) {
-        toast({
-          title: 'Already Enrolled',
-          description: `You are already enrolled in ${course.course_name}`,
-          variant: 'destructive',
-        });
-        setEnrolling(null);
-        return;
+      if (existingActive && existingActive.length > 0) {
+        console.log('Found existing active progress, suspending...');
+        
+        // Send suspension notification
+        for (const existing of existingActive) {
+          try {
+            await sendCourseSuspensionNotification(user.name, existing.course_name || 'Unknown Course', normalizedPhone);
+          } catch (notificationError) {
+            console.warn('Failed to send suspension notification:', notificationError);
+          }
+        }
+
+        // Suspend existing active progress
+        const { error: suspendError } = await supabase
+          .from('course_progress')
+          .update({ status: 'suspended' })
+          .eq('phone_number', normalizedPhone)
+          .in('status', ['assigned', 'started']);
+
+        if (suspendError) {
+          console.error('Error suspending existing progress:', suspendError);
+          throw suspendError;
+        }
       }
 
-      // Create course progress entry for self-assignment
-      const { data: progressData, error: progressError } = await supabase
+      // Create new course progress entry
+      const { error: insertError } = await supabase
         .from('course_progress')
         .insert({
-          learner_id: userProfile.id, // Self-assigned, so learner_id = user id
+          learner_id: user.id,
+          learner_name: user.name,
           course_id: course.id,
-          learner_name: userProfile.name,
-          phone_number: normalizedPhone,
           course_name: course.course_name,
+          status: 'assigned',
+          phone_number: normalizedPhone,
           current_day: 1,
           progress_percent: 0,
-          status: 'assigned',
-          started_at: new Date().toISOString(),
-          is_active: true,
-        })
-        .select()
-        .single();
-
-      if (progressError) {
-        console.error('❌ Error creating course progress:', progressError);
-        toast({
-          title: 'Enrollment Failed',
-          description: progressError.message,
-          variant: 'destructive',
+          is_active: true
         });
-        return;
+
+      if (insertError) {
+        console.error('Error creating course progress:', insertError);
+        throw insertError;
       }
 
-      console.log('✅ Successfully self-enrolled in course:', progressData);
-
-      // Send WhatsApp notification for self-assignment
+      // Send WhatsApp notification for new assignment
       try {
-        await sendCourseAssignmentNotification(
-          userProfile.name,
-          course.course_name,
-          normalizedPhone
-        );
-        console.log('📱 WhatsApp notification sent successfully');
+        await sendCourseAssignmentNotification(user.name, course.course_name, normalizedPhone);
       } catch (notificationError) {
-        console.warn('⚠️ Failed to send WhatsApp notification:', notificationError);
-        // Don't fail the enrollment if notification fails
+        console.warn('Failed to send assignment notification:', notificationError);
       }
 
       toast({
-        title: 'Enrollment Successful',
-        description: `You have been enrolled in ${course.course_name}`,
+        title: 'Course Assigned!',
+        description: `You have been enrolled in "${course.course_name}". You'll receive course content via WhatsApp.`,
       });
 
-      // Refresh enrolled courses
-      fetchEnrolledCourses();
-    } catch (error) {
-      console.error('💥 Exception during enrollment:', error);
+      // Refresh data
+      fetchData();
+    } catch (error: any) {
+      console.error('Error assigning course:', error);
       toast({
-        title: 'Enrollment Error',
-        description: 'Failed to enroll in course',
+        title: 'Assignment Failed',
+        description: `Failed to assign course: ${error.message}`,
         variant: 'destructive',
       });
     } finally {
-      setEnrolling(null);
+      setAssigningCourse(null);
     }
   };
 
   /**
-   * Get status color based on course progress status
+   * Handle logout
    */
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-500';
-      case 'assigned':
-      case 'started':
-        return 'bg-blue-500';
-      case 'suspended':
-        return 'bg-yellow-500';
-      default:
-        return 'bg-gray-500';
-    }
+  const handleLogout = async () => {
+    await signOut();
   };
 
   /**
-   * Get readable status text
+   * Get status badge for course progress
    */
-  const getStatusText = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'assigned':
-        return 'Assigned';
+        return <Badge className="bg-blue-100 text-blue-800">Assigned</Badge>;
       case 'started':
-        return 'In Progress';
+        return <Badge className="bg-green-100 text-green-800">In Progress</Badge>;
       case 'completed':
-        return 'Completed';
+        return <Badge className="bg-purple-100 text-purple-800">Completed</Badge>;
       case 'suspended':
-        return 'Suspended';
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700">Suspended</Badge>;
       default:
-        return status;
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  // Filter courses for search
-  const filteredCourses = courses.filter(course =>
+  // Filter public courses based on search
+  const filteredPublicCourses = publicCourses.filter(course =>
     course.course_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Group enrolled courses by status
-  const activeCourses = enrolledCourses.filter(course => 
-    course.status === 'assigned' || course.status === 'started'
-  );
-  const completedCourses = enrolledCourses.filter(course => 
-    course.status === 'completed'
-  );
-  const suspendedCourses = enrolledCourses.filter(course => 
-    course.status === 'suspended'
   );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
@@ -416,259 +299,184 @@ const LearnerDashboard: React.FC = () => {
   }
 
   return (
-    <>
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Welcome, {userProfile?.name || 'Learner'}!
-              </h1>
-              <p className="text-gray-600 mt-2">Continue your learning journey</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+              <User size={20} className="text-blue-600" />
             </div>
-            <Button onClick={signOut} variant="outline">
-              Sign Out
-            </Button>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Welcome, {user?.name}</h1>
+              <p className="text-sm text-gray-600">{user?.phone}</p>
+            </div>
+          </div>
+          <Button onClick={handleLogout} variant="outline" className="flex items-center gap-2">
+            <LogOut size={16} />
+            Logout
+          </Button>
+        </div>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* My Courses Section */}
+        <section className="mb-12">
+          <div className="flex items-center gap-2 mb-6">
+            <BookOpen className="h-6 w-6 text-blue-600" />
+            <h2 className="text-2xl font-bold text-gray-900">My Courses</h2>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Courses</CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{activeCourses.length}</div>
+          {myCourses.length === 0 ? (
+            <Card className="bg-white">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <GraduationCap className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-gray-900">No Courses Yet</h3>
+                <p className="text-gray-600 text-center mb-4">
+                  You haven't been assigned any courses yet. Explore our public courses below or wait for an admin to assign you a course.
+                </p>
               </CardContent>
             </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Completed</CardTitle>
-                <Trophy className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{completedCourses.length}</div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Suspended</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{suspendedCourses.length}</div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Available</CardTitle>
-                <Plus className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{courses.length}</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Course Tabs */}
-          <Tabs defaultValue="my-courses" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="my-courses">My Courses</TabsTrigger>
-              <TabsTrigger value="explore">Explore Courses</TabsTrigger>
-            </TabsList>
-
-            {/* My Courses Tab */}
-            <TabsContent value="my-courses" className="space-y-6">
-              {/* Active Courses */}
-              {activeCourses.length > 0 && (
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Active Courses</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {activeCourses.map((courseProgress) => (
-                      <Card key={courseProgress.id} className="hover:shadow-lg transition-shadow">
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <CardTitle className="text-lg">{courseProgress.course_name}</CardTitle>
-                            <Badge className={getStatusColor(courseProgress.status)}>
-                              {getStatusText(courseProgress.status)}
-                            </Badge>
-                          </div>
-                          <CardDescription>
-                            Day {courseProgress.current_day} • {courseProgress.progress_percent}% complete
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            <Progress value={courseProgress.progress_percent} className="w-full" />
-                            <div className="flex items-center justify-between text-sm text-gray-600">
-                              <div className="flex items-center">
-                                <Calendar className="h-4 w-4 mr-1" />
-                                Started: {new Date(courseProgress.started_at).toLocaleDateString()}
-                              </div>
-                            </div>
-                            <Button className="w-full" size="sm">
-                              Continue Learning
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Previous Courses */}
-              {(completedCourses.length > 0 || suspendedCourses.length > 0) && (
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Previous Courses</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[...completedCourses, ...suspendedCourses].map((courseProgress) => (
-                      <Card key={courseProgress.id} className="hover:shadow-lg transition-shadow opacity-75">
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <CardTitle className="text-lg">{courseProgress.course_name}</CardTitle>
-                            <Badge className={getStatusColor(courseProgress.status)}>
-                              {getStatusText(courseProgress.status)}
-                            </Badge>
-                          </div>
-                          <CardDescription>
-                            Day {courseProgress.current_day} • {courseProgress.progress_percent}% complete
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            <Progress value={courseProgress.progress_percent} className="w-full" />
-                            <div className="flex items-center justify-between text-sm text-gray-600">
-                              <div className="flex items-center">
-                                <Calendar className="h-4 w-4 mr-1" />
-                                Started: {new Date(courseProgress.started_at).toLocaleDateString()}
-                              </div>
-                              {courseProgress.completed_at && (
-                                <div className="flex items-center">
-                                  <Trophy className="h-4 w-4 mr-1" />
-                                  Completed
-                                </div>
-                              )}
-                            </div>
-                            <Button className="w-full" size="sm" variant="outline">
-                              {courseProgress.status === 'completed' ? 'Review Course' : 'View Details'}
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {enrolledCourses.length === 0 && (
-                <Card>
-                  <CardContent className="text-center py-8">
-                    <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">You haven't enrolled in any courses yet.</p>
-                    <p className="text-gray-500 text-sm mt-2">Explore the available courses to get started!</p>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {myCourses.map((progress) => (
+                <Card key={progress.id} className="bg-white hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg text-gray-900 truncate">
+                        {progress.course_name}
+                      </CardTitle>
+                      {getStatusBadge(progress.status || 'unknown')}
+                    </div>
+                    <CardDescription>
+                      Day {progress.current_day || 1} • {progress.progress_percent || 0}% Complete
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <Clock size={14} />
+                        <span>Started: {new Date(progress.created_at || '').toLocaleDateString()}</span>
+                      </div>
+                      {progress.completed_at && (
+                        <div className="flex items-center gap-2 text-sm text-green-600">
+                          <CheckCircle size={14} />
+                          <span>Completed: {new Date(progress.completed_at).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {progress.status === 'suspended' && (
+                        <div className="flex items-center gap-2 text-sm text-yellow-600">
+                          <Pause size={14} />
+                          <span>Course suspended</span>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
-              )}
-            </TabsContent>
+              ))}
+            </div>
+          )}
+        </section>
 
-            {/* Explore Courses Tab */}
-            <TabsContent value="explore" className="space-y-6">
-              {/* Search Bar */}
-              <div className="relative max-w-md">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search courses..."
-                  className="pl-8"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+        <Separator className="my-8" />
 
-              {/* Available Courses */}
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  Available Public Courses ({filteredCourses.length})
-                </h2>
-                {filteredCourses.length === 0 ? (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-600">
-                        {searchQuery ? 'No courses match your search' : 'No public courses available at the moment.'}
+        {/* Explore Courses Section */}
+        <section>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Search className="h-6 w-6 text-green-600" />
+              <h2 className="text-2xl font-bold text-gray-900">Explore Public Courses</h2>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative max-w-md mb-6">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search courses..."
+              className="pl-8 bg-white"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {filteredPublicCourses.length === 0 ? (
+            <Card className="bg-white">
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <BookOpen className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-gray-900">
+                  {searchQuery ? 'No Courses Found' : 'No Public Courses Available'}
+                </h3>
+                <p className="text-gray-600 text-center">
+                  {searchQuery 
+                    ? 'No courses match your search criteria.' 
+                    : 'Check back later for new public courses.'
+                  }
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredPublicCourses.map((course) => (
+                <Card key={course.id} className="bg-white hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg text-gray-900 truncate">
+                        {course.course_name}
+                      </CardTitle>
+                      {course.progress && getStatusBadge(course.progress.status || 'unknown')}
+                    </div>
+                    <CardDescription>
+                      Public Course • Day {course.day}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <p className="text-sm text-gray-600">
+                        Explore this self-paced learning course and enhance your skills.
                       </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredCourses.map((course) => {
-                      const isEnrolled = enrolledCourses.some(ec => ec.course_id === course.id);
-                      const isActive = activeCourses.some(ec => ec.course_id === course.id);
-                      
-                      return (
-                        <Card key={course.id} className="hover:shadow-lg transition-shadow">
-                          <CardHeader>
-                            <CardTitle className="text-lg">{course.course_name}</CardTitle>
-                            <CardDescription>
-                              Day {course.day} • {new Date(course.created_at).toLocaleDateString()}
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-4">
-                              <div className="flex items-center text-sm text-gray-600">
-                                <Clock className="h-4 w-4 mr-1" />
-                                Duration: {course.day} day{course.day > 1 ? 's' : ''}
-                              </div>
-                              <Button
-                                className="w-full"
-                                onClick={() => handleEnrollCourse(course)}
-                                disabled={enrolling === course.id}
-                                variant={isActive ? "outline" : "default"}
-                              >
-                                {enrolling === course.id ? (
-                                  'Enrolling...'
-                                ) : isActive ? (
-                                  'Currently Enrolled'
-                                ) : isEnrolled ? (
-                                  'Enroll Again'
-                                ) : (
-                                  'Enroll Now'
-                                )}
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
+                      {course.progress ? (
+                        <div className="text-sm text-blue-600">
+                          You are already enrolled in this course
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={() => handleSelfAssign(course)}
+                          disabled={assigningCourse === course.id}
+                          className="w-full bg-green-600 hover:bg-green-700"
+                        >
+                          {assigningCourse === course.id ? 'Assigning...' : 'Enroll Now'}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
 
-      {/* Confirmation Dialog */}
-      <ConfirmDialog
-        open={confirmDialog.open}
-        onOpenChange={(open) => setConfirmDialog({ open })}
-        title="Overwrite Current Course?"
-        description={`You are currently enrolled in "${confirmDialog.existingCourse}". Enrolling in "${confirmDialog.course?.course_name}" will suspend your current progress. Continue?`}
-        confirmText="Yes, Enroll in New Course"
-        cancelText="Cancel"
-        onConfirm={() => {
-          if (confirmDialog.course) {
-            handleEnrollCourse(confirmDialog.course, true);
+        {/* Confirm Dialog for Overwriting */}
+        <ConfirmDialog
+          open={confirmDialog.open}
+          onOpenChange={(open) => setConfirmDialog({ open })}
+          title="Overwrite Current Course?"
+          description={
+            confirmDialog.hasAdminAssigned
+              ? "You have an active course assigned by an admin. You cannot overwrite admin-assigned courses."
+              : "You have another active course. Enrolling in this new course will suspend your current progress. Continue?"
           }
-        }}
-        variant="destructive"
-      />
-    </>
+          confirmText={confirmDialog.hasAdminAssigned ? "OK" : "Yes, Enroll"}
+          cancelText="Cancel"
+          onConfirm={() => {
+            if (!confirmDialog.hasAdminAssigned && confirmDialog.course) {
+              assignCourse(confirmDialog.course);
+            }
+          }}
+          variant={confirmDialog.hasAdminAssigned ? "default" : "destructive"}
+        />
+      </div>
+    </div>
   );
 };
 

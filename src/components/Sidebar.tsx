@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  BookOpen, 
-  BarChart, 
+import {
+  LayoutDashboard,
+  Users,
+  BookOpen,
+  BarChart,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -23,9 +23,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const { signOut } = useMultiAuth();
-  
+
   const navItems = [
-    { icon: LayoutDashboard, label: 'Overview', path: '/' },
+    { icon: LayoutDashboard, label: 'Overview', path: '/dashboard' },
     { icon: Users, label: 'Learners', path: '/learners' },
     { icon: BookOpen, label: 'Courses', path: '/courses' },
     { icon: BarChart, label: 'Analytics', path: '/analytics' },
@@ -43,7 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
   };
 
   return (
-    <div 
+    <div
       className={cn(
         "h-screen sticky top-0 flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out",
         collapsed ? "w-20" : "w-64"
@@ -54,7 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
         {!collapsed && (
           <span className="text-xl font-semibold text-sidebar-foreground">Microlearn</span>
         )}
-        <button 
+        <button
           onClick={() => setCollapsed(!collapsed)}
           className="rounded-full p-1.5 hover:bg-sidebar-accent text-sidebar-foreground transition-all"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -62,15 +62,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
           {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
         </button>
       </div>
-      
+
       {/* Navigation */}
       <nav className="flex-1 py-6 px-3 space-y-1.5">
         {navItems.map((item) => (
-          <Link 
-            key={item.path} 
+          <Link
+            key={item.path}
             to={item.path}
             className={cn(
-              "sidebar-button group", 
+              "sidebar-button group",
               isActive(item.path) ? "active" : "",
               collapsed ? "justify-center" : ""
             )}
@@ -85,7 +85,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
           </Link>
         ))}
       </nav>
-      
+
       {/* User profile */}
       <div className="mt-auto p-4 border-t border-sidebar-border">
         <div className="flex items-center">
@@ -106,15 +106,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user }) => {
           )}
         </div>
         {!collapsed ? (
-          <button 
-            onClick={handleSignOut} 
+          <button
+            onClick={handleSignOut}
             className="mt-4 flex items-center text-sm text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors"
           >
             <LogOut size={16} className="mr-2" />
             Sign out
           </button>
         ) : (
-          <button 
+          <button
             onClick={handleSignOut}
             className="mt-4 flex justify-center w-full text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors"
             title="Sign out"

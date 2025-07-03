@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import {
   Select,
   SelectContent,
@@ -63,8 +63,8 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
   onCancel
 }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [generatedCourse, setGeneratedCourse] = useState<any>(null);
-  const { user } = useAuth();
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const { user } = useMultiAuth();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -77,6 +77,37 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
     },
   });
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const validFiles = files.filter(file => {
+      const validTypes = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'text/plain', 'application/pdf', 'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      
+      if (!validTypes.includes(file.type)) {
+        toast.error(`File ${file.name} is not a supported type`);
+        return false;
+      }
+      
+      if (file.size > maxSize) {
+        toast.error(`File ${file.name} is too large (max 10MB)`);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    setUploadedFiles(prev => [...prev, ...validFiles]);
+    event.target.value = ''; // Reset input
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     console.log('Submitting course generation request with values:', values);
     
@@ -85,6 +116,56 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
 
       const { course_title, topic, goal, style, language } = values;
 
+      // Create registration request entry
+      const { data: requestData, error: requestError } = await supabase
+        .from('registration_requests')
+        .insert({
+          name: user?.name || 'Unknown',
+          number: user?.phone || '',
+          course_title,
+          topic,
+          goal,
+          style,
+          language,
+          approval_status: 'approved'
+        })
+        .select()
+        .single();
+
+      if (requestError) {
+        console.error('Error creating registration request:', requestError);
+        throw new Error('Failed to create registration request');
+      }
+
+      console.log('Registration request created:', requestData);
+
+      // Upload files if any
+      let fileUrls: string[] = [];
+      if (uploadedFiles.length > 0) {
+        console.log('Uploading files:', uploadedFiles.length);
+        
+        for (const file of uploadedFiles) {
+          const fileName = `${requestData.request_id}/${Date.now()}_${file.name}`;
+          
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('course-materials')
+            .upload(fileName, file);
+
+          if (uploadError) {
+            console.error('Error uploading file:', uploadError);
+            continue; // Continue with other files
+          }
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('course-materials')
+            .getPublicUrl(fileName);
+          
+          fileUrls.push(publicUrl);
+        }
+
+        console.log('Uploaded file URLs:', fileUrls);
+      }
+
       // Call the edge function to generate course
       console.log('Calling generate-course function...');
       const { data, error } = await supabase.functions.invoke('generate-course', {
@@ -92,7 +173,9 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
           prompt: `Create a course about ${topic}. Goal: ${goal}. Style: ${style}. Language: ${language}.`,
           courseName: course_title,
           numDays: 3,
-          userId: user?.id
+          userId: user?.id,
+          requestId: requestData.request_id,
+          materialUrls: fileUrls
         }
       });
 
@@ -108,15 +191,14 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
 
       console.log('Course generated successfully:', data);
       
-      // Parse the generated course content
-      if (data.course) {
-        setGeneratedCourse(data.course);
-        toast.success('Course generated successfully! You can now edit and save it.');
-        
-        // Redirect to edit the generated course
-        if (onSuccess) {
-          onSuccess(data.course.id);
-        }
+      toast.success('Course generation request submitted successfully!');
+      
+      // Reset form and files
+      form.reset();
+      setUploadedFiles([]);
+      
+      if (onSuccess) {
+        onSuccess(data.course?.id);
       }
 
     } catch (error: any) {
@@ -246,6 +328,53 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
               />
             </div>
 
+            {/* File Upload Section */}
+            <div className="space-y-4">
+              <div>
+                <FormLabel>Course Materials (Optional)</FormLabel>
+                <div className="mt-2">
+                  <label className="cursor-pointer">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                      <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">
+                        Click to upload images, PDFs, text files, or documents
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Max 10MB per file
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf,.txt,.doc,.docx"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Uploaded Files Display */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Uploaded Files:</p>
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-sm truncate">{file.name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-end space-x-2">
               <Button
                 type="button"
@@ -262,22 +391,12 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
                     Generating...
                   </>
                 ) : (
-                  'Generate'
+                  'Generate Course'
                 )}
               </Button>
             </div>
           </form>
         </Form>
-
-        {generatedCourse && (
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h3 className="text-lg font-medium text-green-800 mb-2">Course Generated Successfully!</h3>
-            <p className="text-sm text-green-700">
-              Your course "{generatedCourse.name}" has been generated with {generatedCourse.days} days of content.
-              You can now view it in your courses list or edit it further.
-            </p>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

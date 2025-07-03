@@ -1,337 +1,318 @@
-
 import React, { useState, useEffect } from 'react';
-import { useMultiAuth } from '@/contexts/MultiAuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, BookOpen, Calendar, Clock } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import { Learner } from '@/lib/types';
-import ConfirmDialog from '@/components/ConfirmDialog';
-import { sendCourseAssignmentNotification, sendCourseSuspensionNotification } from '@/integrations/wati/functions';
-import { normalizePhoneNumber } from '@/lib/utils';
-
-interface Course {
-  id: string;
-  course_name: string;
-  day: number;
-  created_at: string;
-  status: string;
-  request_id: string;
-  visibility: string;
-}
+import { Loader2, Search, BookOpen, Calendar } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useMultiAuth } from '@/contexts/MultiAuthContext';
+import { toast } from 'sonner';
+import { Learner, CourseGroup } from '@/lib/types';
+import CourseOverwriteDialog from './CourseOverwriteDialog';
 
 interface AssignLearnerToCourseProps {
-  learner: Learner;
-  onSuccess?: () => void;
-  onCancel?: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  learner: Learner | null;
+  onAssignmentComplete?: () => void;
 }
 
-/**
- * Component for assigning courses to a specific learner
- * Shows available courses and handles assignment with overwrite confirmation
- */
-const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
-  learner,
-  onSuccess,
-  onCancel
-}) => {
-  const { user } = useMultiAuth();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [assigning, setAssigning] = useState<string | null>(null);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    course?: Course;
-    existingCourse?: string;
-  }>({ open: false });
+const normalizePhoneNumber = (phone: string): string => {
+  const cleaned = phone.replace(/[^\d+]/g, '');
+  
+  if (cleaned.startsWith('+')) {
+    return cleaned;
+  }
+  
+  if (cleaned.length === 10 && /^\d{10}$/.test(cleaned)) {
+    return `+91${cleaned}`;
+  }
+  
+  return cleaned;
+};
 
-  console.log('AssignLearnerToCourse - learner:', learner.name, 'user:', user?.id);
+const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
+  open,
+  onOpenChange,
+  learner,
+  onAssignmentComplete
+}) => {
+  const { user, userRole } = useMultiAuth();
+  const [courses, setCourses] = useState<CourseGroup[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<CourseGroup[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCourse, setSelectedCourse] = useState<CourseGroup | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+  const [showOverwriteDialog, setShowOverwriteDialog] = useState(false);
+  const [currentCourse, setCurrentCourse] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchAvailableCourses();
-  }, []);
+    if (open && user) {
+      fetchCourses();
+    }
+  }, [open, user, userRole]);
 
-  /**
-   * Fetch all approved courses available for assignment
-   */
-  const fetchAvailableCourses = async () => {
+  useEffect(() => {
+    const filtered = courses.filter(course =>
+      course.course_name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    setFilteredCourses(filtered);
+  }, [courses, searchQuery]);
+
+  const fetchCourses = async () => {
     try {
-      console.log('📚 Fetching available courses for assignment...');
+      setIsLoadingCourses(true);
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('courses')
-        .select('*')
-        .eq('status', 'approved')
-        .order('created_at', { ascending: false });
+        .select('*');
 
-      if (error) {
-        console.error('❌ Error fetching courses:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch available courses',
-          variant: 'destructive',
-        });
-        return;
-      }
+      // if (userRole === 'admin') {
+      //   query = query.eq('created_by', user?.id);
+      // }
 
-      console.log('📋 Available courses:', data?.length);
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group courses by course_name and count days
+      const courseGroups: { [key: string]: CourseGroup } = {};
       
-      // Group courses by request_id and take the latest one for each request_id
-      const uniqueCourses = data?.reduce((acc: Course[], course) => {
-        const existingCourse = acc.find(c => c.request_id === course.request_id);
-        if (!existingCourse) {
-          acc.push(course);
-        }
-        return acc;
-      }, []) || [];
-
-      console.log('✅ Unique courses (grouped by request_id):', uniqueCourses.length);
-      setCourses(uniqueCourses);
-    } catch (error) {
-      console.error('💥 Exception fetching courses:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch courses',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Check if learner has existing active course progress
-   */
-  const checkExistingProgress = async (): Promise<string | null> => {
-    const normalizedPhone = normalizePhoneNumber(learner.phone);
-    
-    const { data: existingActive } = await supabase
-      .from('course_progress')
-      .select('*')
-      .eq('phone_number', normalizedPhone)
-      .in('status', ['assigned', 'started']);
-
-    if (existingActive && existingActive.length > 0) {
-      return existingActive[0].course_name;
-    }
-
-    return null;
-  };
-
-  /**
-   * Handle course assignment with confirmation for overwrites
-   */
-  const handleAssignCourse = async (course: Course, confirmOverwrite: boolean = false) => {
-    // Check for existing active courses if not confirming overwrite
-    if (!confirmOverwrite) {
-      const existingCourseName = await checkExistingProgress();
-      if (existingCourseName) {
-        setConfirmDialog({
-          open: true,
-          course,
-          existingCourse: existingCourseName
-        });
-        return;
-      }
-    }
-
-    setAssigning(course.id);
-
-    try {
-      console.log('📝 Assigning course:', course.course_name, 'to learner:', learner.name);
-
-      const normalizedPhone = normalizePhoneNumber(learner.phone);
-
-      // If confirming overwrite, suspend existing courses
-      if (confirmOverwrite) {
-        console.log('⏸️ Suspending existing active courses...');
-        
-        const { data: existingCourses } = await supabase
-          .from('course_progress')
-          .select('*')
-          .eq('phone_number', normalizedPhone)
-          .in('status', ['assigned', 'started']);
-
-        if (existingCourses && existingCourses.length > 0) {
-          await supabase
-            .from('course_progress')
-            .update({ status: 'suspended' })
-            .eq('phone_number', normalizedPhone)
-            .in('status', ['assigned', 'started']);
-
-          // Send suspension notification for existing courses
-          for (const existingCourse of existingCourses) {
-            try {
-              await sendCourseSuspensionNotification(
-                learner.name,
-                existingCourse.course_name,
-                normalizedPhone
-              );
-            } catch (notificationError) {
-              console.warn('⚠️ Failed to send suspension notification:', notificationError);
-            }
+      (data || []).forEach(course => {
+        const key = `${course.course_name}_${course.created_by}`;
+        if (!courseGroups[key]) {
+          courseGroups[key] = {
+            id: course.id,
+            course_name: course.course_name,
+            created_at: course.created_at,
+            updated_at: course.updated_at,
+            created_by: course.created_by,
+            status: course.status,
+            visibility: course.visibility,
+            origin: course.origin,
+            total_days: 1
+          };
+        } else {
+          courseGroups[key].total_days += 1;
+          if (course.updated_at > courseGroups[key].updated_at) {
+            courseGroups[key].updated_at = course.updated_at;
           }
         }
+      });
+
+      setCourses(Object.values(courseGroups));
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      toast.error('Failed to load courses');
+    } finally {
+      setIsLoadingCourses(false);
+    }
+  };
+
+  const handleAssignment = async () => {
+    if (!selectedCourse || !learner) return;
+
+    setIsLoading(true);
+    try {
+      const normalizedPhone = normalizePhoneNumber(learner.phone);
+      if (!normalizedPhone) {
+        throw new Error('Invalid phone number');
       }
 
-      // Create new course progress entry
-      const { data: progressData, error: progressError } = await supabase
+      // Check if learner already has an active course assignment
+      const { data: existingActive, error: selectError } = await supabase
+        .from('course_progress')
+        .select('*, course_name')
+        .eq('phone_number', normalizedPhone)
+        .in('status', ['assigned', 'started']);
+
+      if (selectError) throw selectError;
+
+      if (existingActive && existingActive.length > 0) {
+        setCurrentCourse(existingActive[0].course_name);
+        setShowOverwriteDialog(true);
+        return;
+      }
+
+      await performAssignment();
+    } catch (error) {
+      console.error('Error assigning course:', error);
+      toast.error('Failed to assign course');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const performAssignment = async (isOverwrite = false) => {
+    if (!selectedCourse || !learner) return;
+
+    try {
+      const normalizedPhone = normalizePhoneNumber(learner.phone);
+      if (!normalizedPhone) {
+        throw new Error('Invalid phone number');
+      }
+
+      if (isOverwrite) {
+        await supabase
+          .from('course_progress')
+          .update({ status: 'suspended' })
+          .eq('phone_number', normalizedPhone)
+          .in('status', ['assigned', 'started']);
+      }
+
+      const { error: updateError } = await supabase
+        .from('learners')
+        .update({ 
+          assigned_course_id: selectedCourse.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', learner.id);
+
+      if (updateError) throw updateError;
+
+      const { error: progressError } = await supabase
         .from('course_progress')
         .insert({
           learner_id: learner.id,
-          course_id: course.id,
+          course_id: selectedCourse.id,
+          status: 'assigned',
+          progress_percent: 0,
+          current_day: 1,
+          course_name: selectedCourse.course_name,
           learner_name: learner.name,
           phone_number: normalizedPhone,
-          course_name: course.course_name,
-          current_day: 1,
-          progress_percent: 0,
-          status: 'assigned',
-          started_at: new Date().toISOString(),
           is_active: true,
-        })
-        .select()
-        .single();
-
-      if (progressError) {
-        console.error('❌ Error creating course progress:', progressError);
-        toast({
-          title: 'Assignment Failed',
-          description: progressError.message,
-          variant: 'destructive',
+          last_module_completed_at: new Date().toISOString()
         });
-        return;
-      }
 
-      console.log('✅ Successfully assigned course:', progressData);
+      if (progressError) throw progressError;
 
-      // Send WhatsApp notification for new assignment
-      try {
-        await sendCourseAssignmentNotification(
-          learner.name,
-          course.course_name,
-          normalizedPhone
-        );
-        console.log('📱 WhatsApp notification sent successfully');
-      } catch (notificationError) {
-        console.warn('⚠️ Failed to send WhatsApp notification:', notificationError);
-        // Don't fail the assignment if notification fails
-      }
-
-      toast({
-        title: 'Course Assigned Successfully',
-        description: `${course.course_name} has been assigned to ${learner.name}`,
-      });
-
-      // Call success callback
-      onSuccess?.();
+      toast.success(`Course "${selectedCourse.course_name}" assigned to ${learner.name} successfully`);
+      
+      setSelectedCourse(null);
+      setSearchQuery('');
+      onOpenChange(false);
+      onAssignmentComplete?.();
     } catch (error) {
-      console.error('💥 Exception during course assignment:', error);
-      toast({
-        title: 'Assignment Error',
-        description: 'Failed to assign course to learner',
-        variant: 'destructive',
-      });
-    } finally {
-      setAssigning(null);
+      console.error('Error in assignment:', error);
+      toast.error('Failed to assign course');
+      throw error;
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <span className="ml-2">Loading available courses...</span>
-      </div>
-    );
-  }
+  const handleOverwriteConfirm = async () => {
+    await performAssignment(true);
+    setShowOverwriteDialog(false);
+    setCurrentCourse(null);
+  };
+
+  if (!learner) return null;
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Assign Course to {learner.name}</h3>
-            <p className="text-sm text-muted-foreground">
-              Choose a course to assign to this learner
-            </p>
-          </div>
-          {onCancel && (
-            <Button variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-          )}
-        </div>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Assign Course to {learner.name}
+            </DialogTitle>
+          </DialogHeader>
 
-        {courses.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-8">
-              <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No approved courses available for assignment.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {courses.map((course) => (
-              <Card key={course.id} className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{course.course_name}</CardTitle>
-                    <Badge variant="outline" className="capitalize">
-                      {course.visibility}
-                    </Badge>
-                  </div>
-                  <CardDescription>
-                    {course.day} day{course.day > 1 ? 's' : ''} • Created {new Date(course.created_at).toLocaleDateString()}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Clock className="h-4 w-4 mr-1" />
-                      Duration: {course.day} day{course.day > 1 ? 's' : ''}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      Created: {new Date(course.created_at).toLocaleDateString()}
-                    </div>
-                    <Button
-                      className="w-full"
-                      onClick={() => handleAssignCourse(course)}
-                      disabled={assigning === course.id}
-                    >
-                      {assigning === course.id ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Assigning...
-                        </>
-                      ) : (
-                        'Assign Course'
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search courses..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
 
-      {/* Confirmation Dialog for Course Overwrite */}
-      <ConfirmDialog
-        open={confirmDialog.open}
-        onOpenChange={(open) => setConfirmDialog({ open })}
-        title="Overwrite Current Course?"
-        description={`${learner.name} is currently assigned to "${confirmDialog.existingCourse}". Assigning "${confirmDialog.course?.course_name}" will suspend their current progress. Continue?`}
-        confirmText="Yes, Assign New Course"
-        cancelText="Cancel"
-        onConfirm={() => {
-          if (confirmDialog.course) {
-            handleAssignCourse(confirmDialog.course, true);
-          }
-        }}
-        variant="destructive"
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {isLoadingCourses ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span>Loading courses...</span>
+                </div>
+              ) : filteredCourses.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  {searchQuery ? 'No courses found matching your search.' : 'No courses available.'}
+                </div>
+              ) : (
+                filteredCourses.map((course) => (
+                  <div
+                    key={course.id}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      selectedCourse?.id === course.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setSelectedCourse(course)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <BookOpen className="h-4 w-4 text-blue-600" />
+                          <h3 className="font-medium">{course.course_name}</h3>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>{course.total_days} days</span>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {course.origin === 'microlearn_manual' ? 'Manual' : 'Generated'}
+                          </Badge>
+                          <Badge variant={course.status === 'approved' ? 'default' : 'secondary'}>
+                            {course.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {selectedCourse && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">Selected Course</h4>
+                <p className="text-blue-800">{selectedCourse.course_name}</p>
+                <p className="text-sm text-blue-600 mt-1">
+                  {selectedCourse.total_days} days • {selectedCourse.status}
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAssignment}
+                disabled={!selectedCourse || isLoading}
+              >
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Assign Course
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Overwrite Confirmation Dialog */}
+      <CourseOverwriteDialog
+        open={showOverwriteDialog}
+        onOpenChange={setShowOverwriteDialog}
+        learner={learner}
+        newCourse={{ id: selectedCourse?.id || '', course_name: selectedCourse?.course_name || '' } as any}
+        onConfirm={handleOverwriteConfirm}
       />
     </>
   );
