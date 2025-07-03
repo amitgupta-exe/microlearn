@@ -6,7 +6,8 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Phone, Mail, Calendar, BookOpen, Plus, ArrowLeft } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Users, Phone, Mail, Calendar, BookOpen, Plus, ArrowLeft, Search } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Tables } from '@/integrations/supabase/types';
 import {
@@ -22,18 +23,16 @@ import AssignLearnerToCourse from '@/components/AssignLearnerToCourse';
 type Learner = Tables<'learners'>;
 
 /**
- * Learners Page - Manage learners and assign courses
- * Features:
- * - View all learners in grid/detail view
- * - Create, edit, delete learners
- * - Import learners from CSV
- * - Assign courses to individual learners
+ * Enhanced Learners Page - Manage learners and assign courses
+ * Features: search, filtering, course assignment with confirmation
  */
 const Learners = () => {
   const { id } = useParams();
   const { user, userRole, loading } = useRequireAuth();
   const [learners, setLearners] = useState<Learner[]>([]);
+  const [filteredLearners, setFilteredLearners] = useState<Learner[]>([]);
   const [selectedLearner, setSelectedLearner] = useState<Learner | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
@@ -56,6 +55,16 @@ const Learners = () => {
     }
   }, [id, learners]);
 
+  useEffect(() => {
+    // Filter learners based on search query
+    const filtered = learners.filter(learner =>
+      learner.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      learner.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      learner.phone.includes(searchQuery)
+    );
+    setFilteredLearners(filtered);
+  }, [learners, searchQuery]);
+
   /**
    * Fetch learners based on user role
    * Admins see only their learners, superadmins see all
@@ -75,6 +84,7 @@ const Learners = () => {
       if (error) throw error;
       console.log('Fetched learners:', data?.length);
       setLearners(data || []);
+      setFilteredLearners(data || []);
     } catch (error) {
       console.error('Error fetching learners:', error);
       toast({
@@ -226,8 +236,8 @@ const Learners = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
     );
@@ -239,8 +249,8 @@ const Learners = () => {
         {/* Header Section */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Learners</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Learners</h1>
+            <p className="text-gray-600 mt-1">
               Manage your learners and track their progress
             </p>
           </div>
@@ -248,17 +258,16 @@ const Learners = () => {
             <Button onClick={() => setIsImportOpen(true)} variant="outline">
               Import Learners
             </Button>
-            <Button onClick={handleCreateLearner}>
+            <Button onClick={handleCreateLearner} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="h-4 w-4 mr-2" />
               Add Learner
             </Button>
           </div>
         </div>
 
-        {/* Main Content */}
         {selectedLearner ? (
           /* Individual Learner Detail View */
-          <Card>
+          <Card className="bg-white shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -266,6 +275,7 @@ const Learners = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedLearner(null)}
+                    className="text-gray-600 hover:text-gray-900"
                   >
                     <ArrowLeft className="h-4 w-4 mr-1" />
                     Back to Learners
@@ -275,11 +285,12 @@ const Learners = () => {
                   <Button 
                     onClick={() => handleAssignCourse(selectedLearner)}
                     variant="outline"
+                    className="border-blue-200 text-blue-700 hover:bg-blue-50"
                   >
                     <BookOpen className="h-4 w-4 mr-2" />
                     Assign Course
                   </Button>
-                  <Button onClick={() => handleEditLearner(selectedLearner)}>
+                  <Button onClick={() => handleEditLearner(selectedLearner)} className="bg-blue-600 hover:bg-blue-700">
                     Edit Learner
                   </Button>
                   <Button 
@@ -290,105 +301,137 @@ const Learners = () => {
                   </Button>
                 </div>
               </div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-gray-900">
                 <Users className="h-5 w-5" />
                 {selectedLearner.name}
               </CardTitle>
-              <CardDescription>Learner Details</CardDescription>
+              <CardDescription className="text-gray-600">Learner Details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{selectedLearner.phone}</span>
+                  <Phone className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-700">{selectedLearner.phone}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{selectedLearner.email}</span>
+                  <Mail className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-700">{selectedLearner.email}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Joined {new Date(selectedLearner.created_at).toLocaleDateString()}</span>
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-700">Joined {new Date(selectedLearner.created_at).toLocaleDateString()}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-muted-foreground" />
-                  <Badge variant="outline">{selectedLearner.status}</Badge>
+                  <BookOpen className="h-4 w-4 text-gray-500" />
+                  <Badge 
+                    variant="outline"
+                    className={selectedLearner.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' : ''}
+                  >
+                    {selectedLearner.status}
+                  </Badge>
                 </div>
               </div>
             </CardContent>
           </Card>
         ) : (
-          /* Learners Grid View */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {learners.map((learner) => (
-              <Card 
-                key={learner.id} 
-                className="cursor-pointer hover:shadow-md transition-shadow" 
-                onClick={() => setSelectedLearner(learner)}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span className="truncate">{learner.name}</span>
-                    <Badge variant="outline">{learner.status}</Badge>
-                  </CardTitle>
-                  <CardDescription className="space-y-1">
-                    <div className="flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      <span className="text-xs">{learner.phone}</span>
+          /* Learners Grid View with Search */
+          <div className="space-y-6">
+            {/* Search Bar */}
+            <div className="relative max-w-md">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search learners..."
+                className="pl-8 bg-white"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* Learners Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredLearners.map((learner) => (
+                <Card 
+                  key={learner.id} 
+                  className="cursor-pointer hover:shadow-md transition-shadow bg-white border border-gray-200" 
+                  onClick={() => setSelectedLearner(learner)}
+                >
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between text-gray-900">
+                      <span className="truncate">{learner.name}</span>
+                      <Badge 
+                        variant="outline"
+                        className={learner.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' : ''}
+                      >
+                        {learner.status}
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription className="space-y-1">
+                      <div className="flex items-center gap-1">
+                        <Phone className="h-3 w-3 text-gray-500" />
+                        <span className="text-xs text-gray-600">{learner.phone}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Mail className="h-3 w-3 text-gray-500" />
+                        <span className="text-xs text-gray-600">{learner.email}</span>
+                      </div>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between text-sm text-gray-600">
+                      <span>Joined {new Date(learner.created_at).toLocaleDateString()}</span>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAssignCourse(learner);
+                        }}
+                        className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                      >
+                        <BookOpen className="h-3 w-3 mr-1" />
+                        Assign
+                      </Button>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Mail className="h-3 w-3" />
-                      <span className="text-xs">{learner.email}</span>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Empty State */}
+            {filteredLearners.length === 0 && (
+              <Card className="bg-white">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Users className="h-12 w-12 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-semibold mb-2 text-gray-900">
+                    {searchQuery ? 'No learners found' : 'No learners found'}
+                  </h3>
+                  <p className="text-gray-600 text-center mb-4">
+                    {searchQuery 
+                      ? 'No learners match your search criteria.' 
+                      : 'Get started by adding your first learner or importing a list.'
+                    }
+                  </p>
+                  {!searchQuery && (
+                    <div className="flex gap-2">
+                      <Button onClick={() => setIsImportOpen(true)} variant="outline">
+                        Import Learners
+                      </Button>
+                      <Button onClick={handleCreateLearner} className="bg-blue-600 hover:bg-blue-700">
+                        Add First Learner
+                      </Button>
                     </div>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>Joined {new Date(learner.created_at).toLocaleDateString()}</span>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAssignCourse(learner);
-                      }}
-                    >
-                      <BookOpen className="h-3 w-3 mr-1" />
-                      Assign
-                    </Button>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
-            ))}
+            )}
           </div>
-        )}
-
-        {/* Empty State */}
-        {learners.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Users className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No learners found</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                Get started by adding your first learner or importing a list.
-              </p>
-              <div className="flex gap-2">
-                <Button onClick={() => setIsImportOpen(true)} variant="outline">
-                  Import Learners
-                </Button>
-                <Button onClick={handleCreateLearner}>
-                  Add First Learner
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         )}
 
         {/* Learner Form Dialog */}
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md bg-white">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-gray-900">
                 {selectedLearner ? 'Edit Learner' : 'Add New Learner'}
               </DialogTitle>
             </DialogHeader>
@@ -402,9 +445,9 @@ const Learners = () => {
 
         {/* Import Dialog */}
         <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
             <DialogHeader>
-              <DialogTitle>Import Learners</DialogTitle>
+              <DialogTitle className="text-gray-900">Import Learners</DialogTitle>
             </DialogHeader>
             <LearnerImport onSuccess={handleImportSuccess} />
           </DialogContent>
@@ -412,9 +455,9 @@ const Learners = () => {
 
         {/* Assign Course Dialog */}
         <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
             <DialogHeader>
-              <DialogTitle>Assign Course</DialogTitle>
+              <DialogTitle className="text-gray-900">Assign Course</DialogTitle>
             </DialogHeader>
             {selectedLearner && (
               <AssignLearnerToCourse

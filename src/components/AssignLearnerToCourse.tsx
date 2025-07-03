@@ -5,7 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, BookOpen, Calendar, Clock } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Loader2, BookOpen, Calendar, Clock, Search } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Learner } from '@/lib/types';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -29,8 +30,8 @@ interface AssignLearnerToCourseProps {
 }
 
 /**
- * Component for assigning courses to a specific learner
- * Shows available courses and handles assignment with overwrite confirmation
+ * Enhanced component for assigning courses to a specific learner
+ * Features: search functionality, overwrite confirmation, WhatsApp notifications
  */
 const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
   learner,
@@ -39,8 +40,10 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
 }) => {
   const { user } = useMultiAuth();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     course?: Course;
@@ -52,6 +55,14 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
   useEffect(() => {
     fetchAvailableCourses();
   }, []);
+
+  useEffect(() => {
+    // Filter courses based on search query
+    const filtered = courses.filter(course =>
+      course.course_name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    setFilteredCourses(filtered);
+  }, [courses, searchQuery]);
 
   /**
    * Fetch all approved courses available for assignment
@@ -89,6 +100,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
 
       console.log('✅ Unique courses (grouped by request_id):', uniqueCourses.length);
       setCourses(uniqueCourses);
+      setFilteredCourses(uniqueCourses);
     } catch (error) {
       console.error('💥 Exception fetching courses:', error);
       toast({
@@ -241,8 +253,8 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <span className="ml-2">Loading available courses...</span>
+        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+        <span className="ml-2 text-gray-600">Loading available courses...</span>
       </div>
     );
   }
@@ -250,10 +262,13 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
   return (
     <>
       <div className="space-y-6">
+        {/* Header with Search */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold">Assign Course to {learner.name}</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Assign Course to {learner.name}
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
               Choose a course to assign to this learner
             </p>
           </div>
@@ -264,25 +279,49 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
           )}
         </div>
 
-        {courses.length === 0 ? (
-          <Card>
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search courses..."
+            className="pl-8 bg-white"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {/* Courses Grid */}
+        {filteredCourses.length === 0 ? (
+          <Card className="bg-white">
             <CardContent className="text-center py-8">
               <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No approved courses available for assignment.</p>
+              <p className="text-gray-600">
+                {searchQuery 
+                  ? 'No courses match your search criteria.' 
+                  : 'No approved courses available for assignment.'
+                }
+              </p>
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {courses.map((course) => (
-              <Card key={course.id} className="hover:shadow-md transition-shadow">
+            {filteredCourses.map((course) => (
+              <Card key={course.id} className="hover:shadow-md transition-shadow bg-white border border-gray-200">
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{course.course_name}</CardTitle>
-                    <Badge variant="outline" className="capitalize">
+                    <CardTitle className="text-lg text-gray-900">{course.course_name}</CardTitle>
+                    <Badge 
+                      variant="outline" 
+                      className={`capitalize ${
+                        course.visibility === 'public' 
+                          ? 'bg-green-50 text-green-700 border-green-200' 
+                          : 'bg-blue-50 text-blue-700 border-blue-200'
+                      }`}
+                    >
                       {course.visibility}
                     </Badge>
                   </div>
-                  <CardDescription>
+                  <CardDescription className="text-gray-600">
                     {course.day} day{course.day > 1 ? 's' : ''} • Created {new Date(course.created_at).toLocaleDateString()}
                   </CardDescription>
                 </CardHeader>
@@ -297,7 +336,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
                       Created: {new Date(course.created_at).toLocaleDateString()}
                     </div>
                     <Button
-                      className="w-full"
+                      className="w-full bg-blue-600 hover:bg-blue-700"
                       onClick={() => handleAssignCourse(course)}
                       disabled={assigning === course.id}
                     >
