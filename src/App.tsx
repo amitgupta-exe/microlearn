@@ -64,9 +64,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/superadmin" replace />;
   }
 
+  // Create a simplified user object for Sidebar
+  const sidebarUser = {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    phone: user.phone,
+    role: user.role
+  };
+
   return (
     <div className="flex h-screen bg-white">
-      <Sidebar user={user} />
+      <Sidebar user={sidebarUser} />
       <main className="flex-1 overflow-auto bg-gray-50">
         {children}
       </main>

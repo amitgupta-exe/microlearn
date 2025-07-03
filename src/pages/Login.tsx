@@ -1,9 +1,15 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, GraduationCap, Shield, Users } from 'lucide-react';
+import { ArrowLeft, GraduationCap, Shield, Users, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const Login: React.FC = () => {
   return (
@@ -22,73 +28,57 @@ const Login: React.FC = () => {
       </header>
 
       <div className="flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-4xl">
+        <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Choose Your Login Type</h1>
-            <p className="mt-2 text-gray-600">Select your role to access the appropriate dashboard</p>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Choose Your Login</h1>
+            <p className="mt-2 text-gray-600">Select your role to access the platform</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Super Admin Login */}
-            <Card className="border-2 border-red-200 hover:border-red-300 transition-colors cursor-pointer">
-              <Link to="/superadmin/login">
-                <CardHeader className="text-center bg-red-50">
-                  <div className="flex items-center justify-center mb-2">
-                    <div className="p-3 rounded-full bg-red-500">
-                      <Shield className="h-8 w-8 text-white" />
-                    </div>
-                  </div>
-                  <CardTitle className="text-red-700">Super Admin</CardTitle>
-                  <CardDescription className="text-gray-600">Full system access</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <Button className="w-full bg-red-500 hover:bg-red-600 text-white">
-                    Login as Super Admin
+          <Card className="border-2 border-gray-200 bg-white shadow-lg">
+            <CardHeader className="text-center">
+              <CardTitle className="text-gray-700">Login Options</CardTitle>
+              <CardDescription className="text-gray-600">Choose your account type</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="w-full justify-between" variant="outline">
+                    Select Login Type
+                    <ChevronDown className="h-4 w-4" />
                   </Button>
-                </CardContent>
-              </Link>
-            </Card>
-
-            {/* Admin Login */}
-            <Card className="border-2 border-blue-200 hover:border-blue-300 transition-colors cursor-pointer">
-              <Link to="/admin/login">
-                <CardHeader className="text-center bg-blue-50">
-                  <div className="flex items-center justify-center mb-2">
-                    <div className="p-3 rounded-full bg-blue-500">
-                      <Users className="h-8 w-8 text-white" />
-                    </div>
-                  </div>
-                  <CardTitle className="text-blue-700">Admin</CardTitle>
-                  <CardDescription className="text-gray-600">Manage courses and learners</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white">
-                    Login as Admin
-                  </Button>
-                </CardContent>
-              </Link>
-            </Card>
-
-            {/* Learner Login */}
-            <Card className="border-2 border-green-200 hover:border-green-300 transition-colors cursor-pointer">
-              <Link to="/learner/login">
-                <CardHeader className="text-center bg-green-50">
-                  <div className="flex items-center justify-center mb-2">
-                    <div className="p-3 rounded-full bg-green-500">
-                      <GraduationCap className="h-8 w-8 text-white" />
-                    </div>
-                  </div>
-                  <CardTitle className="text-green-700">Learner</CardTitle>
-                  <CardDescription className="text-gray-600">Access your courses</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <Button className="w-full bg-green-500 hover:bg-green-600 text-white">
-                    Login as Learner
-                  </Button>
-                </CardContent>
-              </Link>
-            </Card>
-          </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-full bg-white z-50">
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin/login" className="w-full flex items-center gap-2 p-2">
+                      <Users className="h-4 w-4 text-blue-600" />
+                      <div>
+                        <div className="font-medium">Admin</div>
+                        <div className="text-sm text-gray-500">Manage courses and learners</div>
+                      </div>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/learner/login" className="w-full flex items-center gap-2 p-2">
+                      <GraduationCap className="h-4 w-4 text-green-600" />
+                      <div>
+                        <div className="font-medium">Learner</div>
+                        <div className="text-sm text-gray-500">Access your courses</div>
+                      </div>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/superadmin/login" className="w-full flex items-center gap-2 p-2">
+                      <Shield className="h-4 w-4 text-red-600" />
+                      <div>
+                        <div className="font-medium">Super Admin</div>
+                        <div className="text-sm text-gray-500">Full system access</div>
+                      </div>
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

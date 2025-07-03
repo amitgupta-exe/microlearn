@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Edit, Trash2, Loader2, Search } from 'lucide-react';
@@ -49,7 +50,9 @@ const Learners: React.FC = () => {
   const { user } = useMultiAuth();
 
   useEffect(() => {
-    fetchLearners();
+    if (user) {
+      fetchLearners();
+    }
   }, [user]);
 
   useEffect(() => {
@@ -62,19 +65,26 @@ const Learners: React.FC = () => {
   }, [learners, searchQuery]);
 
   const fetchLearners = async () => {
+    if (!user) {
+      console.log('No user found, cannot fetch learners');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const { data: userData } = await supabase.auth.getUser();
-      
-      if (!userData?.user) {
-        toast.error('You must be logged in to view learners');
-        return;
-      }
+      console.log('Fetching learners for user:', user.id);
 
       const { data, error } = await supabase
         .from('learners')
-        .select('*')
-        .eq('created_by', userData.user.id)
+        .select(`
+          *,
+          assigned_course:assigned_course_id(
+            id,
+            course_name
+          )
+        `)
+        .eq('created_by', user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -83,16 +93,8 @@ const Learners: React.FC = () => {
         return;
       }
 
-      // Transform the data to match our Learner type
-      const transformedLearners = (data || []).map(learner => ({
-        ...learner,
-        status: learner.status as 'active' | 'inactive',
-        hasActiveCourse: false,
-        activeCourse: null
-      }));
-
-      console.log('Fetched learners:', transformedLearners.length);
-      setLearners(transformedLearners);
+      console.log('Fetched learners data:', data);
+      setLearners(data || []);
     } catch (error) {
       console.error('Error in learners fetch:', error);
       toast.error('An error occurred while loading learners');
@@ -102,20 +104,19 @@ const Learners: React.FC = () => {
   };
 
   const handleCreateLearner = async () => {
+    if (!user) {
+      toast.error('You must be logged in to create learners');
+      return;
+    }
+
     try {
       setLoading(true);
-      const { data: userData } = await supabase.auth.getUser();
-
-      if (!userData?.user) {
-        toast.error('You must be logged in to create learners');
-        return;
-      }
 
       const { error } = await supabase
         .from('learners')
         .insert({
           ...newLearner,
-          created_by: userData.user.id,
+          created_by: user.id,
         });
 
       if (error) {
@@ -218,8 +219,19 @@ const Learners: React.FC = () => {
     setShowAssignDialog(true);
   };
 
+  if (loading && learners.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading learners...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between space-y-2 md:space-y-0">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Manage Learners</h2>
@@ -232,6 +244,7 @@ const Learners: React.FC = () => {
             placeholder="Search learners..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-64"
           />
           <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -239,6 +252,7 @@ const Learners: React.FC = () => {
           </Button>
         </div>
       </div>
+      
       <div className="border rounded-md">
         <Table>
           <TableHeader>
@@ -247,27 +261,21 @@ const Learners: React.FC = () => {
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Assigned Course</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {filteredLearners.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading learners...
-                </TableCell>
-              </TableRow>
-            ) : filteredLearners.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center">
-                  No learners found.
+                <TableCell colSpan={6} className="text-center py-8">
+                  {searchQuery ? 'No learners found matching your search.' : 'No learners found. Create your first learner to get started.'}
                 </TableCell>
               </TableRow>
             ) : (
               filteredLearners.map((learner) => (
                 <TableRow key={learner.id}>
-                  <TableCell>{learner.name}</TableCell>
+                  <TableCell className="font-medium">{learner.name}</TableCell>
                   <TableCell>{learner.email}</TableCell>
                   <TableCell>{learner.phone}</TableCell>
                   <TableCell>
@@ -275,30 +283,39 @@ const Learners: React.FC = () => {
                       {learner.status === 'active' ? 'Active' : 'Inactive'}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {learner.assigned_course ? (
+                      <Badge variant="secondary">
+                        {learner.assigned_course.course_name}
+                      </Badge>
+                    ) : (
+                      <span className="text-gray-500">None</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleAssignCourse(learner)}
-                    >
-                      Assign Course
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditLearner(learner)}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteLearner(learner.id)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </Button>
+                    <div className="flex items-center justify-end space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleAssignCourse(learner)}
+                      >
+                        Assign Course
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditLearner(learner)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteLearner(learner.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -464,11 +481,18 @@ const Learners: React.FC = () => {
       </Dialog>
 
       {/* Assignment Dialog */}
-      <AssignLearnerToCourse
-        open={showAssignDialog}
-        onOpenChange={setShowAssignDialog}
-        learner={selectedLearnerForAssignment}
-      />
+      {selectedLearnerForAssignment && (
+        <AssignLearnerToCourse
+          open={showAssignDialog}
+          onOpenChange={setShowAssignDialog}
+          learner={selectedLearnerForAssignment}
+          onAssignmentComplete={() => {
+            fetchLearners();
+            setShowAssignDialog(false);
+            setSelectedLearnerForAssignment(null);
+          }}
+        />
+      )}
     </div>
   );
 };
