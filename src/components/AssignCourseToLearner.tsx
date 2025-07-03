@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,6 +22,7 @@ interface Props {
 /**
  * Enhanced component for assigning a course to multiple learners
  * Features: search functionality, overwrite confirmation, WhatsApp notifications
+ * Buttons placed outside scrollable section for better UX
  */
 const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, onAssigned }) => {
     const [learners, setLearners] = useState<Learner[]>([]);
@@ -83,7 +84,8 @@ const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, on
                     return {
                         ...learner,
                         hasActiveCourse: progressData && progressData.length > 0,
-                        activeCourse: progressData?.[0]?.course_name || null
+                        activeCourse: progressData?.[0]?.course_name || null,
+                        status: learner.status as 'active' | 'inactive'
                     };
                 })
             );
@@ -259,13 +261,14 @@ const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, on
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="max-w-4xl w-full max-h-[90vh] flex flex-col bg-white">
+                    {/* Header - Fixed */}
                     <DialogHeader className="flex-shrink-0 border-b pb-4">
                         <DialogTitle className="text-xl font-semibold text-gray-900">
                             Assign "{course.course_name}" to Learners
                         </DialogTitle>
                     </DialogHeader>
                     
-                    {/* Search Bar - Fixed at top */}
+                    {/* Search Bar - Fixed */}
                     <div className="flex-shrink-0 p-4 bg-gray-50 border-b">
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
@@ -332,8 +335,8 @@ const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, on
                         )}
                     </div>
 
-                    {/* Action Buttons - Fixed at bottom */}
-                    <div className="flex-shrink-0 flex gap-2 p-4 border-t bg-white">
+                    {/* Action Buttons - Fixed at bottom, outside scroll area */}
+                    <DialogFooter className="flex-shrink-0 flex gap-2 p-4 border-t bg-white">
                         <Button 
                             variant="outline" 
                             onClick={() => onOpenChange(false)} 
@@ -355,7 +358,7 @@ const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, on
                                 `Assign to ${selectedLearners.length} Learner(s)`
                             )}
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 

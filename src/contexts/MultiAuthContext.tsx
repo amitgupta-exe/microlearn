@@ -1,76 +1,93 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User } from '@supabase/supabase-js';
+import { User as SupabaseUser } from '@supabase/supabase-js';
+import { User, UserRole } from '@/lib/types';
 
 interface MultiAuthContextType {
   user: User | null;
-  userRole: string | null;
+  userRole: UserRole | null;
   loading: boolean;
-  signIn: (email: string, password: string, role: 'admin' | 'learner') => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
   learnerLogin: (phone: string) => Promise<{ error: any }>;
+  resetPassword: (email: string) => Promise<{ error: any }>;
 }
 
 const MultiAuthContext = createContext<MultiAuthContextType | undefined>(undefined);
 
 export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Always start fresh - no session persistence
-    console.log('🔄 Starting fresh authentication session');
+    // Always start fresh - no session persistence as requested
+    console.log('🔄 Starting fresh authentication session (no cache)');
     setUser(null);
     setUserRole(null);
     setLoading(false);
   }, []);
 
   /**
-   * Sign in for admin users
+   * Sign in for admin/superadmin users
    */
-  const signIn = async (email: string, password: string, role: 'admin' | 'learner') => {
-    console.log('🔐 Attempting to sign in:', email, 'as role:', role);
+  const signIn = async (email: string, password: string) => {
+    console.log('🔐 Attempting to sign in:', email);
     setLoading(true);
 
     try {
-      if (role === 'admin') {
-        console.log('👤 Admin login attempt via Supabase');
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
+      // Check if it's superadmin login
+      if (email === 'superadmin' && password === 'superadmin123') {
+        setUser({
+          id: 'superadmin',
+          email: 'superadmin@system.com',
+          name: 'Super Admin',
+          role: 'superadmin'
         });
+        setUserRole('superadmin');
+        setLoading(false);
+        return { error: null };
+      }
 
-        if (error) {
-          console.error('❌ Supabase login error:', error);
+      // Regular admin login via Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error('❌ Supabase login error:', error);
+        setLoading(false);
+        return { error };
+      }
+
+      if (data.user) {
+        // Check if user exists in users table
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single();
+
+        if (userError || !userData) {
+          console.error('❌ User not found in users table:', userError);
+          await supabase.auth.signOut();
           setLoading(false);
-          return { error };
+          return { error: { message: 'User not found or not authorized' } };
         }
 
-        console.log('📋 Supabase login result:', data);
-
-        if (data.user) {
-          // Check if user exists in users table
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', email)
-            .single();
-
-          if (userError || !userData) {
-            console.error('❌ User not found in users table:', userError);
-            await supabase.auth.signOut();
-            setLoading(false);
-            return { error: { message: 'User not found or not authorized' } };
-          }
-
-          console.log('✅ Found existing admin user:', userData);
-          setUser(data.user);
-          setUserRole(userData.role);
-          console.log('✅ Supabase login successful for:', email);
-        }
+        console.log('✅ Found existing admin user:', userData);
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          phone: userData.phone || undefined,
+          role: userData.role as UserRole
+        });
+        setUserRole(userData.role as UserRole);
+        console.log('✅ Admin login successful for:', email);
       }
 
       setLoading(false);
@@ -103,48 +120,14 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return { error: { message: 'Learner not found with this phone number' } };
       }
 
-      // Create or get user record for learner
-      const learnerEmail = `${phone}@autogen.com`;
-      let userData = null;
-
-      // Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', learnerEmail)
-        .single();
-
-      if (existingUser) {
-        userData = existingUser;
-      } else {
-        // Create new user record
-        const { data: newUser, error: createError } = await supabase
-          .from('users')
-          .insert({
-            name: learnerData.name,
-            email: learnerEmail,
-            phone: phone,
-            role: 'learner'
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('❌ Failed to create user record:', createError);
-          setLoading(false);
-          return { error: createError };
-        }
-        
-        userData = newUser;
-      }
-
-      console.log('✅ Learner login successful:', userData);
+      console.log('✅ Learner login successful:', learnerData);
       setUser({
-        id: userData.id,
-        email: userData.email,
-        phone: userData.phone,
-        user_metadata: { full_name: userData.name }
-      } as User);
+        id: learnerData.id,
+        email: learnerData.email,
+        name: learnerData.name,
+        phone: learnerData.phone,
+        role: 'learner'
+      });
       setUserRole('learner');
 
       setLoading(false);
@@ -209,6 +192,20 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   /**
+   * Reset password
+   */
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  /**
    * Sign out
    */
   const signOut = async () => {
@@ -236,6 +233,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       signOut,
       signUp,
       learnerLogin,
+      resetPassword,
     }}>
       {children}
     </MultiAuthContext.Provider>

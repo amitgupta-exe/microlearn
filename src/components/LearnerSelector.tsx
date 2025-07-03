@@ -38,6 +38,7 @@ interface LearnerSelectorProps {
 
 /**
  * Enhanced Learner Selector with search functionality and overwrite confirmation
+ * Features: search, multi-select, course status checking, buttons outside scroll area
  */
 const LearnerSelector: React.FC<LearnerSelectorProps> = ({
   open,
@@ -178,6 +179,7 @@ const LearnerSelector: React.FC<LearnerSelectorProps> = ({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col bg-white">
+          {/* Header - Fixed */}
           <DialogHeader className="flex-shrink-0 border-b pb-4">
             <DialogTitle className="text-gray-900">{title}</DialogTitle>
             <DialogDescription className="text-gray-600">
@@ -185,7 +187,7 @@ const LearnerSelector: React.FC<LearnerSelectorProps> = ({
             </DialogDescription>
           </DialogHeader>
 
-          {/* Search Bar - Fixed at top */}
+          {/* Search Bar - Fixed */}
           <div className="flex-shrink-0 p-4 bg-gray-50 border-b">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
@@ -283,7 +285,7 @@ const LearnerSelector: React.FC<LearnerSelectorProps> = ({
             </Table>
           </div>
 
-          {/* Action Buttons - Fixed at bottom */}
+          {/* Action Buttons - Fixed at bottom, outside scroll area */}
           <DialogFooter className="flex-shrink-0 border-t pt-4 bg-white">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

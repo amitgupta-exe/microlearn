@@ -7,6 +7,7 @@ import { MultiAuthProvider, useMultiAuth } from "@/contexts/MultiAuthContext";
 import { SuperAdminProvider } from "@/contexts/SuperAdminContext";
 import { ThemeProvider } from "next-themes";
 import Sidebar from "@/components/Sidebar";
+import Home from "./pages/Home";
 import Index from "./pages/Index";
 import Learners from "./pages/Learners";
 import Courses from "./pages/Courses";
@@ -23,49 +24,6 @@ import LearnerDashboard from "./pages/LearnerDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
-
-/**
- * Home Route Component - handles routing based on auth state
- * Always redirects to login for fresh authentication
- */
-function HomeRoute() {
-  const { user, userRole, loading } = useMultiAuth();
-
-  console.log('HomeRoute - user:', user, 'userRole:', userRole, 'loading:', loading);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Always redirect to login for fresh authentication
-  if (!user || !userRole) {
-    console.log('No authenticated user found, redirecting to login');
-    return <Navigate to="/login" replace />;
-  }
-
-  // Role-based routing
-  switch (userRole) {
-    case 'learner':
-      console.log('Learner detected, redirecting to learner dashboard');
-      return <Navigate to="/learner-dashboard" replace />;
-    
-    case 'superadmin':
-      console.log('Super admin detected, redirecting to super admin dashboard');
-      return <Navigate to="/superadmin" replace />;
-    
-    case 'admin':
-    default:
-      console.log('Admin user detected, redirecting to admin dashboard');
-      return <Navigate to="/dashboard" replace />;
-  }
-}
 
 /**
  * Protected Route Component for Admin Users
@@ -106,7 +64,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-white">
-      <Sidebar user={user as any} />
+      <Sidebar user={user} />
       <main className="flex-1 overflow-auto bg-gray-50">
         {children}
       </main>
@@ -132,8 +90,8 @@ function SuperAdminProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user || userRole !== 'superadmin') {
-    console.log('Not super admin, redirecting to login');
-    return <Navigate to="/login" replace />;
+    console.log('Not super admin, redirecting to home');
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -157,8 +115,8 @@ function LearnerProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!user || userRole !== 'learner') {
-    console.log('Not learner, redirecting to login');
-    return <Navigate to="/login" replace />;
+    console.log('Not learner, redirecting to home');
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -176,15 +134,13 @@ function App() {
                 <div className="min-h-screen bg-white">
                   <Routes>
                     {/* Public routes */}
+                    <Route path="/" element={<Home />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
                     <Route path="/admin/login" element={<SuperAdminLogin />} />
-                    
-                    {/* Home route - handles auth-based redirects */}
-                    <Route path="/" element={<HomeRoute />} />
                     
                     {/* Super Admin routes */}
                     <Route 

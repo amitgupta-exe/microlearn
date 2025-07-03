@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { toast } from '@/hooks/use-toast';
-import { AlertCircle, Shield, Users, GraduationCap } from 'lucide-react';
+import { AlertCircle, Shield, Users, GraduationCap, ArrowLeft } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { cn } from '@/lib/utils';
@@ -22,11 +22,10 @@ const adminLoginSchema = z.object({
 
 const learnerLoginSchema = z.object({
   phone: z.string().min(10, { message: 'Please enter a valid phone number' }),
-  password: z.string().min(1, { message: 'Password is required' }),
 });
 
 const superAdminLoginSchema = z.object({
-  username: z.string().min(1, { message: 'Username is required' }),
+  email: z.string().min(1, { message: 'Email/Username is required' }),
   password: z.string().min(1, { message: 'Password is required' }),
 });
 
@@ -65,7 +64,7 @@ const roleConfig = {
 };
 
 const Login: React.FC = () => {
-  const { signIn, signInLearner } = useMultiAuth();
+  const { signIn, learnerLogin } = useMultiAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,14 +82,13 @@ const Login: React.FC = () => {
     resolver: zodResolver(learnerLoginSchema),
     defaultValues: {
       phone: '',
-      password: '',
     },
   });
 
   const superAdminForm = useForm<SuperAdminLoginFormValues>({
     resolver: zodResolver(superAdminLoginSchema),
     defaultValues: {
-      username: '',
+      email: '',
       password: '',
     },
   });
@@ -108,9 +106,9 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      const { error } = await signIn(values.username, values.password, 'superadmin');
+      const { error } = await signIn(values.email, values.password);
       if (error) {
-        setError('Invalid username or password');
+        setError('Invalid credentials');
         return;
       }
 
@@ -119,7 +117,7 @@ const Login: React.FC = () => {
         description: 'You have successfully logged in as Super Admin.',
       });
       
-      navigate('/');
+      navigate('/superadmin');
     } catch (err) {
       console.error('Super admin login error:', err);
       setError('An unexpected error occurred');
@@ -133,7 +131,7 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      const { error } = await signIn(values.email, values.password, 'admin');
+      const { error } = await signIn(values.email, values.password);
       if (error) {
         setError('Invalid email or password');
         return;
@@ -144,7 +142,7 @@ const Login: React.FC = () => {
         description: 'You have successfully logged in.',
       });
       
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       console.error('Login error:', err);
       setError('An unexpected error occurred');
@@ -158,9 +156,9 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      const { error } = await signInLearner(values.phone, values.password);
+      const { error } = await learnerLogin(values.phone);
       if (error) {
-        setError('Invalid phone number or password');
+        setError('Invalid phone number or learner not found');
         return;
       }
 
@@ -182,249 +180,245 @@ const Login: React.FC = () => {
   const Icon = config.icon;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-12">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Welcome back</h1>
-          <p className="mt-2 text-gray-600">Choose your role and sign in to your account</p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header */}
+      <header className="w-full bg-white shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <ArrowLeft className="h-5 w-5 text-gray-600" />
+            <span className="text-gray-600">Back to Home</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <GraduationCap className="h-8 w-8 text-blue-600" />
+            <h1 className="text-2xl font-bold text-gray-900">EduLearn</h1>
+          </div>
         </div>
+      </header>
 
-        {/* Role Selection */}
-        <div className="grid grid-cols-3 gap-2 p-1 bg-gray-100 rounded-lg">
-          {(Object.keys(roleConfig) as UserRole[]).map((role) => {
-            const roleConf = roleConfig[role];
-            const RoleIcon = roleConf.icon;
-            return (
-              <button
-                key={role}
-                onClick={() => setSelectedRole(role)}
-                className={cn(
-                  "flex flex-col items-center justify-center p-3 rounded-md transition-all duration-200",
-                  selectedRole === role
-                    ? `${roleConf.bgColor} ${roleConf.borderColor} border-2 shadow-sm`
-                    : "hover:bg-white hover:shadow-sm"
-                )}
-              >
-                <RoleIcon 
+      <div className="flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Welcome back</h1>
+            <p className="mt-2 text-gray-600">Choose your role and sign in to your account</p>
+          </div>
+
+          {/* Role Selection */}
+          <div className="grid grid-cols-3 gap-2 p-1 bg-gray-100 rounded-lg">
+            {(Object.keys(roleConfig) as UserRole[]).map((role) => {
+              const roleConf = roleConfig[role];
+              const RoleIcon = roleConf.icon;
+              return (
+                <button
+                  key={role}
+                  onClick={() => setSelectedRole(role)}
                   className={cn(
-                    "h-6 w-6 mb-1",
-                    selectedRole === role ? roleConf.textColor : "text-gray-500"
-                  )} 
-                />
-                <span 
-                  className={cn(
-                    "text-xs font-medium",
-                    selectedRole === role ? roleConf.textColor : "text-gray-600"
+                    "flex flex-col items-center justify-center p-3 rounded-md transition-all duration-200",
+                    selectedRole === role
+                      ? `${roleConf.bgColor} ${roleConf.borderColor} border-2 shadow-sm`
+                      : "hover:bg-white hover:shadow-sm"
                   )}
                 >
-                  {roleConf.title}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Login Form Card */}
-        <Card className={cn("border-2 bg-white shadow-lg", config.borderColor)}>
-          <CardHeader className={cn("text-center", config.bgColor)}>
-            <div className="flex items-center justify-center mb-2">
-              <div className={cn("p-2 rounded-full", config.color)}>
-                <Icon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-            <CardTitle className={config.textColor}>{config.title} Login</CardTitle>
-            <CardDescription className="text-gray-600">{config.description}</CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-4 pt-6">
-            {error && (
-              <Alert variant="destructive" className="bg-red-50 border-red-200">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-red-800">{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {selectedRole === 'superadmin' && (
-              <Form {...superAdminForm}>
-                <form onSubmit={superAdminForm.handleSubmit(onSuperAdminSubmit)} className="space-y-4">
-                  <FormField
-                    control={superAdminForm.control}
-                    name="username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-700">Username</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Enter username" 
-                            {...field}
-                            disabled={isLoading}
-                            className="bg-white border-gray-300 focus:border-red-400"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                  <RoleIcon 
+                    className={cn(
+                      "h-6 w-6 mb-1",
+                      selectedRole === role ? roleConf.textColor : "text-gray-500"
+                    )} 
                   />
-
-                  <FormField
-                    control={superAdminForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-700">Password</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="Enter password"
-                            {...field}
-                            disabled={isLoading}
-                            className="bg-white border-gray-300 focus:border-red-400"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                  <span 
+                    className={cn(
+                      "text-xs font-medium",
+                      selectedRole === role ? roleConf.textColor : "text-gray-600"
                     )}
-                  />
-
-                  <Button 
-                    type="submit" 
-                    className={cn("w-full text-white", config.color)}
-                    disabled={isLoading}
                   >
-                    {isLoading ? 'Signing in...' : `Sign in as ${config.title}`}
-                  </Button>
-                </form>
-              </Form>
-            )}
-
-            {selectedRole === 'learner' && (
-              <Form {...learnerForm}>
-                <form onSubmit={learnerForm.handleSubmit(onLearnerSubmit)} className="space-y-4">
-                  <FormField
-                    control={learnerForm.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-700">Phone Number</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="tel" 
-                            placeholder="Enter your phone number" 
-                            {...field}
-                            disabled={isLoading}
-                            className="bg-white border-gray-300 focus:border-green-400"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={learnerForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-700">Password</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="Enter your password (same as phone number)"
-                            {...field}
-                            disabled={isLoading}
-                            className="bg-white border-gray-300 focus:border-green-400"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <Button 
-                    type="submit" 
-                    className={cn("w-full text-white", config.color)}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Signing in...' : `Sign in as ${config.title}`}
-                  </Button>
-                </form>
-              </Form>
-            )}
-
-            {selectedRole === 'admin' && (
-              <Form {...adminForm}>
-                <form onSubmit={adminForm.handleSubmit(onAdminSubmit)} className="space-y-4">
-                  <FormField
-                    control={adminForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-700">Email address</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="email" 
-                            placeholder="admin@example.com" 
-                            {...field}
-                            disabled={isLoading}
-                            className="bg-white border-gray-300 focus:border-blue-400"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={adminForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel className="text-gray-700">Password</FormLabel>
-                          <Link 
-                            to="/forgot-password" 
-                            className="text-sm font-medium text-blue-600 hover:underline"
-                          >
-                            Forgot password?
-                          </Link>
-                        </div>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="Enter your password"
-                            {...field}
-                            disabled={isLoading}
-                            className="bg-white border-gray-300 focus:border-blue-400"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <Button 
-                    type="submit" 
-                    className={cn("w-full text-white", config.color)}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Signing in...' : `Sign in as ${config.title}`}
-                  </Button>
-                </form>
-              </Form>
-            )}
-          </CardContent>
-        </Card>
-
-        {selectedRole === 'admin' && (
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link to="/signup" className="font-medium text-blue-600 hover:underline">
-                Sign up
-              </Link>
-            </p>
+                    {roleConf.title}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        )}
+
+          {/* Login Form Card */}
+          <Card className={cn("border-2 bg-white shadow-lg", config.borderColor)}>
+            <CardHeader className={cn("text-center", config.bgColor)}>
+              <div className="flex items-center justify-center mb-2">
+                <div className={cn("p-2 rounded-full", config.color)}>
+                  <Icon className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              <CardTitle className={config.textColor}>{config.title} Login</CardTitle>
+              <CardDescription className="text-gray-600">{config.description}</CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4 pt-6">
+              {error && (
+                <Alert variant="destructive" className="bg-red-50 border-red-200">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-red-800">{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {selectedRole === 'superadmin' && (
+                <Form {...superAdminForm}>
+                  <form onSubmit={superAdminForm.handleSubmit(onSuperAdminSubmit)} className="space-y-4">
+                    <FormField
+                      control={superAdminForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700">Email/Username</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter email or username" 
+                              {...field}
+                              disabled={isLoading}
+                              className="bg-white border-gray-300 focus:border-red-400"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={superAdminForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700">Password</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="password" 
+                              placeholder="Enter password"
+                              {...field}
+                              disabled={isLoading}
+                              className="bg-white border-gray-300 focus:border-red-400"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button 
+                      type="submit" 
+                      className={cn("w-full text-white", config.color)}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Signing in...' : `Sign in as ${config.title}`}
+                    </Button>
+                  </form>
+                </Form>
+              )}
+
+              {selectedRole === 'learner' && (
+                <Form {...learnerForm}>
+                  <form onSubmit={learnerForm.handleSubmit(onLearnerSubmit)} className="space-y-4">
+                    <FormField
+                      control={learnerForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700">Phone Number</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="tel" 
+                              placeholder="Enter your phone number" 
+                              {...field}
+                              disabled={isLoading}
+                              className="bg-white border-gray-300 focus:border-green-400"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button 
+                      type="submit" 
+                      className={cn("w-full text-white", config.color)}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Signing in...' : `Sign in as ${config.title}`}
+                    </Button>
+                  </form>
+                </Form>
+              )}
+
+              {selectedRole === 'admin' && (
+                <Form {...adminForm}>
+                  <form onSubmit={adminForm.handleSubmit(onAdminSubmit)} className="space-y-4">
+                    <FormField
+                      control={adminForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700">Email address</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="email" 
+                              placeholder="admin@example.com" 
+                              {...field}
+                              disabled={isLoading}
+                              className="bg-white border-gray-300 focus:border-blue-400"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={adminForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center justify-between">
+                            <FormLabel className="text-gray-700">Password</FormLabel>
+                            <Link 
+                              to="/forgot-password" 
+                              className="text-sm font-medium text-blue-600 hover:underline"
+                            >
+                              Forgot password?
+                            </Link>
+                          </div>
+                          <FormControl>
+                            <Input 
+                              type="password" 
+                              placeholder="Enter your password"
+                              {...field}
+                              disabled={isLoading}
+                              className="bg-white border-gray-300 focus:border-blue-400"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button 
+                      type="submit" 
+                      className={cn("w-full text-white", config.color)}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Signing in...' : `Sign in as ${config.title}`}
+                    </Button>
+                  </form>
+                </Form>
+              )}
+            </CardContent>
+          </Card>
+
+          {selectedRole === 'admin' && (
+            <div className="text-center">
+              <p className="text-sm text-gray-600">
+                Don't have an account?{' '}
+                <Link to="/signup" className="font-medium text-blue-600 hover:underline">
+                  Sign up
+                </Link>
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
