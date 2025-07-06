@@ -64,8 +64,11 @@ interface ColumnMapping {
   email: string | null;
   phone: string | null;
 }
-
-const LearnerImport = () => {
+interface LearnerImportProps {
+  onSuccess: () => void;
+  onCancel: () => void;
+}
+const LearnerImport = ({ onSuccess, onCancel }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [parsedData, setParsedData] = useState<any[]>([]);

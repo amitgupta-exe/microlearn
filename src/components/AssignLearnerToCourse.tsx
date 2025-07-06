@@ -215,6 +215,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
+              Assign LearnnertoCourse.tsx
               Assign Course to {learner.name}
             </DialogTitle>
           </DialogHeader>

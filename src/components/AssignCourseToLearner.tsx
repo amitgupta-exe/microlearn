@@ -262,6 +262,7 @@ const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, on
                     {/* Header - Fixed */}
                     <DialogHeader className="flex-shrink-0 border-b pb-4">
                         <DialogTitle className="text-xl font-semibold text-gray-900">
+                            AssignCourseToLearner.tsx
                             Assign "{course.course_name}" to Learners
                         </DialogTitle>
                     </DialogHeader>

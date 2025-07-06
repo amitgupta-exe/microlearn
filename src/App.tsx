@@ -13,7 +13,6 @@ import Learners from "./pages/Learners";
 import Courses from "./pages/Courses";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
-import Login from "./pages/Login";
 import AdminLogin from "./pages/AdminLogin";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import LearnerLogin from "./pages/LearnerLogin";
@@ -64,18 +63,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/superadmin" replace />;
   }
 
-  // Create a simplified user object for Sidebar
-  const sidebarUser = {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    phone: user.phone,
-    role: user.role
-  };
-
   return (
     <div className="flex h-screen bg-white">
-      <Sidebar user={sidebarUser} />
+      <Sidebar user={user} />
       <main className="flex-1 overflow-auto bg-gray-50">
         {children}
       </main>
