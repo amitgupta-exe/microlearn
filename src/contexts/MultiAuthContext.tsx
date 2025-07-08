@@ -24,12 +24,38 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // useEffect(() => {
+  //   // Always start fresh - no session persistence
+  //   console.log('🔄 Starting fresh authentication session (no cache)');
+  //   setUser(null);
+  //   setUserRole(null);
+  //   setLoading(false);
+  // }, []);
+
+  // useEffect to get the user from the database, Session Persistence
   useEffect(() => {
-    // Always start fresh - no session persistence
-    console.log('🔄 Starting fresh authentication session (no cache)');
-    setUser(null);
-    setUserRole(null);
-    setLoading(false);
+    setLoading(true);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        // Fetch user info from your users table
+        supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data: userData, error }) => {
+            if (!error && userData) {
+              setUser(userData);
+              setUserRole(userData.role);
+            }
+            setLoading(false);
+          });
+      } else {
+        setUser(null);
+        setUserRole(null);
+        setLoading(false);
+      }
+    });
   }, []);
 
   /**
