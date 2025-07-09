@@ -15,11 +15,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { useMultiAuth } from '@/contexts/MultiAuthContext';
 
 // Helper: Normalize phone for login/lookup
 const normalizePhone = (phone) => phone.replace(/\D/g, '').replace(/^0+/, '').replace(/^91/, '');
 
 const Learners: React.FC = () => {
+  const { user } = useMultiAuth();
   // State
   const [learners, setLearners] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -176,6 +178,28 @@ const Learners: React.FC = () => {
           <LearnerForm
             learner={editingLearner}
             onSubmit={async (data) => {
+              if (!editingLearner) {
+                // adds new learner if new
+                const newLearner = {
+                  name: data.name,
+                  email: data.email,
+                  phone: data.phone,
+                  created_by: user?.id,
+                  status: 'active',
+                };
+                const { error } = await supabase.from('learners').insert([newLearner]);
+                if (error) {
+                  toast.error('Failed to add learner');
+                  return;
+                }
+              } else {
+                // updates if trying to edit an existing one
+                const { error } = await supabase.from('learners').update(data).eq('id', editingLearner.id);
+                if (error) {
+                  toast.error('Failed to update learner');
+                  return;
+                }
+              }
               await fetchLearners();
               setShowLearnerForm(false);
               setEditingLearner(null);
