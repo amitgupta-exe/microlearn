@@ -35,6 +35,32 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // useEffect to get the user from the database, Session Persistence
   useEffect(() => {
     setLoading(true);
+    // Check for superadmin session first (hardcode)
+    const isSuperAdminLoggedIn = localStorage.getItem('isSuperAdminLoggedIn');
+    if (isSuperAdminLoggedIn === 'true') {
+      setUser({
+        id: 'superadmin',
+        email: 'superadmin@system.com',
+        name: 'Super Admin',
+        role: 'superadmin'
+      });
+      setUserRole('superadmin');
+      setLoading(false);
+      return;
+    }
+    // Check for learner session
+    const learnerSession = localStorage.getItem('learnerSession');
+    if (learnerSession) {
+      try {
+        const learner = JSON.parse(learnerSession);
+        setUser(learner);
+        setUserRole('learner');
+        setLoading(false);
+        return;
+      } catch (e) {
+        localStorage.removeItem('learnerSession');
+      }
+    }
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         // Fetch user info from your users table
@@ -130,6 +156,7 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           role: 'superadmin'
         });
         setUserRole('superadmin');
+        localStorage.setItem('isSuperAdminLoggedIn', 'true');
         setLoading(false);
         return { error: null };
       } else {
@@ -173,15 +200,16 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       console.log('✅ Learner login successful:', learnerData);
-      setUser({
+      const learnerUser = {
         id: learnerData.id,
         email: learnerData.email,
         name: learnerData.name,
         phone: learnerData.phone,
-        role: 'learner'
-      });
+        role: 'learner' as UserRole
+      };
+      setUser(learnerUser);
       setUserRole('learner');
-
+      localStorage.setItem('learnerSession', JSON.stringify(learnerUser));
       setLoading(false);
       return { error: null };
     } catch (error) {
@@ -265,6 +293,9 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setLoading(true);
 
     try {
+      // Remove superadmin session if present
+      localStorage.removeItem('isSuperAdminLoggedIn');
+      localStorage.removeItem('learnerSession');
       await supabase.auth.signOut();
       setUser(null);
       setUserRole(null);

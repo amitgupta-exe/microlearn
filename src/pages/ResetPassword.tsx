@@ -84,7 +84,7 @@ const ResetPassword: React.FC = () => {
         description: 'Your password has been successfully updated.',
       });
 
-      navigate('/login');
+      navigate('/');
     } catch (err) {
       console.error('Password reset error:', err);
       setError('An unexpected error occurred');

@@ -21,7 +21,7 @@ const AuthCallback = () => {
 
         if (!accessToken || type !== 'signup') {
           // Not a valid signup confirmation
-          navigate('/login');
+          navigate('/');
           return;
         }
 

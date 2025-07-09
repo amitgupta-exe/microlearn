@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Users, BookOpen, FileText, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useSuperAdmin } from '@/contexts/SuperAdminContext';
+import { useMultiAuth } from '@/contexts/MultiAuthContext';
 
 interface RegistrationRequest {
   request_id: string;
@@ -34,7 +34,7 @@ interface AdminStats {
 }
 
 const SuperAdminDashboard = () => {
-  const { logout } = useSuperAdmin();
+  const { signOut } = useMultiAuth();
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [adminStats, setAdminStats] = useState<AdminStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -191,7 +191,7 @@ const SuperAdminDashboard = () => {
             <h1 className="text-3xl font-bold text-gray-900">Super Admin Dashboard</h1>
             <p className="text-gray-600 mt-1">Manage registration requests and admin statistics</p>
           </div>
-          <Button variant="outline" onClick={logout}>
+          <Button variant="outline" onClick={signOut}>
             Sign Out
           </Button>
         </div>
