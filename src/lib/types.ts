@@ -29,6 +29,7 @@ export interface User {
 export interface CourseGroup {
   id: string;
   course_name: string;
+  request_id: string;
   created_at: string;
   updated_at: string;
   created_by: string;

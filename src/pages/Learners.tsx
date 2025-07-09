@@ -17,9 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
-
-// Helper: Normalize phone for login/lookup
-const normalizePhone = (phone) => phone.replace(/\D/g, '').replace(/^0+/, '').replace(/^91/, '');
+import { normalizePhoneNumber } from '@/lib/utils';
 
 const Learners: React.FC = () => {
   const { user } = useMultiAuth();
@@ -197,14 +195,17 @@ const Learners: React.FC = () => {
             onSubmit={async (data) => {
               if (!editingLearner) {
                 // adds new learner if new
+                const normalizedPhoneNumber = normalizePhoneNumber(data.phone)
                 const newLearner = {
                   name: data.name,
                   email: data.email,
-                  phone: data.phone,
+                  phone: normalizedPhoneNumber,
                   created_by: user?.id,
                   status: 'active',
                 };
                 const { error } = await supabase.from('learners').insert([newLearner]);
+
+
                 if (error) {
                   toast.error('Failed to add learner');
                   return;

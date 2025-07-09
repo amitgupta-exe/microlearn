@@ -171,7 +171,7 @@ const AssignCourseToLearner: React.FC<Props> = ({ course, open, onOpenChange, on
             .insert({
                 learner_id: learner.id,
                 learner_name: learner.name,
-                course_id: course.id,
+                course_id: course.request_id,
                 course_name: course.course_name,
                 status: 'assigned',
                 phone_number: normalizedPhone,

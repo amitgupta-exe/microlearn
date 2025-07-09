@@ -74,6 +74,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
           courseGroups[key] = {
             id: course.id,
             course_name: course.course_name,
+            request_id: course.request_id,
             created_at: course.created_at,
             updated_at: course.updated_at,
             created_by: course.created_by,
@@ -143,11 +144,26 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
       }
 
       if (isOverwrite) {
+
+        const {data: previouscourse, error} = await supabase
+          .from('course_progress')
+          .select('*')
+          .eq('phone_number', normalizedPhone)
+          .in('status', ['assigned', 'started']);
+
         await supabase
           .from('course_progress')
           .update({ status: 'suspended' })
           .eq('phone_number', normalizedPhone)
           .in('status', ['assigned', 'started']);
+
+
+
+        await sendCourseSuspensionNotification(
+          learner.name,
+          previouscourse[0]?.course_name,
+          normalizedPhone
+        );
       }
 
       const { error: updateError } = await supabase
@@ -164,7 +180,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
         .from('course_progress')
         .insert({
           learner_id: learner.id,
-          course_id: selectedCourse.id,
+          course_id: selectedCourse.request_id,
           status: 'assigned',
           progress_percent: 0,
           current_day: 1,
@@ -239,8 +255,8 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
                   <div
                     key={course.id}
                     className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedCourse?.id === course.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
                       }`}
                     onClick={() => setSelectedCourse(course)}
                   >
@@ -304,7 +320,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
         open={showOverwriteDialog}
         onOpenChange={setShowOverwriteDialog}
         learner={learner}
-        newCourse={{ id: selectedCourse?.id || '', course_name: selectedCourse?.course_name || '' } as any}
+        newCourse={{ request_id: selectedCourse?.request_id || '', course_name: selectedCourse?.course_name || '' } as any}
         onConfirm={handleOverwriteConfirm}
       />
     </>

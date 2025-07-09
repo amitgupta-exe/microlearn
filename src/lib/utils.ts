@@ -6,13 +6,42 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 
-export function normalizePhoneNumber(number: string | number | undefined | null): string {
-  if (number === undefined || number === null) return '';
-  let num = number.toString().replace(/[\s\-+]/g, '');
-  if (num.startsWith('0')) num = '91' + num.slice(1);
-  if (num.length === 10) return '91' + num;
-  if (num.length === 12 && num.startsWith('91')) return num;
-  if (num.length === 13 && num.startsWith('91')) return num.slice(1); // e.g. '091xxxxxxxxxx'
-  if (num.length === 14 && num.startsWith('91')) return num.slice(2); // e.g. '0091xxxxxxxxxx'
-  return num;
+
+export function normalizePhoneNumber(input: string | number | null | undefined): string {
+  if (!input) {
+    throw new Error("Phone number is empty or undefined");
+  }
+
+  // Convert to string and remove all non-digit characters
+  const cleaned = String(input).replace(/\D/g, '');
+
+  let tenDigitNumber: string;
+
+  if (cleaned.length === 10) {
+    // Already a 10-digit number
+    tenDigitNumber = cleaned;
+  } else if (cleaned.length === 11 && cleaned.startsWith('0')) {
+    // Starts with 0 and followed by 10 digits
+    tenDigitNumber = cleaned.slice(1);
+  } else if (cleaned.length === 12 && cleaned.startsWith('91')) {
+    // Starts with country code 91
+    tenDigitNumber = cleaned.slice(2);
+  } else if (cleaned.length === 13 && cleaned.startsWith('091')) {
+    // Starts with 091
+    tenDigitNumber = cleaned.slice(3);
+  } else if (cleaned.length >= 10) {
+    // Fallback: pick the last 10 digits
+    tenDigitNumber = cleaned.slice(-10);
+  } else {
+    throw new Error(`Invalid phone number format: ${input}`);
+  }
+
+  if (tenDigitNumber.length !== 10) {
+    throw new Error(`Unable to normalize phone number: ${input}`);
+  }
+
+  return `+91${tenDigitNumber}`;
 }
+
+
+
