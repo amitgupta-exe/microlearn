@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { GraduationCap, Users, BookOpen, Phone, Mail, MapPin, ChevronDown, Shield, User } from 'lucide-react';
@@ -10,12 +10,28 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useMultiAuth } from '@/contexts/MultiAuthContext';
 
 /**
  * Landing Page Component
  * Hero section with about us, contact info, and auth buttons
  */
 const Home: React.FC = () => {
+  const { user, userRole, loading } = useMultiAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && user && userRole) {
+      if (userRole === 'superadmin') {
+        navigate('/superadmin', { replace: true });
+      } else if (userRole === 'learner') {
+        navigate('/learner-dashboard', { replace: true });
+      } else if (userRole === 'admin') {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [user, userRole, loading, navigate]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
