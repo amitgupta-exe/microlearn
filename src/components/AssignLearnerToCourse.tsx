@@ -8,7 +8,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { toast } from 'sonner';
 import { Learner, CourseGroup } from '@/lib/types';
+import { sendCourseAssignmentNotification, sendCourseSuspensionNotification } from '@/integrations/wati/functions';
 import CourseOverwriteDialog from './CourseOverwriteDialog';
+import { normalizePhoneNumber } from '@/lib/utils';
 
 interface AssignLearnerToCourseProps {
   open: boolean;
@@ -17,19 +19,6 @@ interface AssignLearnerToCourseProps {
   onAssignmentComplete?: () => void;
 }
 
-const normalizePhoneNumber = (phone: string): string => {
-  const cleaned = phone.replace(/[^\d+]/g, '');
-  
-  if (cleaned.startsWith('+')) {
-    return cleaned;
-  }
-  
-  if (cleaned.length === 10 && /^\d{10}$/.test(cleaned)) {
-    return `+91${cleaned}`;
-  }
-  
-  return cleaned;
-};
 
 const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
   open,
@@ -63,7 +52,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
   const fetchCourses = async () => {
     try {
       setIsLoadingCourses(true);
-      
+
       let query = supabase
         .from('courses')
         .select('*');
@@ -78,7 +67,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
 
       // Group courses by course_name and count days
       const courseGroups: { [key: string]: CourseGroup } = {};
-      
+
       (data || []).forEach(course => {
         const key = `${course.course_name}_${course.created_by}`;
         if (!courseGroups[key]) {
@@ -163,7 +152,7 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
 
       const { error: updateError } = await supabase
         .from('learners')
-        .update({ 
+        .update({
           assigned_course_id: selectedCourse.id,
           updated_at: new Date().toISOString()
         })
@@ -186,10 +175,14 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
           last_module_completed_at: new Date().toISOString()
         });
 
+      try {
+        await sendCourseAssignmentNotification(learner.name, selectedCourse.course_name, normalizedPhone);
+      } catch { }
+
       if (progressError) throw progressError;
 
       toast.success(`Course "${selectedCourse.course_name}" assigned to ${learner.name} successfully`);
-      
+
       setSelectedCourse(null);
       setSearchQuery('');
       onOpenChange(false);
@@ -245,11 +238,10 @@ const AssignLearnerToCourse: React.FC<AssignLearnerToCourseProps> = ({
                 filteredCourses.map((course) => (
                   <div
                     key={course.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      selectedCourse?.id === course.id
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedCourse?.id === course.id
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                      }`}
                     onClick={() => setSelectedCourse(course)}
                   >
                     <div className="flex items-start justify-between">

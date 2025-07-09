@@ -141,7 +141,7 @@ const SuperAdminDashboard = () => {
         .from('registration_requests')
         .update({ approval_status: status })
         .eq('request_id', requestId);
-
+        
       if (error) {
         console.error('Error updating registration status:', error);
         throw error;
