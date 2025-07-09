@@ -435,12 +435,14 @@ const Courses = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={(e) => {
-                          e.stopPropagation();
-                          handlePreviewCourse(courses);
-                        }}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          WhatsApp Preview
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAssignCourse(courses);
+                          }}
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          Assign to Learners
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={(e) => {
                           e.stopPropagation();
@@ -461,13 +463,12 @@ const Courses = () => {
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleAssignCourse(courses);
+                            handleEditCourse(courses);
                           }}
                         >
-                          <Users className="h-4 w-4 mr-2" />
-                          Assign to Learners
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive"
                           onClick={(e) => {
@@ -478,15 +479,7 @@ const Courses = () => {
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditCourse(courses);
-                          }}
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
+
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

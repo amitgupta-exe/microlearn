@@ -71,8 +71,11 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           .single()
           .then(({ data: userData, error }) => {
             if (!error && userData) {
-              setUser(userData);
-              setUserRole(userData.role);
+              setUser({
+                ...userData,
+                role: userData.role as UserRole
+              });
+              setUserRole(userData.role as UserRole);
             }
             setLoading(false);
           });
@@ -180,19 +183,28 @@ export const MultiAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       // Check if learner exists
       const { data: learnerData, error: learnerError } = await supabase
-        .from('learners')
+        .from('users')
         .select('*')
+        .eq('role', 'learner')
         .eq('phone', phone)
-        .single();
+        .single()
+
+
+        console.log('learner data', learnerData);
+        
+        const expectedPassword = phone;
+        console.log('expectedPassword', expectedPassword)
 
       if (learnerError || !learnerData) {
+        console.log(learnerError);
+
         console.error('❌ Learner not found:', learnerError);
         setLoading(false);
         return { error: { message: 'Learner not found with this phone number' } };
       }
 
       // For simplicity, password is the phone number without country code
-      const expectedPassword = phone.replace(/^\+?[0-9]{1,3}/, '');
+
       if (password !== expectedPassword && password !== phone) {
         console.error('❌ Invalid password for learner');
         setLoading(false);

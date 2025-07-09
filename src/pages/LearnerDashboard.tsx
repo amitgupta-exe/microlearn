@@ -76,13 +76,24 @@ const LearnerDashboard: React.FC = () => {
         setMyCourses(progressData || []);
       }
 
-      // Fetch public courses
-      const { data: coursesData, error: coursesError } = await supabase
+      // Fetch public courses with unique request_id
+      const { data: coursesDataRaw, error: coursesError } = await supabase
         .from('courses')
         .select('*')
         .eq('visibility', 'public')
         .eq('status', 'approved')
         .order('created_at', { ascending: false });
+
+      let coursesData: Course[] = [];
+      if (coursesDataRaw) {
+        const seenRequestIds = new Set();
+        coursesData = coursesDataRaw.filter((course: Course) => {
+          if (!course.request_id) return true;
+          if (seenRequestIds.has(course.request_id)) return false;
+          seenRequestIds.add(course.request_id);
+          return true;
+        });
+      }
 
       if (coursesError) {
         console.error('Error fetching courses:', coursesError);

@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search, User, Plus, FileUp, MoreHorizontal } from 'lucide-react';
+import { Edit, BookOpen, Trash2, Search, Users, Plus, FileUp, MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import LearnerForm from '@/components/LearnerForm';
 import LearnerImport from '@/components/LearnerImport';
@@ -15,6 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
 
 // Helper: Normalize phone for login/lookup
@@ -129,7 +130,10 @@ const Learners: React.FC = () => {
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-semibold text-gray-900">{learner.name}</div>
+                      <div>
+                        <Users size={14} />
+                        <div className="font-semibold text-gray-900">{learner.name}</div>
+                      </div>
                       <div className="text-xs text-gray-500">{learner.email}</div>
                       <div className="text-xs text-gray-500">{learner.phone}</div>
                       {/* Assigned course info */}
@@ -151,13 +155,26 @@ const Learners: React.FC = () => {
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleAssignCourse(learner)}>
-                          Assign Course
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAssignCourse(learner);
+                          }}
+                        >
+                          <BookOpen className="h-4 w-4 mr-2" />
+
+                          Assign a Course
                         </DropdownMenuItem>
+
                         <DropdownMenuItem onClick={() => handleEditLearner(learner)}>
+                          <Edit className="h-4 w-4 mr-2" />
+
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteLearner(learner)}>
+
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteLearner(learner)}>
+                          <Trash2 className="h-4 w-4 mr-2" />
+
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

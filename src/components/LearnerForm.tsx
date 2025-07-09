@@ -53,26 +53,7 @@ const LearnerForm: React.FC<LearnerFormProps> = ({
     },
   });
 
-  const sendWelcomeMessage = async (learnerId: string, name: string, phone: string) => {
-    try {
-      // Only send welcome message for new learners (not when updating)
-      if (!learner) {
-        await supabase.functions.invoke('send-course-notification', {
-          body: {
-            learner_id: learnerId,
-            learner_name: name,
-            learner_phone: phone,
-            type: 'welcome'
-          }
-        });
-        console.log('Welcome message sent successfully');
-      }
-    } catch (error) {
-      console.error('Error sending welcome message:', error);
-      // We don't want to fail the whole operation if just the welcome message fails
-      toast.error('Learner created but welcome message could not be sent');
-    }
-  };
+
 
   const handleSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
@@ -87,10 +68,7 @@ const LearnerForm: React.FC<LearnerFormProps> = ({
           .select('id')
           .order('created_at', { ascending: false })
           .limit(1);
-          
-        if (!error && newLearners && newLearners.length > 0) {
-          await sendWelcomeMessage(newLearners[0].id, data.name, data.phone);
-        }
+  
       }
       
       toast.success(`Learner ${learner ? 'updated' : 'created'} successfully`);
