@@ -18,6 +18,7 @@ import {
 
 import { useMultiAuth } from '@/contexts/MultiAuthContext';
 import { normalizePhoneNumber } from '@/lib/utils';
+import { v4 as uuidv4 } from 'uuid';
 
 const Learners: React.FC = () => {
   const { user } = useMultiAuth();
@@ -196,7 +197,9 @@ const Learners: React.FC = () => {
               if (!editingLearner) {
                 // adds new learner if new
                 const normalizedPhoneNumber = normalizePhoneNumber(data.phone)
+                const newId = uuidv4();
                 const newLearner = {
+                  id: newId,
                   name: data.name,
                   email: data.email,
                   phone: normalizedPhoneNumber,
@@ -204,9 +207,17 @@ const Learners: React.FC = () => {
                   status: 'active',
                 };
                 const { error } = await supabase.from('learners').insert([newLearner]);
-
-
-                if (error) {
+                // Also add to users table with same id
+                const { error: userError } = await supabase.from('users').insert([
+                  {
+                    id: newId,
+                    name: data.name,
+                    email: data.email,
+                    phone: normalizedPhoneNumber,
+                    role: 'learner',
+                  },
+                ]);
+                if (error || userError) {
                   toast.error('Failed to add learner');
                   return;
                 }

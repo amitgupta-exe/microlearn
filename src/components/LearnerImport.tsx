@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
+import { v4 as uuidv4 } from 'uuid';
 
 // Fuzzy matching function with threshold
 const fuzzyMatch = (str1: string, possibleMatches: string[], threshold = 0.8) => {
@@ -71,7 +72,7 @@ interface LearnerImportProps {
 const LearnerImport = ({ onSuccess, onCancel }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [parsedData, setParsedData] = useState<any[]>([]);
+  const [parsedData, setParsedData] = useState<LearnerData[]>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
     name: null,
     email: null,
@@ -178,27 +179,41 @@ const LearnerImport = ({ onSuccess, onCancel }) => {
       // Insert in batches of 10 for better performance
       const batchSize = 10;
       for (let i = 0; i < validLearners.length; i += batchSize) {
-        const batch = validLearners.slice(i, i + batchSize);
+        const batch: LearnerData[] = validLearners.slice(i, i + batchSize);
 
         // Convert to format for insertion
-        const learnersToInsert = batch.map(learner => ({
+        const learnersToInsert = batch.map(learner => {
+          const id = uuidv4();
+          return {
+            id,
+            name: learner.name,
+            email: learner.email,
+            phone: learner.phone,
+            created_by: userData.user.id,
+            status: 'active',
+            _userId: id, // for mapping to usersToInsert
+          };
+        });
+
+        const usersToInsert = learnersToInsert.map(learner => ({
+          id: learner.id,
           name: learner.name,
           email: learner.email,
           phone: learner.phone,
-          created_by: userData.user.id,
-          status: 'active'
+          role: 'learner',
         }));
-
 
         const { data, error } = await supabase
           .from('learners')
           .insert(learnersToInsert)
           .select();
+        // Insert into users table
+        const { error: userError } = await supabase
+          .from('users')
+          .insert(usersToInsert);
 
-
-
-        if (error) {
-          console.error('Error inserting batch:', error);
+        if (error || userError) {
+          console.error('Error inserting batch:', error || userError);
           failedCount += batch.length;
         } else {
           successCount += data.length;
