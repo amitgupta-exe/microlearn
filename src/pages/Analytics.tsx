@@ -54,10 +54,13 @@ const Analytics = () => {
         .from('learners')
         .select('*', { count: 'exact', head: true });
 
-      // Fetch total courses
-      const { count: coursesCount } = await supabase
+      // Fetch total courses (unique request_id)
+      const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
-        .select('*', { count: 'exact', head: true });
+        .select('request_id');
+      if (coursesError) throw coursesError;
+      const uniqueRequestIds = new Set((coursesData || []).map((course: any) => course.request_id));
+      const coursesCount = uniqueRequestIds.size;
 
       // Fetch learners per course
       const { data: learnersPerCourseRaw } = await supabase
@@ -110,7 +113,7 @@ const Analytics = () => {
 
       setAnalyticsData({
         totalLearners: learnersCount || 0,
-        totalCourses: coursesCount || 0,
+        totalCourses: coursesCount,
         messagesSent: 0, // Update if you have messages logic
         messagesByPeriod: {
           daily: [],

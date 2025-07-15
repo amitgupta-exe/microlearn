@@ -30,7 +30,7 @@ const Index = () => {
   const fetchStats = async () => {
     try {
       let learnersQuery = supabase.from('learners').select('id', { count: 'exact' });
-      let coursesQuery = supabase.from('courses').select('id', { count: 'exact' });
+      let coursesQuery = supabase.from('courses').select('request_id, created_by');
       let messagesQuery = supabase.from('messages_sent').select('id', { count: 'exact' });
       let progressQuery = supabase.from('course_progress').select('id', { count: 'exact' });
 
@@ -54,16 +54,19 @@ const Index = () => {
         }
       }
 
-      const [learners, courses, messages, progress] = await Promise.all([
+      const [learners, coursesResult, messages, progress] = await Promise.all([
         learnersQuery,
         coursesQuery,
         messagesQuery,
         progressQuery,
       ]);
 
+      // Count unique request_id values
+      const uniqueRequestIds = new Set((coursesResult.data || []).map((course: any) => course.request_id));
+
       setStats({
         totalLearners: learners.count || 0,
-        totalCourses: courses.count || 0,
+        totalCourses: uniqueRequestIds.size,
         messagesSent: messages.count || 0,
         activeProgress: progress.count || 0,
       });
