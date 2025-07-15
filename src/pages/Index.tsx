@@ -32,7 +32,7 @@ const Index = () => {
       let learnersQuery = supabase.from('learners').select('id', { count: 'exact' });
       let coursesQuery = supabase.from('courses').select('request_id, created_by');
       let messagesQuery = supabase.from('messages_sent').select('id', { count: 'exact' });
-      let progressQuery = supabase.from('course_progress').select('id', { count: 'exact' });
+      let progressQuery = supabase.from('course_progress').select('id', { count: 'exact' }).eq('status', 'assigned');
 
       // Filter based on user role
       if (userRole === 'admin') {
@@ -48,9 +48,9 @@ const Index = () => {
         
         const learnerIds = adminLearners?.map(l => l.id) || [];
         if (learnerIds.length > 0) {
-          progressQuery = progressQuery.in('learner_id', learnerIds);
+          progressQuery = progressQuery.in('learner_id', learnerIds).eq('status', 'assigned');
         } else {
-          progressQuery = progressQuery.eq('learner_id', 'none'); // No results
+          progressQuery = progressQuery.eq('learner_id', 'none').eq('status', 'assigned'); // No results
         }
       }
 
@@ -62,7 +62,7 @@ const Index = () => {
       ]);
 
       // Count unique request_id values
-      const uniqueRequestIds = new Set((coursesResult.data || []).map((course: any) => course.request_id));
+      const uniqueRequestIds = new Set((coursesResult.data || []).map((course: { request_id: string }) => course.request_id));
 
       setStats({
         totalLearners: learners.count || 0,
