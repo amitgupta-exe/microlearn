@@ -113,19 +113,6 @@ export async function sendListInteractiveMessage(
   }
 }
 
-export async function sendCourseAssignmentNotification(
-  learnerName: string,
-  courseName: string,
-  phoneNumber: string
-): Promise<void> {
-  console.log('🔔 Sending course assignment notification via WATI');
-  
-  const headerText = "Course Assignment Notification";
-  const bodyText = `Hi ${learnerName}! The course "${courseName}" has been assigned to you. Click below to start learning!`;
-  const buttons = [{ title: "Start Learning" }];
-
-  await sendInteractiveButtonsMessage(phoneNumber, headerText, bodyText, buttons);
-}
 
 export async function sendCourseSuspensionNotification(
   learnerName: string,
@@ -133,9 +120,9 @@ export async function sendCourseSuspensionNotification(
   phoneNumber: string
 ): Promise<void> {
   console.log('🔔 Sending course suspension notification via WATI');
-  
+
   const message = `Hello ${learnerName}! Your previous course "${courseName}" has been suspended as you have been assigned a new course.`;
-  
+
   await sendWhatsAppMessage(phoneNumber, message);
 }
 
@@ -144,8 +131,69 @@ export async function sendWelcomeMessage(
   phoneNumber: string
 ): Promise<void> {
   console.log('🔔 Sending welcome message via WATI');
-  
+
   const message = `Hello ${learnerName}! You have been successfully registered for MicroLearn training.`;
-  
+
   await sendWhatsAppMessage(phoneNumber, message);
+}
+
+export async function sendTemplateMessage(
+  phoneNumber: string,
+  templateName: string,
+  templateParameters: { name: string; value: string }[] = [],
+  apiKey: string = WATI_API_KEY
+): Promise<void> {
+  // Updated URL to include tenantId from your WATI_API_BASE
+  const url = `${WATI_API_BASE}/api/v1/sendTemplateMessage?whatsappNumber=${phoneNumber}`;
+  
+  const payload = {
+    template_name: templateName,
+    broadcast_name: templateName,
+    parameters: templateParameters,
+  };
+
+  console.log('Sending template message:', payload);
+
+  try {
+    const response = await axios.post(url, payload, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    console.log('Template message sent successfully:', response.data);
+  } catch (error: any) {
+    console.error('Error sending template message:', error.response ? error.response.data : error.message);
+    if (error.response) {
+      console.error('Status Code:', error.response.status);
+      console.error('Headers:', error.response.headers);
+      console.error('Response Data:', error.response.data);
+    }
+    throw error; // Re-throw to allow fallback handling
+  }
+}
+
+export async function sendCourseAssignmentNotification(
+  learnerName: string,
+  courseName: string,
+  phoneNumber: string
+): Promise<void> {
+  console.log('🔔 Sending course assignment notification via WATI');
+
+  try {
+    // Map your template variables to the correct parameter names
+    const parameters = [
+      { name: "name", value: learnerName },// Starting with Day 1
+      { name: "course_name", value: courseName }
+    ];
+
+    await sendTemplateMessage(phoneNumber, "microlearnnotification", parameters);
+    console.log('Template message sent successfully');
+  } catch (error) {
+    console.log('Template message failed, falling back to regular message');
+    
+    // Fallback to regular WhatsApp message if template fails
+    const message = `Hey ${learnerName}! Welcome to Day 1 of ${courseName}. It's an exciting journey! Let's get started!`;
+    await sendWhatsAppMessage(phoneNumber, message);
+  }
 }
