@@ -69,7 +69,7 @@ const LearnerLogin: React.FC = () => {
           </Link>
           <div className="flex items-center gap-2">
             <GraduationCap className="h-8 w-8 text-green-600" />
-            <h1 className="text-2xl font-bold text-gray-900">EduLearn</h1>
+            <h1 className="text-2xl font-bold text-gray-900">MicroLearn</h1>
           </div>
         </div>
       </header>

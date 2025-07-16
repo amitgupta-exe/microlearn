@@ -69,7 +69,7 @@ const AdminLogin: React.FC = () => {
           </Link>
           <div className="flex items-center gap-2">
             <Users className="h-8 w-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Microlearn</h1>
+            <h1 className="text-2xl font-bold text-gray-900">MicroLearn</h1>
           </div>
         </div>
       </header>

@@ -182,7 +182,7 @@ const Home: React.FC = () => {
             <h3 className="text-3xl font-bold text-center mb-8 text-gray-900">About Microlearn</h3>
             <div className="max-w-4xl mx-auto text-center">
               <p className="text-lg text-gray-600 mb-6">
-                EduLearn is a revolutionary learning management platform that combines the power of 
+                MicroLearn is a revolutionary learning management platform that combines the power of 
                 micro-learning with the convenience of WhatsApp delivery. We believe that effective 
                 learning happens in small, consistent doses delivered at the right time.
               </p>
@@ -218,8 +218,8 @@ const Home: React.FC = () => {
                   <Mail className="h-6 w-6" />
                 </div>
                 <h4 className="text-xl font-semibold mb-2">Email Us</h4>
-                <p className="text-gray-300">support@edulearn.com</p>
-                <p className="text-gray-300">hello@edulearn.com</p>
+                <p className="text-gray-300">support@microlearn.com</p>
+                <p className="text-gray-300">hello@microlearn.com</p>
               </div>
               <div className="flex flex-col items-center">
                 <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mb-4">
@@ -248,9 +248,9 @@ const Home: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <GraduationCap className="h-6 w-6 text-blue-600" />
-              <span className="text-lg font-semibold text-gray-900">EduLearn</span>
+              <span className="text-lg font-semibold text-gray-900">MicroLearn</span>
             </div>
-            <p className="text-gray-600">© 2024 EduLearn. All rights reserved.</p>
+            <p className="text-gray-600">© 2025 MicroLearn. All rights reserved.</p>
           </div>
         </div>
       </footer>
