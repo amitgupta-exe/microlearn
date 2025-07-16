@@ -146,10 +146,11 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
       const { course_title, topic, goal, style, language } = values;
 
       // Extract text from PDF files
-      let pdfText = '';
+      let extractedPdfText = 'No specific context'; // Default value
       if (uploadedFiles.length > 0) {
         console.log('Processing uploaded files:', uploadedFiles.length);
-
+        
+        let pdfText = '';
         for (const file of uploadedFiles) {
           if (file.type === 'application/pdf') {
             const extractedText = await extractPdfText(file);
@@ -159,26 +160,37 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
           }
           // You can add DOCX processing here if needed using mammoth.js
         }
+        
+        // If we extracted any text, use it; otherwise keep default
+        if (pdfText.trim()) {
+          extractedPdfText = pdfText.trim();
+        }
       }
 
-      // Create FormData for multipart/form-data request
-      const formData = new FormData();
-      formData.append('topic', topic);
-      formData.append('goal', goal);
-      formData.append('style', style);
-      formData.append('language', language);
+      console.log('Extracted PDF text length:', extractedPdfText.length);
 
-      // If there's a file, append it
-      if (uploadedFiles.length > 0) {
-        formData.append('document', uploadedFiles[0]);
-      }
+      // Send as JSON instead of FormData since the backend expects JSON
+      const requestBody = {
+        extracted_pdf_text: extractedPdfText,
+        topic,
+        goal,
+        style,
+        language
+      };
 
-      console.log('Calling localhost API...');
+      console.log('Calling API with request body:', {
+        ...requestBody,
+        extracted_pdf_text: `${extractedPdfText.substring(0, 100)}${extractedPdfText.length > 100 ? '...' : ''}`
+      });
 
-      // Call localhost API
-      const response = await fetch('http://localhost:3000/api/generate-course', {
+      // Call API
+      const response = await fetch('http://localhost:3002/api/generate-course', {
+      // const response = await fetch('https://microlearn-backend-b2fba3bvbuejcehm.southindia-01.azurewebsites.net/api/generate-course', {
         method: 'POST',
-        body: formData, // Send as FormData for file upload
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -189,21 +201,22 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
       const courseData = await response.json();
       console.log('Generate course response:', courseData);
 
-      if (!courseData.success) {
-        throw new Error(courseData.error || 'Failed to generate course');
-      }
+      // if (!courseData.success) {
+      //   throw new Error(courseData.error || 'Failed to generate course');
+      // }
 
-      console.log('Course generated successfully:', courseData);
+      console.log('Course generated successfully:', courseData.text);
 
       // Store the generated course and form data
-      setGeneratedCourse(courseData.courseContent);
+      setGeneratedCourse(courseData.text);
       setFormData({
         course_title,
         topic,
         goal,
         style,
         language,
-        hasDocument: uploadedFiles.length > 0
+        hasDocument: uploadedFiles.length > 0,
+        extractedText: extractedPdfText !== 'No specific context' ? extractedPdfText.substring(0, 200) + '...' : 'No specific context'
       });
 
       toast.success('Course generated successfully! Review and save to database.');
@@ -213,7 +226,7 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
 
       let errorMessage = 'An error occurred while generating the course.';
       if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-        errorMessage = 'Network error. Please check if the localhost server is running on port 3000.';
+        errorMessage = 'Network error. Please check your internet connection.';
       } else {
         errorMessage = error.message;
       }
@@ -238,6 +251,7 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
 
       console.log('[DEBUG] Raw generated course:', generatedCourse);
 
+      // Parse the generated course content
       const match = generatedCourse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
       let jsonString;
       if (match) {
@@ -246,47 +260,88 @@ const CoursePromptForm: React.FC<CoursePromptFormProps> = ({
         const braceMatch = generatedCourse.match(/\{[\s\S]*\}/);
         jsonString = braceMatch ? braceMatch[0] : null;
       }
-      if (!jsonString) {
-        console.log("cant extract");
 
+      if (!jsonString) {
+        console.log("Can't extract JSON - saving as plain text");
+        // Save as plain text if no JSON structure found
+        const { error: courseInsertError } = await supabase
+          .from('courses')
+          .insert({
+            id: crypto.randomUUID(),
+            course_name: formData.course_title,
+            origin: 'microlearn_cop',
+            created_by: user?.id,
+            request_id: courseId,
+            course_data: generatedCourse,
+            visibility: 'public',
+            status: 'approved',
+            day: 1,
+            module_1: generatedCourse,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (courseInsertError) {
+          throw new Error('Failed to save course');
+        }
+
+        toast.success('Course saved to database successfully!');
+        resetForm();
+        return;
       }
+
+      // Parse JSON
       let course;
       try {
-        jsonString = jsonString.trim();
+        // Clean the JSON string before parsing
+        jsonString = jsonString.trim()
+          .replace(/[\x00-\x1F\x7F-\x9F]/g, '') // Remove control characters
+          .replace(/\\/g, '\\\\') // Escape backslashes
+          .replace(/"/g, '"'); // Normalize quotes
+      
         course = JSON.parse(jsonString);
       } catch (e) {
-        console.error('[Webhook] Failed to parse extracted JSON from OpenAI:', e, 'Original jsonString snippet:', jsonString.substring(0, 500));
-
+        console.error('Failed to parse JSON:', e);
+        throw new Error('Failed to parse course structure');
       }
 
-
+      // Insert each day and module into courses
       let dayNum = 1;
       for (const dayKey of Object.keys(course)) {
         const modules = course[dayKey];
         const insertObj = {
-          id: crypto.randomUUID(), // unique row id for each module/day
+          id: crypto.randomUUID(),
           request_id: courseId,
-          course_name: formData.topic,
+          course_name: formData.course_title,
           visibility: "public",
-          origin: "cop",
+          origin: "microlearn_cop",
+          status: "approved",
           day: dayNum,
           module_1: modules[`Day ${dayNum} - Module 1`] ? modules[`Day ${dayNum} - Module 1`]["content"] : null,
           module_2: modules[`Day ${dayNum} - Module 2`] ? modules[`Day ${dayNum} - Module 2`]["content"] : null,
           module_3: modules[`Day ${dayNum} - Module 3`] ? modules[`Day ${dayNum} - Module 3`]["content"] : null,
-          created_by: user?.id || null
+          created_by: user?.id || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
+
         const { data, error } = await supabase.from('courses').insert([insertObj]).select();
         if (error) {
           console.error(`Supabase insert error on day ${dayNum}:`, error);
-          return;
+          throw new Error(`Failed to save day ${dayNum}`);
         }
         dayNum++;
       }
-    } catch {
 
+      toast.success(`Course saved successfully! (${dayNum - 1} days created)`);
+      resetForm();
+
+    } catch (error: any) {
+      console.error("Error saving course:", error);
+      toast.error(error.message || "Failed to save course to database");
+    } finally {
+      setIsSaving(false);
     }
-
-
   };
 
   // Helper function to reset form state
